@@ -3,19 +3,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include "csvLoader.h"
 
 /* ---- 설정 ---- */
 #define LINE_BUF  4096
 #define MAX_COLS  1024
 
-/* ---- 데이터 테이블 ---- */
-typedef struct {
-    int   rowCount;   /* 데이터 행 수 (헤더 제외) */
-    int   colCount;   /* 열 수 */
-    char** header;    /* [colCount] 헤더 문자열 */
-    int* id;         /* [rowCount] 각 행의 첫 열을 정수화한 값 */
-    char*** cell;     /* [rowCount][colCount] 문자열(0열 포함) */
-} CsvTable;
+CsvTable csvTables[CSV_TABLE_MAX];
+char* csvTableNames[CSV_TABLE_MAX];
+static int CSV_COUNT = 0;
 
 /* ---- 내부 헬퍼(간단) ---- */
 /* 문자열을 복제해서 새 메모리에 할당 */
@@ -64,9 +60,7 @@ static int splitSimpleCsv(char* lineBuf, char** fields, int maxFields) {
 /* ---- 로드: 파일 전체를 메모리에 올림 ----
    path 의 CSV를 읽어 CsvTable *table 에 채운다.
    성공 1, 실패 0 */
-int csvLoadAll(const char* path, CsvTable* table) {
-    if (!path || !table) return 0;
-    memset(table, 0, sizeof(*table));
+int csvLoadAll(const char* path) {
 
     FILE* fp;
     errno_t err = fopen_s(&fp, path, "rb");
@@ -87,20 +81,21 @@ int csvLoadAll(const char* path, CsvTable* table) {
     char* headerFields[MAX_COLS];
     int colCount = splitSimpleCsv(lineBuf, headerFields, MAX_COLS);
 
-    table->colCount = colCount;
-    table->header = (char**)malloc(colCount * sizeof(char*));
+    CsvTable table;
+    table.colCount = colCount;
+    table.header = (char**)malloc(colCount * sizeof(char*));
     for (int colIndex = 0; colIndex < colCount; colIndex++)
-        table->header[colIndex] = dupStr(headerFields[colIndex]);
+        table.header[colIndex] = dupStr(headerFields[colIndex]);
 
     /* 2) 데이터 행 수 파악 */
     long afterHeaderPos = ftell(fp);
     int rowCount = 0;
     while (fgets(lineBuf, sizeof(lineBuf), fp)) rowCount++;
-    table->rowCount = rowCount;
+    table.rowCount = rowCount;
 
     /* 3) 메모리 할당 & 재파싱 */
-    table->id = (int*)malloc(rowCount * sizeof(int));
-    table->cell = (char***)malloc(rowCount * sizeof(char**));
+    table.id = (int*)malloc(rowCount * sizeof(int));
+    table.cell = (char***)malloc(rowCount * sizeof(char**));
 
     fseek(fp, afterHeaderPos, SEEK_SET);
     int rowIndex = 0;
@@ -114,18 +109,28 @@ int csvLoadAll(const char* path, CsvTable* table) {
             fieldCount = colCount;
         }
 
-        table->cell[rowIndex] = (char**)malloc(colCount * sizeof(char*));
+        table.cell[rowIndex] = (char**)malloc(colCount * sizeof(char*));
         for (int colIndex = 0; colIndex < colCount; colIndex++) {
-            table->cell[rowIndex][colIndex] = dupStr(rowFields[colIndex]);
+            table.cell[rowIndex][colIndex] = dupStr(rowFields[colIndex]);
         }
 
         /* 첫 컬럼을 id로 */
         {
-            unsigned char* u = (unsigned char*)table->cell[rowIndex][0];
-            table->id[rowIndex] = atoi(table->cell[rowIndex][0]);
+            unsigned char* u = (unsigned char*)table.cell[rowIndex][0];
+            table.id[rowIndex] = atoi(table.cell[rowIndex][0]);
         }
         rowIndex++;
     }
+
+
+    size_t len = strlen(path);
+    char* buffer = (char*)malloc(len + 1);
+    if (buffer) {
+        strcpy_s(buffer, len + 1, path);
+    }
+    csvTableNames[CSV_COUNT] = buffer;
+    csvTables[CSV_COUNT] = table;
+    ++CSV_COUNT;
 
     fclose(fp);
     return 1;
@@ -133,29 +138,39 @@ int csvLoadAll(const char* path, CsvTable* table) {
 
 /* ---- 조회: (메모리에 이미 로드된 테이블에서) id + header명으로 값 얻기 ----
    성공 1(문자열 out으로 복사), 실패 0 */
-int csvGetValueInTable(const CsvTable* table, int wantedId,
+int csvGetValueInTable(const char* path, int wantedId,
     const char* headerName,
     char* out, size_t outSize)
 {
-    if (!table || !headerName || !out || outSize == 0) return 0;
+    if (!path || !headerName || !out || outSize == 0) return 0;
 
-    /* 1) 열 인덱스 찾기 */
+    // 1) 테이블 찾기
+    const CsvTable* t = NULL;
+    for (size_t i = 0; i < CSV_COUNT; ++i) {
+        if (strcmp(path, csvTableNames[i]) == 0) {  // 같으면 0
+            t = &csvTables[i];                      // 포인터로 직접 참조
+            break;
+        }
+    }
+    if (!t) return 0;  // 못 찾음
+
+    // 2) 열 인덱스 찾기
     int targetCol = -1;
-    for (int colIndex = 0; colIndex < table->colCount; colIndex++) {
-        if (strcmp(table->header[colIndex], headerName) == 0) {
+    for (int colIndex = 0; colIndex < t->colCount; ++colIndex) {
+        if (strcmp(t->header[colIndex], headerName) == 0) {
             targetCol = colIndex;
             break;
         }
     }
     if (targetCol < 0) return 0;
 
-    /* 2) 행 찾기 (선형 탐색) */
-    for (int rowIndex = 0; rowIndex < table->rowCount; rowIndex++) {
-        if (table->id[rowIndex] == wantedId) {
-            const char* src = table->cell[rowIndex][targetCol];
+    // 3) 행(원하는 id) 찾기
+    for (int rowIndex = 0; rowIndex < t->rowCount; ++rowIndex) {
+        if (t->id[rowIndex] == wantedId) {
+            const char* src = t->cell[rowIndex][targetCol];
             if (!src) src = "";
+            // 목적지 크기를 outSize로 넘기고, 자동 널종료에 맡김
             strncpy_s(out, outSize, src, _TRUNCATE);
-            out[outSize - 1] = '\0';
             return 1;
         }
     }

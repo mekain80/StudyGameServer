@@ -1,6 +1,6 @@
 #pragma once
-
 #include <stddef.h> /* size_t */
+#define CSV_TABLE_MAX		10
 
 /* ---- 데이터 테이블 ----
    rowCount : 데이터 행 수(헤더 제외)
@@ -24,7 +24,7 @@ typedef struct {
    - 규칙: 첫 행=헤더, 첫 열=id(정수)
    - 메모리는 csvFreeTable로 해제해야 함
 ----------------------------------------------------------- */
-int csvLoadAll(const char* path, CsvTable* table);
+int csvLoadAll(const char* path);
 
 /* -----------------------------------------------------------
    csvGetValueInTable
@@ -32,11 +32,11 @@ int csvLoadAll(const char* path, CsvTable* table);
    - out/outSize: 결과 문자열을 복사받을 버퍼/크기
    - 성공 시 1, 실패 시 0
 ----------------------------------------------------------- */
-int csvGetValueInTable(const CsvTable* table,
+int csvGetValueInTable(const char* path,
     int            wantedId,
     const char* headerName,
-    char* out,
-    size_t         outSize);
+    char* out, 
+    size_t outSize);
 
 /* -----------------------------------------------------------
    csvFreeTable
