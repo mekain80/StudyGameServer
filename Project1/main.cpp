@@ -259,7 +259,7 @@ void titleScene() {
 	// 2. 로직부 
 
 	// 3. 랜더부
-	char startStr[] = "게임을 시작하려면 A키를 눌러주세요.";
+	char startStr[] = "Press the A key to start the game.";
 	for (size_t i = 0; i < strlen(startStr); i++) {
 		Sprite_Draw(i, 0, startStr[i]);
 	}
