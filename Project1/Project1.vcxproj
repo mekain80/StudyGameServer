@@ -124,11 +124,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Console.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="..\..\..\..\..\..\Downloads\Console.cpp" />
+    <ClCompile Include="..\..\..\..\..\..\Downloads\main.cpp" />
+    <ClCompile Include="player.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Console.h" />
+    <ClInclude Include="..\..\..\..\..\..\Downloads\Console.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="stage.csv" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
