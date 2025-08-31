@@ -68,9 +68,10 @@ int csvLoadAll(const char* path, CsvTable* table) {
     if (!path || !table) return 0;
     memset(table, 0, sizeof(*table));
 
-    FILE* fp = fopen(path, "rb");
-    if (!fp) {
-        perror("fopen");
+    FILE* fp;
+    errno_t err = fopen_s(&fp, path, "rb");
+    if (err != 0) {
+        perror("fopen_s");
         return 0;
     }
 
@@ -153,7 +154,7 @@ int csvGetValueInTable(const CsvTable* table, int wantedId,
         if (table->id[rowIndex] == wantedId) {
             const char* src = table->cell[rowIndex][targetCol];
             if (!src) src = "";
-            strncpy(out, src, outSize - 1);
+            strncpy_s(out, outSize, src, _TRUNCATE);
             out[outSize - 1] = '\0';
             return 1;
         }

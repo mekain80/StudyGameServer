@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include "Console.h"
 #include <stdlib.h> 
+#include "csvLoader.h" 
 #pragma comment(lib, "winmm.lib")
 
 enum gameState { TITLE, PLAY, GAMEOVER };
