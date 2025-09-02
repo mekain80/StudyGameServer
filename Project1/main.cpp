@@ -21,8 +21,10 @@ const double FRAME_TIME_SEC = 1.0 / FPS;
 
 
 int STAGE = 1;
-bool isStageBegin = true;
-
+int LOGIC_FPS_CNT = 0;
+int RENDER_FPS_CNT = 0;
+bool IS_STAGE_BEGIN = true;
+LARGE_INTEGER freq, startTime;
 
 struct Player
 {
@@ -135,11 +137,10 @@ void Sprite_Draw(int iX, int iY, char chSprite);
 void main(void)
 {
 	timeBeginPeriod(1);
-	LARGE_INTEGER freq;
 	QueryPerformanceFrequency(&freq);
+	QueryPerformanceCounter(&startTime);
 
-	LARGE_INTEGER start, end;
-	QueryPerformanceCounter(&start);
+	LARGE_INTEGER end;
 
 	cs_Initial();
 
@@ -152,7 +153,6 @@ void main(void)
 		Buffer_Clear();
 		switch (GAME_STATE)
 		{
-			// 1. 게임 타이틀
 		case TITLE:
 			titleScene();
 			break;
@@ -186,7 +186,7 @@ void main(void)
 
 			// 프레임 맞추기용 대기 Sleep(X)
 		QueryPerformanceCounter(&end);
-		double elapsed = static_cast<double>(end.QuadPart - start.QuadPart) / freq.QuadPart;
+		double elapsed = static_cast<double>(end.QuadPart - startTime.QuadPart) / freq.QuadPart;
 
 		if (elapsed < FRAME_TIME_SEC) {
 			// 남은 시간(초 → 밀리초)
@@ -194,7 +194,7 @@ void main(void)
 			Sleep(sleepTime);
 		}
 		// 기준 시간 갱신 (틱 단위로)
-		start.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
 
 		Buffer_Flip();
 	}
@@ -252,22 +252,39 @@ void Sprite_Draw(int iX, int iY, char chSprite)
 
 
 void titleScene() {
+	LARGE_INTEGER logicBeginTicks;
+	QueryPerformanceCounter(&logicBeginTicks);
+
 	// 1. 키보드 입력부
 	if (GetAsyncKeyState('A') != 0x00) {
 		GAME_STATE = PLAY;
 	}
 	// 2. 로직부 
+	++LOGIC_FPS_CNT;
 
 	// 3. 랜더부
+
+	// 한 프레임 이상 지연된 경우, 프레임 스킵
+	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
+	if (FRAME_TIME_SEC < secsSinceLastFrame) {
+		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+		return;
+	}
+
 	char startStr[] = "Press the A key to start the game.";
 	for (size_t i = 0; i < strlen(startStr); i++) {
 		Sprite_Draw(i, 0, startStr[i]);
 	}
+	++RENDER_FPS_CNT;
 }
 
 void playScene() {
+	LARGE_INTEGER logicBeginTicks;
+	QueryPerformanceCounter(&logicBeginTicks);
+
+
 	// 스테이지 시작 판정
-	if (isStageBegin == true) {
+	if (IS_STAGE_BEGIN == true) {
 		player.hp = PLAYER_MAX_HP;
 		player.isVisible = true;
 		player.x = PLAYER_START_POS_X;
@@ -287,7 +304,7 @@ void playScene() {
 			bullets[i].isVisible = false;
 		}
 
-		isStageBegin = false;
+		IS_STAGE_BEGIN = false;
 	}
 
 
@@ -382,10 +399,16 @@ void playScene() {
 			}
 		}
 	}
+	++LOGIC_FPS_CNT;
 
 
 
 	// 3. 랜더부
+	// 한 프레임 이상 지연된 경우, 프레임 스킵
+	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
+	if (FRAME_TIME_SEC < secsSinceLastFrame) {
+		return;
+	}
 	Sprite_Draw(player.x, player.y, 'A');
 	for (size_t i = 0; i < MAX_ENEMY; i++)
 	{
@@ -401,11 +424,27 @@ void playScene() {
 			Sprite_Draw(bullets[i].x, bullets[i].y, 'I');
 		}
 	}
+	++RENDER_FPS_CNT;
 }
 
 void gameoverScene()
 {
-	isStageBegin = true;
+	LARGE_INTEGER logicBeginTicks;
+	QueryPerformanceCounter(&logicBeginTicks);
+
+	// 1. 키보드 입력부
+	// 2. 로직부
+	IS_STAGE_BEGIN = true;
 	GAME_STATE = TITLE;
+	++LOGIC_FPS_CNT;
+
+	// 3. 랜더부
+	// 한 프레임 이상 지연된 경우, 프레임 스킵
+	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
+	if (FRAME_TIME_SEC < secsSinceLastFrame) {
+		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+		return;
+	}
+	++RENDER_FPS_CNT;
 }
 
