@@ -453,7 +453,7 @@ void gameoverScene()
 
 void testFps() { // main으로 대체해서 test
 	LARGE_INTEGER windowStart; // FPS 집계 기준
-	int logic_fps, render_fps;
+	int logic_fps = 0, render_fps = 0;
 
 	timeBeginPeriod(1);
 	QueryPerformanceFrequency(&freq);
