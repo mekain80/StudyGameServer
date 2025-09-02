@@ -56,6 +56,9 @@ void titleScene();
 void playScene();
 void gameoverScene();
 
+
+void frameTest();
+
 //--------------------------------------------------------------------
 // 화면 깜빡임을 없애기 위한 화면 버퍼.
 // 게임이 진행되는 상황을 매번 화면을 지우고 비행기 찍고, 지우고 찍고,
@@ -448,3 +451,57 @@ void gameoverScene()
 	++RENDER_FPS_CNT;
 }
 
+void testFps() { // main으로 대체해서 test
+	LARGE_INTEGER windowStart; // FPS 집계 기준
+	int logic_fps, render_fps;
+
+	timeBeginPeriod(1);
+	QueryPerformanceFrequency(&freq);
+	QueryPerformanceCounter(&startTime);
+	QueryPerformanceCounter(&windowStart);
+
+	LARGE_INTEGER start, end;
+
+
+	while (true) {
+		QueryPerformanceCounter(&start);
+
+		double checkOneSec = static_cast<double>(startTime.QuadPart - windowStart.QuadPart) / freq.QuadPart;
+		if (1 < checkOneSec) {
+			printf("logic FPS: %d, Render FPS: %d\n", LOGIC_FPS_CNT - logic_fps, RENDER_FPS_CNT - render_fps);
+			logic_fps = LOGIC_FPS_CNT;
+			render_fps = RENDER_FPS_CNT;
+			QueryPerformanceCounter(&windowStart);
+		}
+
+		// 1. 로직
+		for (volatile size_t i = 0; i < 10000; i++)
+		{
+			for (volatile size_t j = 0; j < 100; j++) {
+				// busy waiting
+			}
+		}
+		++LOGIC_FPS_CNT;
+
+		// 한 프레임 이상 지연된 경우, 프레임 스킵
+		LARGE_INTEGER logicEndTicks;
+		QueryPerformanceCounter(&logicEndTicks);
+		const double secsSinceLastFrame = static_cast<double>(start.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
+		if (FRAME_TIME_SEC < secsSinceLastFrame) {
+			startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+			continue;
+		}
+
+		// 2. 렌더
+		QueryPerformanceCounter(&end);
+		double elapsed = static_cast<double>(end.QuadPart - startTime.QuadPart) / freq.QuadPart;
+		if (elapsed < FRAME_TIME_SEC) {
+			// 남은 시간(초 → 밀리초)
+			DWORD sleepTime = static_cast<DWORD>((FRAME_TIME_SEC - elapsed) * 1000.0);
+			Sleep(sleepTime);
+		}
+		// 기준 시간 갱신 (틱 단위로)
+		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+		++RENDER_FPS_CNT;
+	}
+}
