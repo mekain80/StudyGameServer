@@ -3,6 +3,7 @@
 #define CSV_TABLE_MAX		10
 
 /* ---- 데이터 테이블 ----
+   fileName : 파일 이름
    rowCount : 데이터 행 수(헤더 제외)
    colCount : 열 수
    header   : [colCount] 헤더 문자열 배열(힙 할당)
@@ -10,6 +11,7 @@
    cell     : [rowCount][colCount] 각 셀 문자열(힙 할당)
 */
 typedef struct {
+    char* fileName;
     int    rowCount;
     int    colCount;
     char** header;
@@ -28,12 +30,12 @@ int csvLoadAll(const char* path);
 
 /* -----------------------------------------------------------
    csvGetValueInTable
-   - 이미 메모리에 로드된 테이블에서 (wantedId, headerName)으로 값을 조회
+   - 이미 메모리에 로드된 테이블에서 (id, headerName)으로 값을 조회
    - out/outSize: 결과 문자열을 복사받을 버퍼/크기
    - 성공 시 1, 실패 시 0
 ----------------------------------------------------------- */
 int csvGetValueInTable(const char* path,
-    int            wantedId,
+    int            id,
     const char* headerName,
     char* out, 
     size_t outSize);
@@ -44,3 +46,11 @@ int csvGetValueInTable(const char* path,
    - 호출 후 table 필드들은 무효화됨(포인터는 해제됨)
 ----------------------------------------------------------- */
 void csvFreeTable(CsvTable* table);
+
+/* -----------------------------------------------------------
+   getCsvTable
+   - csvTable을 반환
+----------------------------------------------------------- */
+CsvTable getCsvTable(const char* path);
+
+int* getCsvIdArray(const char* path, size_t& size);

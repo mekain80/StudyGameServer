@@ -10,7 +10,6 @@
 #define MAX_COLS  1024
 
 CsvTable csvTables[CSV_TABLE_MAX];
-char* csvTableNames[CSV_TABLE_MAX];
 static int CSV_COUNT = 0;
 
 /* ---- 내부 헬퍼(간단) ---- */
@@ -61,6 +60,12 @@ static int splitSimpleCsv(char* lineBuf, char** fields, int maxFields) {
    path 의 CSV를 읽어 CsvTable *table 에 채운다.
    성공 1, 실패 0 */
 int csvLoadAll(const char* path) {
+    for (size_t i = 0; i < CSV_COUNT; i++)
+    {
+       if (strcmp(csvTables[i].fileName, path) == 0) {
+            return 1;
+       }
+    }
 
     FILE* fp;
     errno_t err = fopen_s(&fp, path, "rb");
@@ -128,7 +133,7 @@ int csvLoadAll(const char* path) {
     if (buffer) {
         strcpy_s(buffer, len + 1, path);
     }
-    csvTableNames[CSV_COUNT] = buffer;
+    table.fileName = buffer;
     csvTables[CSV_COUNT] = table;
     ++CSV_COUNT;
 
@@ -138,7 +143,7 @@ int csvLoadAll(const char* path) {
 
 /* ---- 조회: (메모리에 이미 로드된 테이블에서) id + header명으로 값 얻기 ----
    성공 1(문자열 out으로 복사), 실패 0 */
-int csvGetValueInTable(const char* path, int wantedId,
+int csvGetValueInTable(const char* path, int id,
     const char* headerName,
     char* out, size_t outSize)
 {
@@ -147,9 +152,19 @@ int csvGetValueInTable(const char* path, int wantedId,
     // 1) 테이블 찾기
     const CsvTable* t = NULL;
     for (size_t i = 0; i < CSV_COUNT; ++i) {
-        if (strcmp(path, csvTableNames[i]) == 0) {  // 같으면 0
+        if (strcmp(path, csvTables[i].fileName) == 0) {  // 같으면 0
             t = &csvTables[i];                      // 포인터로 직접 참조
             break;
+        }
+    }
+    bool loadCsv = csvLoadAll(path);
+    if (loadCsv) {
+        // TODO 개선 필요... (획득한 csvTable 바로 찾을 수 있게)
+        for (size_t i = 0; i < CSV_COUNT; ++i) {
+            if (strcmp(path, csvTables[i].fileName) == 0) {  // 같으면 0
+                t = &csvTables[i];                      // 포인터로 직접 참조
+                break;
+            }
         }
     }
     if (!t) return 0;  // 못 찾음
@@ -166,7 +181,7 @@ int csvGetValueInTable(const char* path, int wantedId,
 
     // 3) 행(원하는 id) 찾기
     for (int rowIndex = 0; rowIndex < t->rowCount; ++rowIndex) {
-        if (t->id[rowIndex] == wantedId) {
+        if (t->id[rowIndex] == id) {
             const char* src = t->cell[rowIndex][targetCol];
             if (!src) src = "";
             // 목적지 크기를 outSize로 넘기고, 자동 널종료에 맡김
@@ -197,6 +212,24 @@ void csvFreeTable(CsvTable* table) {
     free(table->id);
 }
 
+CsvTable getCsvTable(const char* path) {
+    for (size_t i = 0; i < CSV_COUNT; i++)
+    {
+        if (strcmp(csvTables[i].fileName, path) == 0) {
+            return csvTables[i];
+        }
+    }
+}
+
+int* getCsvIdArray(const char* path, size_t &size) {
+    for (size_t i = 0; i < CSV_COUNT; i++)
+    {
+        if (strcmp(csvTables[i].fileName, path) == 0) {
+            size = csvTables[i].rowCount;
+            return csvTables[i].id;
+        }
+    }
+}
 
 /* ---- 예시 ----
 #define DEMO

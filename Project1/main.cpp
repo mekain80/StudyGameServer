@@ -6,27 +6,33 @@
 #include "csvLoader.h" 
 #pragma comment(lib, "winmm.lib")
 
-enum gameState { TITLE, PLAY, GAMEOVER };
+enum gameState { TITLE, LOADING, PLAY, GAMEOVER };
 gameState GAME_STATE;
 
 const int MAX_ENEMY = 1000;
 const int MAX_BULLET = 100;
 const int BULLET_DEMAGE = 1;
 const int PLAYER_MAX_HP = 5;
+const char PLAYER_SHAPE = 'A';
+const char BULLET_SHAPE = 'I';
+const int MAX_PATTERN_CNT = 10;
 const int PLAYER_START_POS_X = dfSCREEN_WIDTH / 2;
 const int PLAYER_START_POS_Y = dfSCREEN_HEIGHT - 1;
 const int FPS = 50;
 const double FRAME_TIME = 1000 / FPS; // 1프레임 = 약 20ms
 const double FRAME_TIME_SEC = 1.0 / FPS;
 const int PLAYER_SPEED = 2;
-const int PLAYER_ATTACK_SPEED = 8;
+const int PLAYER_ATTACK_SPEED = 1; // TODO 약 8로 조정, 현재는 테스트를 위해 1로 설정
 const int PLAYER_BULLET_SPEED = 2;
 
-int STAGE = 1;
+int STAGE = 0;
 int LOGIC_FPS_CNT = 0;
 int RENDER_FPS_CNT = 0;
 bool IS_STAGE_BEGIN = true;
 LARGE_INTEGER freq, startTime;
+const char* STAGE_INFO = "stage_info.csv";
+const char* ENEMY_INFO = "enemy_info.csv";
+
 
 struct Player
 {
@@ -34,14 +40,22 @@ struct Player
 	int x, y;
 	bool isVisible = false;
 	int movedTick = 0;
-	int attackedTick = 0;
+	int atkedTick = 0;
 };
 
 struct Enemy
 {
 	int hp;
 	int x, y;
+	int type;
 	bool isVisible = false;
+	int moveSpeed = 0;
+	int atkSpeed = 0;
+	int currMovePattern = 0; 
+	//char atkPattern[MAX_PATTERN_CNT] = "";
+	int movedTick = 0;
+	int atkedTick = 0;
+	char shape = '\0'; // 그냥 테이블 값 볼까요?
 };
 
 struct Bullet
@@ -49,7 +63,7 @@ struct Bullet
 	int x, y;
 	bool isEnemy;
 	bool isVisible = false;
-	int speed = 5;
+	int speed = 5;	// TODO 총알 별로 속도 조정
 	int movedTick = 0;
 };
 
@@ -59,6 +73,7 @@ Enemy enemies[MAX_ENEMY];
 Bullet bullets[MAX_BULLET];
 
 void titleScene();
+void loadingScene();
 void playScene();
 void gameoverScene();
 
@@ -165,7 +180,9 @@ void main(void)
 		case TITLE:
 			titleScene();
 			break;
-
+		case LOADING:
+			loadingScene();
+			break;
 		case PLAY:
 			playScene();
 			break;
@@ -266,7 +283,7 @@ void titleScene() {
 
 	// 1. 키보드 입력부
 	if (GetAsyncKeyState('A') != 0x00) {
-		GAME_STATE = PLAY;
+		GAME_STATE = LOADING;
 	}
 	// 2. 로직부 
 	++LOGIC_FPS_CNT;
@@ -287,6 +304,46 @@ void titleScene() {
 	++RENDER_FPS_CNT;
 }
 
+void loadingScene() {
+	LARGE_INTEGER logicBeginTicks;
+	QueryPerformanceCounter(&logicBeginTicks);
+
+	// 1. 키보드 입력부
+
+	// 2. 로직부 
+	char stage_name[256];
+	if (IS_STAGE_BEGIN == true) {
+		++STAGE;
+		if (csvGetValueInTable(STAGE_INFO, STAGE, "stage_name", stage_name, sizeof(stage_name))) {
+			csvLoadAll(stage_name);
+		}
+		csvLoadAll(ENEMY_INFO);
+		IS_STAGE_BEGIN = false;
+	}
+
+	// 스테이지까지 불러왔는지 확인 해야되는데... 일단 PASS
+	bool a = csvLoadAll(STAGE_INFO);
+	bool b = csvLoadAll(ENEMY_INFO);
+	if (csvLoadAll(STAGE_INFO) && csvLoadAll(ENEMY_INFO)) {
+		IS_STAGE_BEGIN = true;
+		GAME_STATE = PLAY;
+		return;
+	}
+
+	// 한 프레임 이상 지연된 경우, 프레임 스킵
+	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
+	if (FRAME_TIME_SEC < secsSinceLastFrame) {
+		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+		return;
+	}
+
+	// 3. 랜더부
+	char startStr[] = "NOW LOADING...";
+	for (size_t i = 0; i < strlen(startStr); i++) {
+		Sprite_Draw(i, 0, startStr[i]);
+	}
+}
+
 void playScene() {
 	LARGE_INTEGER logicBeginTicks;
 	QueryPerformanceCounter(&logicBeginTicks);
@@ -299,12 +356,33 @@ void playScene() {
 		player.x = PLAYER_START_POS_X;
 		player.y = PLAYER_START_POS_Y;
 
-		// csv 파일로 대체 필요
-		for (size_t i = 0; i < 22; i++)
+		char stageName[256];
+		csvGetValueInTable(STAGE_INFO, STAGE, "stage_name", stageName, sizeof(stageName));
+		csvLoadAll(stageName);
+
+		size_t enemyIArraySize;
+		int* enemyInfoArray = getCsvIdArray(stageName, enemyIArraySize);
+		for (size_t i = 0; i < enemyIArraySize; i++)
 		{
-			enemies[i].hp = 1;
-			enemies[i].x = (i % 10) * 2;
-			enemies[i].y = 2 * (i / 10) + 1;
+			int id = enemyInfoArray[i];
+			char buf[256];
+			csvGetValueInTable(stageName, id, "x", buf, sizeof(buf));
+			enemies[i].x = atoi(buf);
+			csvGetValueInTable(stageName, id, "y", buf, sizeof(buf));
+			enemies[i].y = atoi(buf);
+			csvGetValueInTable(stageName, id, "type", buf, sizeof(buf));
+			int type = atoi(buf);
+			enemies[i].type = type;
+
+			csvGetValueInTable(ENEMY_INFO, type, "hp", buf, sizeof(buf));
+			enemies[i].hp = atoi(buf);
+			csvGetValueInTable(ENEMY_INFO, type, "move_speed", buf, sizeof(buf));
+			enemies[i].moveSpeed = atoi(buf);
+			csvGetValueInTable(ENEMY_INFO, type, "atk_speed", buf, sizeof(buf));
+			enemies[i].atkSpeed = atoi(buf);
+			csvGetValueInTable(ENEMY_INFO, type, "shape", buf, sizeof(buf));
+			enemies[i].shape = buf[0];
+
 			enemies[i].isVisible = true;
 		}
 
@@ -353,15 +431,15 @@ void playScene() {
 	}
 
 	
-	if (GetAsyncKeyState('Z') != 0 and player.attackedTick + PLAYER_ATTACK_SPEED < LOGIC_FPS_CNT) {
+	if (GetAsyncKeyState('Z') != 0 and player.atkedTick + PLAYER_ATTACK_SPEED < LOGIC_FPS_CNT) {
 		for (size_t i = 0; i < MAX_BULLET; i++)
 		{
 			if (bullets[i].isVisible == false) {
 				bullets[i].isVisible = true;
 				bullets[i].x = player.x;
-				bullets[i].y = player.y;
+				bullets[i].y = player.y - 1;
 				bullets[i].isEnemy = false;
-				player.attackedTick = LOGIC_FPS_CNT;
+				player.atkedTick = LOGIC_FPS_CNT;
 				break;
 			}
 		}
@@ -369,6 +447,98 @@ void playScene() {
 
 
 	// 2. 로직부	
+	// 적의 이동 & 공격
+	bool isClear = true;
+	for (size_t i = 0; i < MAX_ENEMY; i++)
+	{
+		if (enemies[i].isVisible) {
+			isClear = false;
+			if (enemies[i].movedTick + enemies[i].moveSpeed < LOGIC_FPS_CNT) {
+
+				int type = enemies[i].type;
+				char movePattern[MAX_PATTERN_CNT] = "";
+				csvGetValueInTable(ENEMY_INFO, type, "move_pattern", movePattern, sizeof(movePattern));
+				
+				int nx = 0, ny = 0;
+				switch (movePattern[enemies[i].currMovePattern])
+				{
+				case 'w':
+					ny = enemies[i].y - 1;
+					break;
+				case 'a':
+					nx = enemies[i].x - 1;
+					break;
+				case 'x':
+					ny = enemies[i].y + 1;
+					break;
+				case 'd':
+					nx = enemies[i].x + 1;
+					break;
+				case 'q':
+					nx = enemies[i].x - 1;
+					ny = enemies[i].y - 1;
+					break;
+				case 'e':
+					nx = enemies[i].x + 1;
+					ny = enemies[i].y - 1;
+					break;
+				case 'z':
+					nx = enemies[i].x - 1;
+					ny = enemies[i].y + 1;
+					break;
+				case 'c':
+					nx = enemies[i].x + 1;
+					ny = enemies[i].y + 1;
+					break;
+				case 's':
+					nx = enemies[i].x;
+					ny = enemies[i].y;
+					break;
+				default:
+					printf("\n%s\n", movePattern);
+					perror("move pattrean error");
+					break;
+				}
+
+				// 이동 가능 범위일 때만
+				if (0 < ny && ny < dfSCREEN_HEIGHT && 0 < nx && nx < dfSCREEN_WIDTH) {
+					enemies[i].x = nx;
+					enemies[i].y = ny;
+				}
+
+				++enemies[i].currMovePattern;
+				if (movePattern[enemies[i].currMovePattern] == '\0') {
+					enemies[i].currMovePattern = 0;
+				}
+
+				enemies[i].movedTick = LOGIC_FPS_CNT;
+			}
+
+			if (enemies[i].atkedTick + enemies[i].atkSpeed < LOGIC_FPS_CNT) {
+				for (size_t j = 0; j < MAX_BULLET; j++)
+				{
+					if (bullets[j].isVisible == false) {
+						bullets[j].isVisible = true;
+						bullets[j].x = enemies[j].x;
+						bullets[j].y = enemies[j].y + 1;
+						bullets[j].isEnemy = true;
+
+						enemies[i].atkedTick = LOGIC_FPS_CNT;
+						break;
+					}
+				}
+			}
+		}
+
+
+	}
+	if (isClear) {
+		IS_STAGE_BEGIN = true;
+		GAME_STATE = LOADING;
+		// 다음 스테이지 있는지 확인 필요
+		return; // TODO 클리어 바로 리턴..?
+	}
+
 	for (size_t i = 0; i < MAX_BULLET; i++)
 	{
 		if (bullets[i].isVisible) {
@@ -436,22 +606,22 @@ void playScene() {
 	if (FRAME_TIME_SEC < secsSinceLastFrame) {
 		return;
 	}
-	Sprite_Draw(player.x, player.y, 'A');
+	Sprite_Draw(player.x, player.y, PLAYER_SHAPE);
 	for (size_t i = 0; i < MAX_ENEMY; i++)
 	{
 		if (enemies[i].isVisible) {
-			char buf[16] = { 0 };               // hp가 충분히 들어갈 버퍼
-			_itoa_s(enemies[i].hp, buf, 10);  // MSVC 안전 함수 (10진수)
-			Sprite_Draw(enemies[i].x, enemies[i].y, buf[0]);
+			Sprite_Draw(enemies[i].x, enemies[i].y, enemies[i].shape);
 		}
 	}
 	for (size_t i = 0; i < MAX_BULLET; i++)
 	{
 		if (bullets[i].isVisible) {
-			Sprite_Draw(bullets[i].x, bullets[i].y, 'I');
+			Sprite_Draw(bullets[i].x, bullets[i].y, BULLET_SHAPE);
 		}
 	}
 	++RENDER_FPS_CNT;
+
+	printf("STAGE : %d", STAGE);
 }
 
 void gameoverScene()
@@ -459,18 +629,25 @@ void gameoverScene()
 	LARGE_INTEGER logicBeginTicks;
 	QueryPerformanceCounter(&logicBeginTicks);
 
+	IS_STAGE_BEGIN = true;
+	STAGE = 0;
+
 	// 1. 키보드 입력부
 	// 2. 로직부
 	IS_STAGE_BEGIN = true;
 	GAME_STATE = TITLE;
 	++LOGIC_FPS_CNT;
 
-	// 3. 랜더부
 	// 한 프레임 이상 지연된 경우, 프레임 스킵
 	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
 	if (FRAME_TIME_SEC < secsSinceLastFrame) {
 		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
 		return;
+	}
+	// 3. 랜더부
+	char startStr[] = "GAME OVER";
+	for (size_t i = 0; i < strlen(startStr); i++) {
+		Sprite_Draw(i, 0, startStr[i]);
 	}
 	++RENDER_FPS_CNT;
 }
