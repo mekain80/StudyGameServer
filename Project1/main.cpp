@@ -15,8 +15,8 @@ const int BULLET_DEMAGE = 1;
 const int PLAYER_MAX_HP = 5;
 const int PLAYER_START_POS_X = dfSCREEN_WIDTH / 2;
 const int PLAYER_START_POS_Y = dfSCREEN_HEIGHT - 1;
-const int FPS = 60;
-const double FRAME_TIME = 1000 / FPS; // 1프레임 = 약 16ms
+const int FPS = 50;
+const double FRAME_TIME = 1000 / FPS; // 1프레임 = 약 20ms
 const double FRAME_TIME_SEC = 1.0 / FPS;
 
 
