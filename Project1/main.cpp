@@ -18,7 +18,9 @@ const int PLAYER_START_POS_Y = dfSCREEN_HEIGHT - 1;
 const int FPS = 50;
 const double FRAME_TIME = 1000 / FPS; // 1프레임 = 약 20ms
 const double FRAME_TIME_SEC = 1.0 / FPS;
-
+const int PLAYER_SPEED = 2;
+const int PLAYER_ATTACK_SPEED = 8;
+const int PLAYER_BULLET_SPEED = 2;
 
 int STAGE = 1;
 int LOGIC_FPS_CNT = 0;
@@ -31,6 +33,8 @@ struct Player
 	int hp;
 	int x, y;
 	bool isVisible = false;
+	int movedTick = 0;
+	int attackedTick = 0;
 };
 
 struct Enemy
@@ -45,6 +49,8 @@ struct Bullet
 	int x, y;
 	bool isEnemy;
 	bool isVisible = false;
+	int speed = 5;
+	int movedTick = 0;
 };
 
 // 변수
@@ -316,30 +322,38 @@ void playScene() {
 	SHORT downKey = GetAsyncKeyState(VK_DOWN);
 	SHORT rightKey = GetAsyncKeyState(VK_RIGHT);
 	SHORT leftKey = GetAsyncKeyState(VK_LEFT);
-	if (upKey != 0 && downKey != 0) {}
-	else if (upKey != 0) {
-		if (player.y - 1 >= 0) {
-			player.y -= 1;
+	if (player.movedTick + PLAYER_SPEED < LOGIC_FPS_CNT) {
+		if (upKey != 0 && downKey != 0) {}
+		else if (upKey != 0) {
+			if (player.y - 1 >= 0) {
+				player.y -= 1;
+				player.movedTick = LOGIC_FPS_CNT;
+			}
 		}
-	}
-	else if (downKey != 0) {
-		if (player.y + 1 < dfSCREEN_HEIGHT) {
-			player.y += 1;
+		else if (downKey != 0) {
+			if (player.y + 1 < dfSCREEN_HEIGHT) {
+				player.y += 1;
+				player.movedTick = LOGIC_FPS_CNT;
+			}
 		}
-	}
-	if (rightKey != 0 && leftKey != 0) {}
-	else if (rightKey != 0) {
-		if (player.x + 1 < dfSCREEN_WIDTH - 1) {
-			player.x += 1;
+
+		if (rightKey != 0 && leftKey != 0) {}
+		else if (rightKey != 0) {
+			if (player.x + 1 < dfSCREEN_WIDTH - 1) {
+				player.x += 1;
+				player.movedTick = LOGIC_FPS_CNT;
+			}
 		}
-	}
-	else if (leftKey != 0) {
-		if (player.x - 1 >= 0) {
-			player.x -= 1;
+		else if (leftKey != 0) {
+			if (player.x - 1 >= 0) {
+				player.x -= 1;
+				player.movedTick = LOGIC_FPS_CNT;
+			}
 		}
 	}
 
-	if (GetAsyncKeyState('Z') != 0) {
+	
+	if (GetAsyncKeyState('Z') != 0 and player.attackedTick + PLAYER_ATTACK_SPEED < LOGIC_FPS_CNT) {
 		for (size_t i = 0; i < MAX_BULLET; i++)
 		{
 			if (bullets[i].isVisible == false) {
@@ -347,6 +361,7 @@ void playScene() {
 				bullets[i].x = player.x;
 				bullets[i].y = player.y;
 				bullets[i].isEnemy = false;
+				player.attackedTick = LOGIC_FPS_CNT;
 				break;
 			}
 		}
@@ -359,19 +374,28 @@ void playScene() {
 		if (bullets[i].isVisible) {
 			//  총알 전진
 			if (bullets[i].isEnemy) {
-				if (bullets[i].y + 1 < dfSCREEN_HEIGHT) {
-					bullets[i].y += 1;
-				}
-				else {
-					bullets[i].isVisible = false;
+				if (bullets[i].movedTick + bullets[i].speed < LOGIC_FPS_CNT) {
+					if (bullets[i].y + 1 < dfSCREEN_HEIGHT) {
+						bullets[i].y += 1;
+					}
+					else {
+						bullets[i].isVisible = false;
+					}
+					// 총알이 멈추는 경우는 없어 무조건 갱신
+					bullets[i].movedTick = LOGIC_FPS_CNT;
 				}
 			}
 			else {
-				if (bullets[i].y - 1 >= 0) {
-					bullets[i].y -= 1;
-				}
-				else {
-					bullets[i].isVisible = false;
+				if (bullets[i].movedTick + bullets[i].speed < LOGIC_FPS_CNT) {
+					if (bullets[i].y - 1 >= 0) {
+						bullets[i].y -= 1;
+					}
+					else {
+						bullets[i].isVisible = false;
+					}
+
+					// 총알이 멈추는 경우는 없어 무조건 갱신
+					bullets[i].movedTick = LOGIC_FPS_CNT;
 				}
 			}
 
