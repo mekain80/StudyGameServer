@@ -459,41 +459,19 @@ void playScene() {
 				char movePattern[MAX_PATTERN_CNT] = "";
 				csvGetValueInTable(ENEMY_INFO, type, "move_pattern", movePattern, sizeof(movePattern));
 				
-				int nx = 0, ny = 0;
-				switch (movePattern[enemies[i].currMovePattern])
-				{
-				case 'w':
-					ny = enemies[i].y - 1;
-					break;
-				case 'a':
-					nx = enemies[i].x - 1;
-					break;
-				case 'x':
-					ny = enemies[i].y + 1;
-					break;
-				case 'd':
-					nx = enemies[i].x + 1;
-					break;
-				case 'q':
-					nx = enemies[i].x - 1;
-					ny = enemies[i].y - 1;
-					break;
-				case 'e':
-					nx = enemies[i].x + 1;
-					ny = enemies[i].y - 1;
-					break;
-				case 'z':
-					nx = enemies[i].x - 1;
-					ny = enemies[i].y + 1;
-					break;
-				case 'c':
-					nx = enemies[i].x + 1;
-					ny = enemies[i].y + 1;
-					break;
-				case 's':
-					nx = enemies[i].x;
-					ny = enemies[i].y;
-					break;
+				// 초기값을 현재 좌표로
+				int nx = enemies[i].x;
+				int ny = enemies[i].y;
+				switch (movePattern[enemies[i].currMovePattern]) {
+				case 'w': ny -= 1; break;
+				case 'a': nx -= 1; break;
+				case 'x': ny += 1; break;
+				case 'd': nx += 1; break;
+				case 'q': nx -= 1; ny -= 1; break;
+				case 'e': nx += 1; ny -= 1; break;
+				case 'z': nx -= 1; ny += 1; break;
+				case 'c': nx += 1; ny += 1; break;
+				case 's': /* stay */ break;
 				default:
 					printf("\n%s\n", movePattern);
 					perror("move pattrean error");
