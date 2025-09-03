@@ -27,12 +27,14 @@ const int PLAYER_BULLET_SPEED = 2;
 const int PLAYER_INVINCIBLE_FRAMES = 30; // 데미지 받고 몇 프레임 무적으로 할것인지
 const char PLAYER_INVINCIBLE_SHAPE = 'B';
 const int DEFAULT_BULLET_SPEED = 5;
+const int MIN_WAIT_TIME_LOADING_SCENE = 3;
 
 int STAGE = 0;
 int LOGIC_FPS_CNT = 0;
 int RENDER_FPS_CNT = 0;
 bool IS_STAGE_BEGIN = true;
 LARGE_INTEGER freq, startTime;
+LARGE_INTEGER sceneBeginTick;
 const char* STAGE_INFO = "stage_info.csv";
 const char* ENEMY_INFO = "enemy_info.csv";
 
@@ -312,6 +314,10 @@ void loadingScene() {
 	LARGE_INTEGER logicBeginTicks;
 	QueryPerformanceCounter(&logicBeginTicks);
 
+	if (IS_STAGE_BEGIN) {
+		sceneBeginTick = logicBeginTicks;
+	}
+
 	// 1. 키보드 입력부
 
 	// 2. 로직부 
@@ -325,10 +331,9 @@ void loadingScene() {
 		IS_STAGE_BEGIN = false;
 	}
 
-	// 스테이지까지 불러왔는지 확인 해야되는데... 일단 PASS
-	bool a = csvLoadAll(STAGE_INFO);
-	bool b = csvLoadAll(ENEMY_INFO);
-	if (csvLoadAll(STAGE_INFO) && csvLoadAll(ENEMY_INFO)) {
+	// 로딩 창 최소 시간 초과 & 데이터 로드 완료 시 PLAY SCENE으로 전환
+	const double sceneElapedtime = static_cast<double>(logicBeginTicks.QuadPart - sceneBeginTick.QuadPart) / static_cast<double>(freq.QuadPart);
+	if (MIN_WAIT_TIME_LOADING_SCENE < sceneElapedtime && csvLoadAll(STAGE_INFO) && csvLoadAll(ENEMY_INFO)) {
 		IS_STAGE_BEGIN = true;
 		GAME_STATE = PLAY;
 		return;
