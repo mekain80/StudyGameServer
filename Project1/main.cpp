@@ -602,7 +602,9 @@ void playScene() {
 	}
 	++RENDER_FPS_CNT;
 
-	printf("STAGE : %d", STAGE);
+	// TODO PLAY SCENE 종료 시 제거도 해야됨
+	printf("\nSTAGE : %d\n", STAGE);
+	printf("HP : %d\n", player.hp);
 }
 
 void gameoverScene()
