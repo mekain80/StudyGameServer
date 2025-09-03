@@ -24,6 +24,7 @@ const double FRAME_TIME_SEC = 1.0 / FPS;
 const int PLAYER_SPEED = 2;
 const int PLAYER_ATTACK_SPEED = 1; // TODO 약 8로 조정, 현재는 테스트를 위해 1로 설정
 const int PLAYER_BULLET_SPEED = 2;
+const int DEFAULT_BULLET_SPEED = 5;
 
 int STAGE = 0;
 int LOGIC_FPS_CNT = 0;
@@ -63,7 +64,7 @@ struct Bullet
 	int x, y;
 	bool isEnemy;
 	bool isVisible = false;
-	int speed = 5;	// TODO 총알 별로 속도 조정
+	int speed = DEFAULT_BULLET_SPEED;	// TODO 총알 별로 속도 조정
 	int movedTick = 0;
 };
 
@@ -429,6 +430,23 @@ void playScene() {
 			}
 		}
 	}
+	// 총알 충돌 확인
+	for (size_t i = 0; i < MAX_BULLET; i++)
+	{
+		if (bullets[i].isVisible) {
+			if (player.isVisible) {
+				if (bullets[i].isEnemy && bullets[i].x == player.x && bullets[i].y == player.y) {
+					player.hp -= BULLET_DEMAGE;
+					if (player.hp <= 0) {
+						player.isVisible = false;
+						GAME_STATE = GAMEOVER;
+					}
+					bullets[i].isVisible = false;
+				}
+			}
+		}
+	}
+
 
 	
 	if (GetAsyncKeyState('Z') != 0 and player.atkedTick + PLAYER_ATTACK_SPEED < LOGIC_FPS_CNT) {
@@ -450,11 +468,9 @@ void playScene() {
 
 	// 2. 로직부	
 	// 적의 이동 & 공격
-	bool isClear = true;
 	for (size_t i = 0; i < MAX_ENEMY; i++)
 	{
 		if (enemies[i].isVisible) {
-			isClear = false;
 			if (enemies[i].movedTick + enemies[i].moveSpeed < LOGIC_FPS_CNT) {
 
 				int type = enemies[i].type;
@@ -513,14 +529,24 @@ void playScene() {
 				}
 			}
 		}
-
-
 	}
-	if (isClear) {
-		IS_STAGE_BEGIN = true;
-		GAME_STATE = LOADING;
-		// 다음 스테이지 있는지 확인 필요
-		return; // TODO 클리어 바로 리턴..?
+	// 총알 충돌 확인
+	for (size_t i = 0; i < MAX_BULLET; i++)
+	{
+		if (bullets[i].isVisible) {
+			for (size_t j = 0; j < MAX_ENEMY; j++)
+			{
+				if (enemies[j].isVisible) {
+					if (bullets[i].isEnemy == false && bullets[i].x == enemies[j].x && bullets[i].y == enemies[j].y) {
+						enemies[j].hp -= BULLET_DEMAGE;
+						if (enemies[j].hp <= 0) {
+							player.isVisible = false;
+						}
+						bullets[i].isVisible = false;
+					}
+				}
+			}
+		}
 	}
 
 	for (size_t i = 0; i < MAX_BULLET; i++)
@@ -580,6 +606,22 @@ void playScene() {
 			}
 		}
 	}
+
+	// 클리어 확인
+	bool isClear = true;
+	for (size_t i = 0; i < MAX_ENEMY; i++)
+	{
+		if (enemies[i].isVisible) {
+			isClear = false;
+		}
+	}
+	if (isClear) {
+		IS_STAGE_BEGIN = true;
+		GAME_STATE = LOADING;
+		// 다음 스테이지 있는지 확인 필요
+		return; // TODO 클리어 바로 리턴..?
+	}
+
 	++LOGIC_FPS_CNT;
 
 
