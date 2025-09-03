@@ -24,6 +24,8 @@ const double FRAME_TIME_SEC = 1.0 / FPS;
 const int PLAYER_SPEED = 2;
 const int PLAYER_ATTACK_SPEED = 1; // TODO 약 8로 조정, 현재는 테스트를 위해 1로 설정
 const int PLAYER_BULLET_SPEED = 2;
+const int PLAYER_INVINCIBLE_FRAMES = 30; // 데미지 받고 몇 프레임 무적으로 할것인지
+const char PLAYER_INVINCIBLE_SHAPE = 'B';
 const int DEFAULT_BULLET_SPEED = 5;
 
 int STAGE = 0;
@@ -42,6 +44,7 @@ struct Player
 	bool isVisible = false;
 	int movedTick = 0;
 	int atkedTick = 0;
+	int damagedTick = 0;
 };
 
 struct Enemy
@@ -435,8 +438,9 @@ void playScene() {
 	{
 		if (bullets[i].isVisible) {
 			if (player.isVisible) {
-				if (bullets[i].isEnemy && bullets[i].x == player.x && bullets[i].y == player.y) {
+				if (bullets[i].isEnemy && bullets[i].x == player.x && bullets[i].y == player.y && player.damagedTick + PLAYER_INVINCIBLE_FRAMES <= LOGIC_FPS_CNT) {
 					player.hp -= BULLET_DEMAGE;
+					player.damagedTick = LOGIC_FPS_CNT;
 					if (player.hp <= 0) {
 						player.isVisible = false;
 						GAME_STATE = GAMEOVER;
@@ -595,8 +599,9 @@ void playScene() {
 
 			// 플레이어와 총알 충돌 판정
 			if (player.isVisible) {
-				if (bullets[i].isEnemy && bullets[i].x == player.x && bullets[i].y == player.y) {
+				if (bullets[i].isEnemy && bullets[i].x == player.x && bullets[i].y == player.y && player.damagedTick + PLAYER_INVINCIBLE_FRAMES <= LOGIC_FPS_CNT) {
 					player.hp -= BULLET_DEMAGE;
+					player.damagedTick = LOGIC_FPS_CNT;
 					if (player.hp <= 0) {
 						player.isVisible = false;
 						GAME_STATE = GAMEOVER;
@@ -621,7 +626,6 @@ void playScene() {
 		// 다음 스테이지 있는지 확인 필요
 		return; // TODO 클리어 바로 리턴..?
 	}
-
 	++LOGIC_FPS_CNT;
 
 
@@ -632,7 +636,14 @@ void playScene() {
 	if (FRAME_TIME_SEC < secsSinceLastFrame) {
 		return;
 	}
-	Sprite_Draw(player.x, player.y, PLAYER_SHAPE);
+	// 무적 시간에 따른 플레이어 모양 변경
+	if (player.damagedTick != 0 && LOGIC_FPS_CNT - 1 <= player.damagedTick + PLAYER_INVINCIBLE_FRAMES) {
+		Sprite_Draw(player.x, player.y, PLAYER_INVINCIBLE_SHAPE);
+	}
+	else {
+		Sprite_Draw(player.x, player.y, PLAYER_SHAPE);
+	}
+
 	for (size_t i = 0; i < MAX_ENEMY; i++)
 	{
 		if (enemies[i].isVisible) {
