@@ -1,4 +1,4 @@
-id,hp,atk_speed,move_pattern,attak_pattern,shape
-1,1,1,x,3,a
-2,2,2,xad,2,b
-3,3,3,xaxd,1,c
+id,hp,move_speed,move_pattern,atk_speed,shape
+1,1,60,x,3,a
+2,2,30,xad,2,b
+3,3,30,xaxd,1,c
