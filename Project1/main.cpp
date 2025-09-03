@@ -12,6 +12,7 @@ gameState GAME_STATE;
 const int MAX_ENEMY = 1000;
 const int MAX_BULLET = 100;
 const int BULLET_DEMAGE = 1;
+const int ENEMY_DEMAGE = 1;
 const int PLAYER_MAX_HP = 5;
 const char PLAYER_SHAPE = 'A';
 const char BULLET_SHAPE = 'I';
@@ -455,6 +456,22 @@ void playScene() {
 			}
 		}
 	}
+	// 적과의 충돌 확인 로직
+	for (size_t i = 0; i < MAX_ENEMY; i++)
+	{
+		if (enemies[i].isVisible) {
+			if (player.isVisible) {
+				if (enemies[i].x == player.x && enemies[i].y == player.y && player.damagedTick + PLAYER_INVINCIBLE_FRAMES <= LOGIC_FPS_CNT) {
+					player.hp -= ENEMY_DEMAGE;
+					player.damagedTick = LOGIC_FPS_CNT;
+					if (player.hp <= 0) {
+						player.isVisible = false;
+						GAME_STATE = GAMEOVER;
+					}
+				}
+			}
+		}
+	}
 
 
 	
@@ -520,6 +537,18 @@ void playScene() {
 				}
 
 				enemies[i].movedTick = LOGIC_FPS_CNT;
+
+				// 적이 움직였으므로 플레이어와 충돌 로직 확인
+				if (player.isVisible) {
+					if (enemies[i].x == player.x && enemies[i].y == player.y && player.damagedTick + PLAYER_INVINCIBLE_FRAMES <= LOGIC_FPS_CNT) {
+						player.hp -= ENEMY_DEMAGE;
+						player.damagedTick = LOGIC_FPS_CNT;
+						if (player.hp <= 0) {
+							player.isVisible = false;
+							GAME_STATE = GAMEOVER;
+						}
+					}
+				}
 			}
 
 			if (enemies[i].atkedTick + enemies[i].atkSpeed < LOGIC_FPS_CNT) {
