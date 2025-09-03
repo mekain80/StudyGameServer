@@ -439,6 +439,8 @@ void playScene() {
 				bullets[i].x = player.x;
 				bullets[i].y = player.y - 1;
 				bullets[i].isEnemy = false;
+				bullets[i].movedTick = LOGIC_FPS_CNT;
+
 				player.atkedTick = LOGIC_FPS_CNT;
 				break;
 			}
@@ -497,9 +499,10 @@ void playScene() {
 				{
 					if (bullets[j].isVisible == false) {
 						bullets[j].isVisible = true;
-						bullets[j].x = enemies[j].x;
-						bullets[j].y = enemies[j].y + 1;
+						bullets[j].x = enemies[i].x;
+						bullets[j].y = enemies[i].y + 1;
 						bullets[j].isEnemy = true;
+						bullets[j].movedTick = LOGIC_FPS_CNT;
 
 						enemies[i].atkedTick = LOGIC_FPS_CNT;
 						break;
