@@ -480,10 +480,13 @@ void playScene() {
 					break;
 				}
 
-				// 이동 가능 범위일 때만
+				// 이동 가능 범위로 가지 않는다면, 죽음 처리
 				if (0 < ny && ny < dfSCREEN_HEIGHT && 0 < nx && nx < dfSCREEN_WIDTH) {
 					enemies[i].x = nx;
 					enemies[i].y = ny;
+				}
+				else {
+					enemies[i].isVisible = false;
 				}
 
 				++enemies[i].currMovePattern;
