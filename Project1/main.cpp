@@ -28,7 +28,7 @@ const int PLAYER_BULLET_SPEED = 2;
 const int PLAYER_INVINCIBLE_FRAMES = 30; // 데미지 받고 몇 프레임 무적으로 할것인지
 const char PLAYER_INVINCIBLE_SHAPE = 'B';
 const int DEFAULT_BULLET_SPEED = 5;
-const int MIN_WAIT_TIME_LOADING_SCENE = 3;
+const int MIN_WAIT_TIME_LOADING_SCENE = 1;
 size_t MAX_STAGE = 0;
 
 
@@ -358,14 +358,7 @@ void loadingScene() {
 		csvLoadAll(ENEMY_INFO);
 		IS_STAGE_BEGIN = false;
 	}
-
-	// 로딩 창 최소 시간 초과 & 데이터 로드 완료 시 PLAY SCENE으로 전환
 	const double sceneElapedtime = static_cast<double>(logicBeginTicks.QuadPart - sceneBeginTick.QuadPart) / static_cast<double>(freq.QuadPart);
-	if (MIN_WAIT_TIME_LOADING_SCENE < sceneElapedtime && csvLoadAll(STAGE_INFO) && csvLoadAll(ENEMY_INFO)) {
-		IS_STAGE_BEGIN = true;
-		GAME_STATE = PLAY;
-		return;
-	}
 
 	// 한 프레임 이상 지연된 경우, 프레임 스킵
 	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
@@ -392,6 +385,28 @@ void loadingScene() {
 		Sprite_Draw(loadingStartX + i, loadingStartY, loadingText[i]);
 	}
 
+	// 단순히 최소 시간으로만 로딩 진척도 구현
+	const int loadingBarLength = 10;
+	const int loadingBarStartX = (dfSCREEN_WIDTH - loadingBarLength) / 2;
+	const int loadingBarStartY = (dfSCREEN_HEIGHT / 2) + 2;
+
+	// 경과 시간 비율 계산
+	float ratio = (float)sceneElapedtime / (float)MIN_WAIT_TIME_LOADING_SCENE;
+	if (ratio > 1.f) ratio = 1.f;
+	if (ratio < 0.f) ratio = 0.f;
+	int filled = (int)(ratio * loadingBarLength);
+
+	// 출력
+	for (int i = 0; i < loadingBarLength; i++) {
+		Sprite_Draw(loadingBarStartX + i, loadingBarStartY, (i < filled) ? '#' : '.');
+	}
+
+	// 로딩 창 최소 시간 초과 & 데이터 로드 완료 시 PLAY SCENE으로 전환
+	if (MIN_WAIT_TIME_LOADING_SCENE < sceneElapedtime && csvLoadAll(STAGE_INFO) && csvLoadAll(ENEMY_INFO)) {
+		IS_STAGE_BEGIN = true;
+		GAME_STATE = PLAY;
+		return;
+	}
 }
 
 void playScene() {
