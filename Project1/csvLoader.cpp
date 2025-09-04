@@ -1,29 +1,26 @@
-// csvLoader.cpp
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include "csvLoader.h"
 
-/* ---- 설정 ---- */
-#define LINE_BUF  4096
-#define MAX_COLS  1024
+static const int kLineBuf = 4096;   // 한 줄 최대 길이
+static const int kMaxCols = 1024;   // 최대 컬럼 수
 
-CsvTable csvTables[CSV_TABLE_MAX];
-static int CSV_COUNT = 0;
+CsvTable csvTables[kCsvTableMax];
+static int g_csvCount = 0;          // 현재 로드된 테이블 개수
 
-/* ---- 내부 헬퍼(간단) ---- */
-/* 문자열을 복제해서 새 메모리에 할당 */
+// 문자열을 복제해서 새 메모리에 할당 후 반환
 static char* dupStr(const char* source) {
-    size_t length = strlen(source);           // 문자열 길이
-    char* copy = (char*)malloc(length + 1);   // 널 종료 포함해서 메모리 할당
+    size_t length = strlen(source);
+    char* copy = (char*)malloc(length + 1);
     if (copy) {
-        memcpy(copy, source, length + 1);     // 문자열 복사
+        memcpy(copy, source, length + 1);
     }
     return copy;
 }
 
-/* 문자열 끝의 개행(\r\n) 제거 */
+// 문자열 끝의 개행(\r\n) 제거
 static void rstripCrlf(char* str) {
     size_t length = strlen(str);
 
@@ -35,6 +32,8 @@ static void rstripCrlf(char* str) {
     }
 }
 
+// 콤마(,) 기준 단순 분리: 따옴표/이스케이프 미지원(간단 CSV 전용)
+// lineBuf를 제자리에서 자르며, fields에 각 토큰 시작 포인터를 채운다.
 static int splitSimpleCsv(char* lineBuf, char** fields, int maxFields) {
     int fieldCount = 0;
     char* current = lineBuf;
@@ -56,118 +55,116 @@ static int splitSimpleCsv(char* lineBuf, char** fields, int maxFields) {
     return fieldCount;
 }
 
-/* ---- 로드: 파일 전체를 메모리에 올림 ----
-   path 의 CSV를 읽어 CsvTable *table 에 채운다.
-   성공 1, 실패 0 */
+// 경로로 테이블 인덱스 찾기(없으면 -1)
+static int findTableIndex(const char* path) {
+    if (!path) 
+        return -1;
+    for (int i = 0; i < g_csvCount; ++i) {
+        if (csvTables[i].fileName && strcmp(csvTables[i].fileName, path) == 0)
+            return i;
+    }
+    return -1;
+}
+
+// 파일 전체 로드(이미 로드된 파일이면 재로딩하지 않고 성공 반환)
+// 성공 1, 실패 0
 int csvLoadAll(const char* path) {
-    for (size_t i = 0; i < CSV_COUNT; i++)
-    {
-       if (strcmp(csvTables[i].fileName, path) == 0) {
-            return 1;
-       }
+    if (!path || !*path) return 0;
+    if (findTableIndex(path) >= 0) return 1;
+
+    // 저장소 꽉 찼는지 확인
+    if (g_csvCount >= kCsvTableMax) {
+        perror("csvLoadAll");
+        return 0;
     }
 
-    FILE* fp;
+    FILE* fp = nullptr;
     errno_t err = fopen_s(&fp, path, "rb");
     if (err != 0) {
         perror("fopen_s");
         return 0;
     }
 
-    char lineBuf[LINE_BUF];
+    char lineBuf[kLineBuf];
 
-    /* 1) 헤더 */
+    // 1) 헤더를 headerFields에 저장
     if (!fgets(lineBuf, sizeof(lineBuf), fp)) { 
         fclose(fp); 
         return 0;
     }
     rstripCrlf(lineBuf);
 
-    char* headerFields[MAX_COLS];
-    int colCount = splitSimpleCsv(lineBuf, headerFields, MAX_COLS);
+    char* headerFields[kMaxCols];
+    int colCount = splitSimpleCsv(lineBuf, headerFields, kMaxCols);
 
     CsvTable table;
     table.colCount = colCount;
     table.header = (char**)malloc(colCount * sizeof(char*));
-    for (int colIndex = 0; colIndex < colCount; colIndex++)
+    for (int colIndex = 0; colIndex < colCount; colIndex++) {
         table.header[colIndex] = dupStr(headerFields[colIndex]);
+    }
 
-    /* 2) 데이터 행 수 파악 */
+    // 2) 데이터 행 수 파악
     long afterHeaderPos = ftell(fp);
     int rowCount = 0;
     while (fgets(lineBuf, sizeof(lineBuf), fp)) rowCount++;
     table.rowCount = rowCount;
 
-    /* 3) 메모리 할당 & 재파싱 */
+    // 3) 테이블 구조 + 메모리 할당
     table.id = (int*)malloc(rowCount * sizeof(int));
     table.cell = (char***)malloc(rowCount * sizeof(char**));
 
+    // 헤더를 제외한 파일의 처음으로 이동
     fseek(fp, afterHeaderPos, SEEK_SET);
     int rowIndex = 0;
     while (rowIndex < rowCount && fgets(lineBuf, sizeof(lineBuf), fp)) {
         rstripCrlf(lineBuf);
 
-        char* rowFields[MAX_COLS];
-        int fieldCount = splitSimpleCsv(lineBuf, rowFields, MAX_COLS);
-        if (fieldCount < colCount) { /* 부족하면 빈칸 보충 */
-            for (int k = fieldCount; k < colCount; k++) rowFields[k] = (char*)"";
-            fieldCount = colCount;
-        }
-
+        char* rowFields[kMaxCols];
+        splitSimpleCsv(lineBuf, rowFields, kMaxCols);
         table.cell[rowIndex] = (char**)malloc(colCount * sizeof(char*));
         for (int colIndex = 0; colIndex < colCount; colIndex++) {
             table.cell[rowIndex][colIndex] = dupStr(rowFields[colIndex]);
         }
 
-        /* 첫 컬럼을 id로 */
-        {
-            unsigned char* u = (unsigned char*)table.cell[rowIndex][0];
-            table.id[rowIndex] = atoi(table.cell[rowIndex][0]);
-        }
+        // 첫 컬럼을 id로 설정
+        unsigned char* u = (unsigned char*)table.cell[rowIndex][0];
+        table.id[rowIndex] = atoi(table.cell[rowIndex][0]);
+
         rowIndex++;
     }
 
-
+    // csv 파일 이름 설정
     size_t len = strlen(path);
     char* buffer = (char*)malloc(len + 1);
     if (buffer) {
         strcpy_s(buffer, len + 1, path);
     }
     table.fileName = buffer;
-    csvTables[CSV_COUNT] = table;
-    ++CSV_COUNT;
+    csvTables[g_csvCount] = table;
+    ++g_csvCount;
 
     fclose(fp);
     return 1;
 }
 
-/* ---- 조회: (메모리에 이미 로드된 테이블에서) id + header명으로 값 얻기 ----
-   성공 1(문자열 out으로 복사), 실패 0 */
-int csvGetValueInTable(const char* path, int id,
-    const char* headerName,
-    char* out, size_t outSize)
+// csv 테이블에서 원하는 값 찾기(id, header)
+// 성공 1, 실패 0
+int csvGetValueInTable(const char* path, int id, const char* headerName, char* out, size_t outSize)
 {
-    if (!path || !headerName || !out || outSize == 0) return 0;
+    if (!path || !headerName || !out || outSize == 0) 
+        return 0;
 
-    // 1) 테이블 찾기
-    const CsvTable* t = NULL;
-    for (size_t i = 0; i < CSV_COUNT; ++i) {
-        if (strcmp(path, csvTables[i].fileName) == 0) {  // 같으면 0
-            t = &csvTables[i];                      // 포인터로 직접 참조
-            break;
-        }
+    int idx = findTableIndex(path);
+    // 아직 csv가 로드 안 되어 있으면 로드 시도
+    if (idx < 0) {
+        if (!csvLoadAll(path)) 
+            return 0;
+        idx = findTableIndex(path);
+        if (idx < 0) 
+            return 0;
     }
-    bool loadCsv = csvLoadAll(path);
-    if (loadCsv) {
-        // TODO 개선 필요... (획득한 csvTable 바로 찾을 수 있게)
-        for (size_t i = 0; i < CSV_COUNT; ++i) {
-            if (strcmp(path, csvTables[i].fileName) == 0) {  // 같으면 0
-                t = &csvTables[i];                      // 포인터로 직접 참조
-                break;
-            }
-        }
-    }
-    if (!t) return 0;  // 못 찾음
+    const CsvTable* t = &csvTables[idx];
 
     // 2) 열 인덱스 찾기
     int targetCol = -1;
@@ -192,37 +189,9 @@ int csvGetValueInTable(const char* path, int id,
     return 0;
 }
 
-/* ---- 해제: 로드한 테이블의 동적 메모리 해제 ---- */
-void csvFreeTable(CsvTable* table) {
-    if (!table) return;
-    if (table->header) {
-        for (int colIndex = 0; colIndex < table->colCount; colIndex++)
-            free(table->header[colIndex]);
-        free(table->header);
-    }
-    if (table->cell) {
-        for (int rowIndex = 0; rowIndex < table->rowCount; rowIndex++) {
-            if (!table->cell[rowIndex]) continue;
-            for (int colIndex = 0; colIndex < table->colCount; colIndex++)
-                free(table->cell[rowIndex][colIndex]);
-            free(table->cell[rowIndex]);
-        }
-        free(table->cell);
-    }
-    free(table->id);
-}
-
-CsvTable getCsvTable(const char* path) {
-    for (size_t i = 0; i < CSV_COUNT; i++)
-    {
-        if (strcmp(csvTables[i].fileName, path) == 0) {
-            return csvTables[i];
-        }
-    }
-}
-
+// csv 파일의 Id 배열 반환
 int* getCsvIdArray(const char* path, size_t &size) {
-    for (size_t i = 0; i < CSV_COUNT; i++)
+    for (size_t i = 0; i < g_csvCount; i++)
     {
         if (strcmp(csvTables[i].fileName, path) == 0) {
             size = csvTables[i].rowCount;
@@ -230,26 +199,3 @@ int* getCsvIdArray(const char* path, size_t &size) {
         }
     }
 }
-
-/* ---- 예시 ----
-#define DEMO
-#ifdef DEMO
-int main(void){
-    CsvTable table;
-    if (!csvLoadAll("stages.csv", &table)) {
-        printf("load fail\n");
-        return 1;
-    }
-
-    char buf[256];
-    if (csvGetValueInTable(&table, 2, "stage_name", buf, sizeof(buf))) {
-        printf("id=2 -> %s\n", buf);  // 기대: stage2.csv
-    } else {
-        printf("not found\n");
-    }
-
-    csvFreeTable(&table);
-    return 0;
-}
-#endif
-*/

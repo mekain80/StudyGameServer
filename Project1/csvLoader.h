@@ -1,15 +1,14 @@
 #pragma once
-#include <stddef.h> /* size_t */
-#define CSV_TABLE_MAX		10
+#include <stddef.h>
+const int kCsvTableMax = 10;
 
-/* ---- 데이터 테이블 ----
-   fileName : 파일 이름
-   rowCount : 데이터 행 수(헤더 제외)
-   colCount : 열 수
-   header   : [colCount] 헤더 문자열 배열(힙 할당)
-   id       : [rowCount] 각 행의 첫 열을 정수화한 값
-   cell     : [rowCount][colCount] 각 셀 문자열(힙 할당)
-*/
+/// CsvTable
+/// fileName : 파일 이름
+/// rowCount : 데이터 행 수(헤더 제외)
+/// colCount : 열 수
+/// header   : 헤더 문자열 배열
+/// id       : 각 행의 첫 열을 정수화한 값(기본키) [rowCount]
+/// cell     : [rowCount][colCount] 각 셀 문자열
 typedef struct {
     char* fileName;
     int    rowCount;
@@ -19,38 +18,33 @@ typedef struct {
     char*** cell;
 } CsvTable;
 
-/* -----------------------------------------------------------
-   csvLoadAll
-   - path의 CSV 파일을 읽어서 CsvTable을 힙 메모리에 채움
-   - 성공 시 1, 실패 시 0 반환
-   - 규칙: 첫 행=헤더, 첫 열=id(정수)
-   - 메모리는 csvFreeTable로 해제해야 함
------------------------------------------------------------ */
+/// <summary>
+/// path의 CSV를 읽어 전역 저장소에 로드
+/// 규칙: 첫 행=헤더, 첫 열=id
+/// </summary>
+/// <param name="path">파일 이름(상대 경로)</param>
+/// <returns>성공 시 1, 실패 시 0</returns>
 int csvLoadAll(const char* path);
 
-/* -----------------------------------------------------------
-   csvGetValueInTable
-   - 이미 메모리에 로드된 테이블에서 (id, headerName)으로 값을 조회
-   - out/outSize: 결과 문자열을 복사받을 버퍼/크기
-   - 성공 시 1, 실패 시 0
------------------------------------------------------------ */
+/// <summary>
+/// 이미 메모리에 로드된 테이블에서 (id, headerName)으로 값을 조회
+/// </summary>
+/// <param name="path">파일 이름(상대 경로)</param>
+/// <param name="id">Id(기본키)</param>
+/// <param name="headerName">헤더 문자열</param>
+/// <param name="out">해당 하는 데이터</param>
+/// <param name="outSize">해당 하는 데이터 char 배열의 크기</param>
+/// <returns>성공 시 1, 실패 시 0</returns>
 int csvGetValueInTable(const char* path,
-    int            id,
+    int id,
     const char* headerName,
     char* out, 
     size_t outSize);
 
-/* -----------------------------------------------------------
-   csvFreeTable
-   - csvLoadAll로 확보된 모든 동적 메모리 해제
-   - 호출 후 table 필드들은 무효화됨(포인터는 해제됨)
------------------------------------------------------------ */
-void csvFreeTable(CsvTable* table);
-
-/* -----------------------------------------------------------
-   getCsvTable
-   - csvTable을 반환
------------------------------------------------------------ */
-CsvTable getCsvTable(const char* path);
-
+/// <summary>
+/// 파일 이름(상대 경로)에 해당하는 Id(기본키) 배열 반환
+/// </summary>
+/// <param name="path">파일 이름(상대 경로)</param>
+/// <param name="size">Id(기본키) 배열 사이즈</param>
+/// <returns>Id(기본키) 배열</returns>
 int* getCsvIdArray(const char* path, size_t& size);
