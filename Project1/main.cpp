@@ -35,7 +35,7 @@ size_t MAX_STAGE = 0;
 int STAGE = 0;
 int LOGIC_FPS_CNT = 0;
 int RENDER_FPS_CNT = 0;
-bool IS_STAGE_BEGIN = true;
+bool IS_SCENE_BEGIN = true;
 LARGE_INTEGER freq, startTime;
 LARGE_INTEGER sceneBeginTick;
 const char* STAGE_INFO = "stage_info.csv";
@@ -61,10 +61,9 @@ struct Enemy
 	int moveSpeed = 0;
 	int atkSpeed = 0;
 	int currMovePattern = 0; 
-	//char atkPattern[MAX_PATTERN_CNT] = "";
 	int movedTick = 0;
 	int atkedTick = 0;
-	char shape = '\0'; // 그냥 테이블 값 볼까요?
+	char shape;
 };
 
 struct Bullet
@@ -72,7 +71,7 @@ struct Bullet
 	int x, y;
 	bool isEnemy;
 	bool isVisible = false;
-	int speed = DEFAULT_BULLET_SPEED;	// TODO 총알 별로 속도 조정
+	int speed = DEFAULT_BULLET_SPEED;
 	int movedTick = 0;
 };
 
@@ -87,6 +86,8 @@ void playScene();
 void gameOverScene();
 void gameClearScene();
 
+void changeGameState(gameState);
+void clearHUD();
 
 void frameTest();
 
@@ -296,7 +297,7 @@ void titleScene() {
 
 	// 1. 키보드 입력부
 	if (GetAsyncKeyState('A') != 0x00) {
-		GAME_STATE = LOADING;
+		changeGameState(LOADING);
 	}
 	// 2. 로직부 
 	++LOGIC_FPS_CNT;
@@ -338,7 +339,7 @@ void loadingScene() {
 	LARGE_INTEGER logicBeginTicks;
 	QueryPerformanceCounter(&logicBeginTicks);
 
-	if (IS_STAGE_BEGIN) {
+	if (IS_SCENE_BEGIN) {
 		sceneBeginTick = logicBeginTicks;
 	}
 
@@ -346,7 +347,7 @@ void loadingScene() {
 
 	// 2. 로직부 
 	char stage_name[256];
-	if (IS_STAGE_BEGIN == true) {
+	if (IS_SCENE_BEGIN == true) {
 		++STAGE;
 		if (csvGetValueInTable(STAGE_INFO, STAGE, "stage_name", stage_name, sizeof(stage_name))) {
 			csvLoadAll(stage_name);
@@ -356,7 +357,7 @@ void loadingScene() {
 		}
 
 		csvLoadAll(ENEMY_INFO);
-		IS_STAGE_BEGIN = false;
+		IS_SCENE_BEGIN = false;
 	}
 	const double sceneElapedtime = static_cast<double>(logicBeginTicks.QuadPart - sceneBeginTick.QuadPart) / static_cast<double>(freq.QuadPart);
 
@@ -403,8 +404,7 @@ void loadingScene() {
 
 	// 로딩 창 최소 시간 초과 & 데이터 로드 완료 시 PLAY SCENE으로 전환
 	if (MIN_WAIT_TIME_LOADING_SCENE < sceneElapedtime && csvLoadAll(STAGE_INFO) && csvLoadAll(ENEMY_INFO)) {
-		IS_STAGE_BEGIN = true;
-		GAME_STATE = PLAY;
+		changeGameState(PLAY);
 		return;
 	}
 }
@@ -415,7 +415,7 @@ void playScene() {
 
 
 	// 스테이지 시작 판정
-	if (IS_STAGE_BEGIN == true) {
+	if (IS_SCENE_BEGIN == true) {
 		player.hp = PLAYER_MAX_HP;
 		player.isVisible = true;
 		player.x = PLAYER_START_POS_X;
@@ -456,7 +456,7 @@ void playScene() {
 			bullets[i].isVisible = false;
 		}
 
-		IS_STAGE_BEGIN = false;
+		IS_SCENE_BEGIN = false;
 	}
 
 
@@ -504,7 +504,7 @@ void playScene() {
 					player.damagedTick = LOGIC_FPS_CNT;
 					if (player.hp <= 0) {
 						player.isVisible = false;
-						GAME_STATE = GAME_OVER;
+						changeGameState(GAME_OVER);
 					}
 					bullets[i].isVisible = false;
 				}
@@ -521,7 +521,7 @@ void playScene() {
 					player.damagedTick = LOGIC_FPS_CNT;
 					if (player.hp <= 0) {
 						player.isVisible = false;
-						GAME_STATE = GAME_OVER;
+						changeGameState(GAME_OVER);
 					}
 				}
 			}
@@ -547,8 +547,7 @@ void playScene() {
 
 	// esc로 타이틀로 이동
 	if (GetAsyncKeyState(VK_ESCAPE) != 0) {
-		IS_STAGE_BEGIN = true;
-		GAME_STATE = TITLE;
+		changeGameState(TITLE);
 		return;
 	}
 
@@ -606,7 +605,7 @@ void playScene() {
 						player.damagedTick = LOGIC_FPS_CNT;
 						if (player.hp <= 0) {
 							player.isVisible = false;
-							GAME_STATE = GAME_OVER;
+							changeGameState(GAME_OVER);
 						}
 					}
 				}
@@ -699,7 +698,7 @@ void playScene() {
 					player.damagedTick = LOGIC_FPS_CNT;
 					if (player.hp <= 0) {
 						player.isVisible = false;
-						GAME_STATE = GAME_OVER;
+						changeGameState(GAME_OVER);
 					}
 					bullets[i].isVisible = false;
 				}
@@ -748,35 +747,63 @@ void playScene() {
 		}
 	}
 	if (isClear) {
-		IS_STAGE_BEGIN = true;
 		if (STAGE != MAX_STAGE) {
-			GAME_STATE = LOADING;
+			changeGameState(LOADING);
 		}
 		else {
-			GAME_STATE = GAME_CLEAR;
+			changeGameState(GAME_CLEAR);
 		}
 		return;
 	}
 
 
-	// TODO PLAY SCENE 종료 시 제거도 해야됨
-	printf("\nSTAGE : %d\n", STAGE);
-	printf("HP : %d\n", player.hp);
+	// HUD 문자열 생성
+	if (player.isVisible) {
+		// 1번째 줄 : STAGE 왼쪽 + move 오른쪽
+		{
+			char left[64];
+			char right[64];
+			snprintf(left, sizeof(left), "STAGE : %d", STAGE);
+			snprintf(right, sizeof(right), "move : arrows");
+
+			int leftLen = (int)strlen(left);
+			int rightLen = (int)strlen(right);
+			int spaces = dfSCREEN_WIDTH - leftLen - rightLen - 1; // -1은 '\0' 고려
+
+			cs_MoveCursor(0, dfSCREEN_HEIGHT);
+			printf("%s%*s%s\n", left, spaces, "", right);
+		}
+
+		// 2번째 줄 : HP 왼쪽 + attack 오른쪽
+		{
+			char left[64];
+			char right[64];
+			snprintf(left, sizeof(left), "HP : %d", player.hp);
+			snprintf(right, sizeof(right), "attack : Z");
+
+			int leftLen = (int)strlen(left);
+			int rightLen = (int)strlen(right);
+			int spaces = dfSCREEN_WIDTH - leftLen - rightLen - 1;
+
+			cs_MoveCursor(0, dfSCREEN_HEIGHT + 1);
+			printf("%s%*s%s", left, spaces, "", right);
+		}
+	}
 }
 
 void gameOverScene()
 {
 	LARGE_INTEGER logicBeginTicks;
 	QueryPerformanceCounter(&logicBeginTicks);
-	if (IS_STAGE_BEGIN) {
+	if (IS_SCENE_BEGIN) {
 		sceneBeginTick = logicBeginTicks;
-		IS_STAGE_BEGIN = false;
+		IS_SCENE_BEGIN = false;
 	}
 
 	// 1. 키보드 입력부
 	if (GetAsyncKeyState(VK_ESCAPE) != 0x00) {
 		STAGE = 0;
-		GAME_STATE = TITLE;
+		changeGameState(TITLE);
 	}
 	// 2. 로직부
 	++LOGIC_FPS_CNT;
@@ -816,19 +843,17 @@ void gameClearScene()
 {
 	LARGE_INTEGER logicBeginTicks;
 	QueryPerformanceCounter(&logicBeginTicks);
-	if (IS_STAGE_BEGIN) {
+	if (IS_SCENE_BEGIN) {
 		sceneBeginTick = logicBeginTicks;
-		IS_STAGE_BEGIN = false;
+		IS_SCENE_BEGIN = false;
 
 	}
 
 	// 1. 키보드 입력부
 	if (GetAsyncKeyState(VK_ESCAPE) != 0x00) {
 		STAGE = 0;
-		GAME_STATE = TITLE;
+		changeGameState(TITLE);
 		GetAsyncKeyState('A'); // A를 이전에 눌렀다면, esc 클릭 후 바로 게임이 실행됨으로 예외처리
-
-		IS_STAGE_BEGIN = true;
 	}
 
 	// 2. 로직부
@@ -862,6 +887,20 @@ void gameClearScene()
 	for (int i = 0; i < exitGuideLength; i++) {
 		Sprite_Draw(exitGuideStartX + i, exitGuideStartY, exitGuideText[i]);
 	}
+}
+
+void changeGameState(gameState nextState) {
+	IS_SCENE_BEGIN = true;
+	GAME_STATE = nextState;
+	clearHUD();
+}
+
+void clearHUD()
+{
+	cs_MoveCursor(0, dfSCREEN_HEIGHT);
+	for (int i = 0; i < dfSCREEN_WIDTH; i++) putchar(' ');
+	cs_MoveCursor(0, dfSCREEN_HEIGHT + 1);
+	for (int i = 0; i < dfSCREEN_WIDTH; i++) putchar(' ');
 }
 
 void testFps() { // main으로 대체해서 test
