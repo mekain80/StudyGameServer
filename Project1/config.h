@@ -14,7 +14,7 @@ constexpr int    kPlayerStartPosY = dfSCREEN_HEIGHT - 1;
 constexpr int    kFps = 50;
 constexpr double kFrameTimeMs = 1000.0 / kFps;  // 1프레임 = 약 20ms
 constexpr double kFrameTimeSec = 1.0 / kFps;
-constexpr int    kPlayerMoveSpeedCellsPerFrame = 7;
+constexpr int    kPlayerMoveSpeedCellsPerFrame = 5;
 constexpr int    kPlayerAttackSpeed = 8;
 constexpr int    kPlayerInvincibleFrames = 30; // 데미지 받고 몇 프레임 무적으로 할것인지
 constexpr char   kPlayerInvincibleShape = 'B';
