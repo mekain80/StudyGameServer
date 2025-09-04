@@ -29,6 +29,8 @@ const int PLAYER_INVINCIBLE_FRAMES = 30; // 데미지 받고 몇 프레임 무�
 const char PLAYER_INVINCIBLE_SHAPE = 'B';
 const int DEFAULT_BULLET_SPEED = 5;
 const int MIN_WAIT_TIME_LOADING_SCENE = 3;
+size_t MAX_STAGE = 0;
+
 
 int STAGE = 0;
 int LOGIC_FPS_CNT = 0;
@@ -304,9 +306,26 @@ void titleScene() {
 		return;
 	}
 
-	char startStr[] = "Press the A key to start the game.";
-	for (size_t i = 0; i < strlen(startStr); i++) {
-		Sprite_Draw(i, 0, startStr[i]);
+	char titleText[] = "Terminal Shooter Game";
+	char startGuideText[] = "Press the A key to start the game.";
+
+	// 문자열 길이 (null 제외)
+	int titleLength = sizeof(titleText) - 1;
+	int startGuideLength = sizeof(startGuideText) - 1;
+
+	// 중앙 좌표 계산
+	int titleStartX = (dfSCREEN_WIDTH - titleLength) / 2;
+	int titleStartY = (dfSCREEN_HEIGHT / 2) - 2;
+	int startGuideStartX = (dfSCREEN_WIDTH - startGuideLength) / 2;
+	int startGuideStartY = (dfSCREEN_HEIGHT / 2) + 5;
+
+	// "Terminal Shooter Game" 출력
+	// "Press the A key to start the game." 출력
+	for (int i = 0; i < titleLength; i++) {
+		Sprite_Draw(titleStartX + i, titleStartY, titleText[i]);
+	}
+	for (int i = 0; i < startGuideLength; i++) {
+		Sprite_Draw(startGuideStartX + i, startGuideStartY, startGuideText[i]);
 	}
 	++RENDER_FPS_CNT;
 }
@@ -327,6 +346,9 @@ void loadingScene() {
 		++STAGE;
 		if (csvGetValueInTable(STAGE_INFO, STAGE, "stage_name", stage_name, sizeof(stage_name))) {
 			csvLoadAll(stage_name);
+			if (MAX_STAGE == 0) {
+				getCsvIdArray(STAGE_INFO, MAX_STAGE);
+			}
 		}
 		csvLoadAll(ENEMY_INFO);
 		IS_STAGE_BEGIN = false;
@@ -473,8 +495,7 @@ void playScene() {
 		}
 	}
 
-
-	
+	// 총알 발사
 	if (GetAsyncKeyState('Z') != 0 and player.atkedTick + PLAYER_ATTACK_SPEED < LOGIC_FPS_CNT) {
 		for (size_t i = 0; i < MAX_BULLET; i++)
 		{
@@ -489,6 +510,13 @@ void playScene() {
 				break;
 			}
 		}
+	}
+
+	// esc로 타이틀로 이동
+	if (GetAsyncKeyState(VK_ESCAPE) != 0) {
+		IS_STAGE_BEGIN = true;
+		GAME_STATE = TITLE;
+		return;
 	}
 
 
@@ -701,14 +729,17 @@ void gameoverScene()
 {
 	LARGE_INTEGER logicBeginTicks;
 	QueryPerformanceCounter(&logicBeginTicks);
-
-	IS_STAGE_BEGIN = true;
-	STAGE = 0;
+	if (IS_STAGE_BEGIN) {
+		sceneBeginTick = logicBeginTicks;
+		IS_STAGE_BEGIN = false;
+	}
 
 	// 1. 키보드 입력부
+	if (GetAsyncKeyState(VK_ESCAPE) != 0x00) {
+		STAGE = 0;
+		GAME_STATE = TITLE;
+	}
 	// 2. 로직부
-	IS_STAGE_BEGIN = true;
-	GAME_STATE = TITLE;
 	++LOGIC_FPS_CNT;
 
 	// 한 프레임 이상 지연된 경우, 프레임 스킵
@@ -717,10 +748,27 @@ void gameoverScene()
 		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
 		return;
 	}
+
 	// 3. 랜더부
-	char startStr[] = "GAME OVER";
-	for (size_t i = 0; i < strlen(startStr); i++) {
-		Sprite_Draw(i, 0, startStr[i]);
+	char gameOverText[] = "GAME OVER";
+	char exitGuideText[] = "Press ESC to quit the game.";
+
+	// 문자열 길이 (null 제외)
+	int gameOverLength = sizeof(gameOverText) - 1;
+	int exitGuideLength = sizeof(exitGuideText) - 1;
+
+	// 좌표 계산
+	int gameOverStartX = (dfSCREEN_WIDTH - gameOverLength) / 2;
+	int gameOverStartY = (dfSCREEN_HEIGHT / 2) - 1;
+	int exitGuideStartX = (dfSCREEN_WIDTH - exitGuideLength) / 2;
+	int exitGuideStartY = (dfSCREEN_HEIGHT / 2) + 1;
+
+	// "GAME OVER" 출력
+	for (int i = 0; i < gameOverLength; i++) {
+		Sprite_Draw(gameOverStartX + i, gameOverStartY, gameOverText[i]);
+	}
+	for (int i = 0; i < exitGuideLength; i++) {
+		Sprite_Draw(exitGuideStartX + i, exitGuideStartY, exitGuideText[i]);
 	}
 	++RENDER_FPS_CNT;
 }
