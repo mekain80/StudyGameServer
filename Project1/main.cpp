@@ -9,33 +9,59 @@
 #pragma comment(lib, "winmm.lib")
 
 // 전역 변수
+// 씬 상태
 enum gameState { TITLE, LOADING, PLAY, GAME_OVER, GAME_CLEAR, EXIT };
-gameState g_gameState = TITLE;		// 게임(씬) 상태
-size_t g_maxStage = 0;				// 게임 최대 스테이지
-int g_stage = 0;					// 현재 스테이지
-int g_logicFpsCnt = 0;				// 로직 프레임 횟수
-int g_renderFpsCnt = 0;				// 렌더링 프레임 횟수
-bool g_isSceneBegin = true;			// 씬 첫 진입 확인
-LARGE_INTEGER g_freq;				// QPC의 Frequency
-LARGE_INTEGER g_frameStartTick;		// 다음 프레임의 목표 시작 틱(스케줄 기준, 고정 간격으로 전진)
-LARGE_INTEGER g_sceneStartTick;		// 현재 씬에 진입한 순간의 틱(씬 교체 시에만 갱신)
-LARGE_INTEGER g_updateStartTick;	// 매번 업데이트 시작에서 순간의 틱(매 루프 갱신)
-Player player;						// 플레이어
-Enemy enemies[kMaxEnemies];			// 적
-Bullet bullets[kMaxBullets];		// 총알
+gameState g_gameState = TITLE;      // 현재 씬 상태
 
+// 진행/계수
+size_t g_maxStage = 0;              // 스테이지 수(최대)
+int    g_stage = 0;                 // 현재 스테이지 인덱스
+int    g_logicFpsCnt = 0;           // 로직 프레임 누적
+int    g_renderFpsCnt = 0;          // 렌더 프레임 누적
+bool   g_isSceneBegin = true;       // 씬 첫 진입 플래그
+
+// 타이밍(단위: QPC counts)
+LARGE_INTEGER g_freq;               // 초당 카운트(주파수)
+LARGE_INTEGER g_frameStartTick;     // 다음 프레임 목표 시작 카운트(고정 간격 스케줄 기준)
+LARGE_INTEGER g_sceneStartTick;     // 씬 진입 시점 카운트(씬 전환 때만 갱신)
+LARGE_INTEGER g_updateStartTick;    // 매 루프 갱신 시작 시점 카운트
+
+// 엔티티 컨테이너
+Player player;                      // 플레이어 1개
+Enemy  enemies[kMaxEnemies];        // 적 풀
+Bullet bullets[kMaxBullets];        // 탄환 풀
+
+
+// 함수
+// 타이틀 화면 처리(입력/표시/상태전환 트리거)
 void titleScene();
+
+// 로딩 화면 처리(리소스/CSV 준비 + 최소 대기 연출)
 void loadingScene();
+
+// 게임 플레이 처리(입력→로직→충돌/사망/클리어 판정→렌더)
 void playScene();
+
+// 패배 화면 처리(재도전/타이틀 복귀 선택)
 void gameOverScene();
+
+// 클리어 화면 처리(최종 연출/타이틀 복귀)
 void gameClearScene();
 
-void changeGameState(gameState);
+// 씬 전환: 내부적으로 g_gameState 갱신 및 g_isSceneBegin, g_sceneStartTick 리셋
+void changeGameState(gameState next);
+
+// 렌더링 스킵 여부 판정: 예) 로직 지연 시 렌더 1회 생략(프레임 유지 목적)
 bool isFrameSkip();
-bool isKeyDown(SHORT);
+
+// 키 눌림 확인(즉시 상태, Windows GetAsyncKeyState 래핑)
+bool isKeyDown(SHORT vk);
+
+// HUD 클리어(플레이 전 상태에서 UI 영역 정리)
 void clearHUD();
 
-void frameTest();
+// 프레임/시간 테스트 유틸: QPC/프레임 카운트 확인용
+void testFps();
 
 //--------------------------------------------------------------------
 // 화면 깜빡임을 없애기 위한 화면 버퍼.
@@ -354,6 +380,7 @@ void playScene() {
 		csvGetValueInTable(g_stageInfoPath, g_stage, "stage_name", stageName, sizeof(stageName));
 		csvLoadAll(stageName);
 
+		// 적 배치
 		size_t enemyIdArraySize = 0;
 		int* enemyInfoArray = getCsvIdArray(stageName, enemyIdArraySize);
 		for (size_t i = 0; i < enemyIdArraySize; i++)
@@ -480,7 +507,7 @@ void playScene() {
 			// 이동 패턴 순환
 			if (movePattern[enemies[i].currMovePattern] != '\0')
 				++enemies[i].currMovePattern;
-			if (movePattern[enemies[i].currMovePattern] == '\0')
+			else
 				enemies[i].currMovePattern = 0;
 
 			enemies[i].movedTick = g_logicFpsCnt;
@@ -525,16 +552,21 @@ void playScene() {
 		// 이동 쿨다운
 		if (bullets[bulletIdx].movedTick + bullets[bulletIdx].speed < g_logicFpsCnt) {
 			if (bullets[bulletIdx].isEnemy) {
-				if (bullets[bulletIdx].y + 1 < dfSCREEN_HEIGHT) bullets[bulletIdx].y += 1;
-				else bullets[bulletIdx].isVisible = false;
+				if (bullets[bulletIdx].y + 1 < dfSCREEN_HEIGHT) 
+					bullets[bulletIdx].y += 1;
+				else 
+					bullets[bulletIdx].isVisible = false;
 			}
 			else {
-				if (bullets[bulletIdx].y - 1 >= 0) bullets[bulletIdx].y -= 1;
-				else bullets[bulletIdx].isVisible = false;
+				if (bullets[bulletIdx].y - 1 >= 0) 
+					bullets[bulletIdx].y -= 1;
+				else 
+					bullets[bulletIdx].isVisible = false;
 			}
 			bullets[bulletIdx].movedTick = g_logicFpsCnt;
 		}
 
+		// 위 로직에서 총알이 비활성화 될 수 있어 다시 확인
 		if (!bullets[bulletIdx].isVisible) continue;
 
 		// 적과 충돌(플레이어 총알만)
@@ -613,8 +645,8 @@ void playScene() {
 	}
 
 	// HUD 문자열 생성
-	// STAGE : %d	 +		move : arrows
-	// HP : %d		 +		attack : Z
+	// STAGE : %d	  		move : arrows
+	// HP : %d		  		attack : Z
 	if (player.isVisible and (isClear == false)) {
 		char left[64];
 		char right[64];
