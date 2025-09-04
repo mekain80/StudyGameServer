@@ -4,88 +4,25 @@
 #include "Console.h"
 #include <stdlib.h> 
 #include "csvLoader.h" 
+#include "config.h" 
+#include "entities.h" 
 #pragma comment(lib, "winmm.lib")
 
+// 전역 변수
 enum gameState { TITLE, LOADING, PLAY, GAME_OVER, GAME_CLEAR, EXIT };
-gameState g_gameState = TITLE;
-
-const int kMaxEnemies = 1000;
-const int kMaxBullets = 100;
-const int kBulletDamage = 1;
-const int kEnemyDamage = 1;
-const int kPlayerMaxHP = 5;
-const char kPlayerShape = 'A';
-const char kBulletShape = 'I';
-const int kMaxPatternCnt = 30;
-const int kPlayerStartPosX = dfSCREEN_WIDTH / 2;
-const int kPlayerStartPosY = dfSCREEN_HEIGHT - 1;
-const int kFps = 50;
-const double kFrameTimeMs = 1000.0 / kFps; // 1프레임 = 약 20ms
-const double kFrameTimeSec = 1.0 / kFps;
-const int kPlayerSpeedCellsPerFrame = 2;
-const int kPlayerAttackSpeed = 1; // TODO 약 8로 조정, 현재는 테스트를 위해 1로 설정
-const int kPlayerInvincibleFrames = 30; // 데미지 받고 몇 프레임 무적으로 할것인지
-const char kPlayerInvincibleShape = 'B';
-const int kDefaultBulletSpeed = 5;
-const int kMinWaitTimeLoadingScene = 1;
-const int kLoadingBarLength = 10;
-
-size_t g_maxStage = 0;
-int g_stage = 0;
-int g_logicFpsCnt = 0;
-int g_renderFpsCnt = 0;
-bool g_isSceneBegin = true;
-LARGE_INTEGER g_freq;
-// 다음 프레임의 목표 시작 틱(스케줄 기준, 고정 간격으로 전진)
-LARGE_INTEGER g_frameStartTick;
-
-// 현재 씬에 진입한 순간의 틱(씬 교체 시에만 갱신)
-LARGE_INTEGER g_sceneStartTick;
-
-// 매번 업데이트 시작에서 순간의 틱(매 루프 갱신)
-LARGE_INTEGER g_updateStartTick;
-
-const char g_stageInfoPath[] = "stage_info.csv";
-const char g_enemyInfoPath[] = "enemy_info.csv";
-
-
-struct Player
-{
-	int hp;
-	int x, y;
-	bool isVisible = false;
-	int movedTick = 0;
-	int atkedTick = 0;
-	int damagedTick = 0;
-};
-
-struct Enemy
-{
-	int hp;
-	int x, y;
-	int type;
-	bool isVisible = false;
-	int moveSpeed = 0;
-	int atkSpeed = 0;
-	int currMovePattern = 0; 
-	int movedTick = 0;
-	int atkedTick = 0;
-	char shape;
-};
-
-struct Bullet
-{
-	int x, y;
-	bool isEnemy;
-	bool isVisible = false;
-	int speed = kDefaultBulletSpeed;
-	int movedTick = 0;
-};
-
-// 변수
-Player player;
-Enemy enemies[kMaxEnemies];
-Bullet bullets[kMaxBullets];
+gameState g_gameState = TITLE;		// 게임(씬) 상태
+size_t g_maxStage = 0;				// 게임 최대 스테이지
+int g_stage = 0;					// 현재 스테이지
+int g_logicFpsCnt = 0;				// 로직 프레임 횟수
+int g_renderFpsCnt = 0;				// 렌더링 프레임 횟수
+bool g_isSceneBegin = true;			// 씬 첫 진입 확인
+LARGE_INTEGER g_freq;				// QPC의 Frequency
+LARGE_INTEGER g_frameStartTick;		// 다음 프레임의 목표 시작 틱(스케줄 기준, 고정 간격으로 전진)
+LARGE_INTEGER g_sceneStartTick;		// 현재 씬에 진입한 순간의 틱(씬 교체 시에만 갱신)
+LARGE_INTEGER g_updateStartTick;	// 매번 업데이트 시작에서 순간의 틱(매 루프 갱신)
+Player player;						// 플레이어
+Enemy enemies[kMaxEnemies];			// 적
+Bullet bullets[kMaxBullets];		// 총알
 
 void titleScene();
 void loadingScene();
@@ -408,6 +345,7 @@ void playScene() {
 		}
 		for (size_t i = 0; i < kMaxBullets; ++i) {
 			bullets[i].isVisible = false;
+			bullets[i].speed = kDefaultBulletSpeed;
 			bullets[i].movedTick = 0;
 		}
 
@@ -454,7 +392,7 @@ void playScene() {
 	const bool isLeft = isKeyDown(VK_LEFT);
 
 	// 플레이어 이동
-	if (player.movedTick + kPlayerSpeedCellsPerFrame < g_logicFpsCnt) {
+	if (player.movedTick + kPlayerMoveSpeedCellsPerFrame < g_logicFpsCnt) {
 		if (isUp && isDown) {}
 		else if (isUp && (player.y - 1 >= 0)) {
 			player.y -= 1;

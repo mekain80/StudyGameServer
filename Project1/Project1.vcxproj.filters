@@ -21,10 +21,29 @@
     <ClCompile Include="Console.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="csvLoader.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="config.h">
+      <Filter>헤더 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Console.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="csvLoader.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="entities.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="enemy_info.csv" />
+    <None Include="stage1.csv" />
+    <None Include="stage2.csv" />
+    <None Include="stage3.csv" />
+    <None Include="stage_info.csv" />
   </ItemGroup>
 </Project>
