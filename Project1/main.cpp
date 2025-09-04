@@ -9,37 +9,37 @@
 enum gameState { TITLE, LOADING, PLAY, GAME_OVER, GAME_CLEAR, EXIT };
 gameState GAME_STATE;
 
-const int MAX_ENEMY = 1000;
-const int MAX_BULLET = 100;
-const int BULLET_DEMAGE = 1;
-const int ENEMY_DEMAGE = 1;
-const int PLAYER_MAX_HP = 5;
-const char PLAYER_SHAPE = 'A';
-const char BULLET_SHAPE = 'I';
-const int MAX_PATTERN_CNT = 30;
-const int PLAYER_START_POS_X = dfSCREEN_WIDTH / 2;
-const int PLAYER_START_POS_Y = dfSCREEN_HEIGHT - 1;
-const int FPS = 50;
-const double FRAME_TIME = 1000 / FPS; // 1프레임 = 약 20ms
-const double FRAME_TIME_SEC = 1.0 / FPS;
-const int PLAYER_SPEED = 2;
-const int PLAYER_ATTACK_SPEED = 1; // TODO 약 8로 조정, 현재는 테스트를 위해 1로 설정
-const int PLAYER_BULLET_SPEED = 2;
-const int PLAYER_INVINCIBLE_FRAMES = 30; // 데미지 받고 몇 프레임 무적으로 할것인지
-const char PLAYER_INVINCIBLE_SHAPE = 'B';
-const int DEFAULT_BULLET_SPEED = 5;
-const int MIN_WAIT_TIME_LOADING_SCENE = 1;
-size_t MAX_STAGE = 0;
+const int kMaxEnemies = 1000;
+const int kMaxBullets = 100;
+const int kBulletDamage = 1;
+const int kEnemyDamage = 1;
+const int kPlayerMaxHP = 5;
+const char kPlayerShape = 'A';
+const char kBulletShape = 'I';
+const int kMaxPatternCnt = 30;
+const int kPlayerStartPosX = dfSCREEN_WIDTH / 2;
+const int kPlayerStartPosY = dfSCREEN_HEIGHT - 1;
+const int kFps = 50;
+const double kFrameTimeMs = 1000 / kFps; // 1프레임 = 약 20ms
+const double kFrameTimeSec = 1.0 / kFps;
+const int kPlayerSpeedCellsPerFrame = 2;
+const int kPlayerAttackSpeed = 1; // TODO 약 8로 조정, 현재는 테스트를 위해 1로 설정
+const int kPlayerBulletSpeed = 2;
+const int kPlayerInvincibleFrames = 30; // 데미지 받고 몇 프레임 무적으로 할것인지
+const char kPlayerInvincibleShape = 'B';
+const int kDefaultBulletSpeed = 5;
+const int kMinWaitTimeLoadingScene = 1;
 
 
-int STAGE = 0;
-int LOGIC_FPS_CNT = 0;
-int RENDER_FPS_CNT = 0;
-bool IS_SCENE_BEGIN = true;
-LARGE_INTEGER freq, startTime;
-LARGE_INTEGER sceneBeginTick;
-const char* STAGE_INFO = "stage_info.csv";
-const char* ENEMY_INFO = "enemy_info.csv";
+size_t g_maxStage = 0;
+int g_stage = 0;
+int g_logicFpsCnt = 0;
+int g_renderFpsCnt = 0;
+bool g_isSceneBegin = true;
+LARGE_INTEGER g_freq, g_frameStartTime;
+LARGE_INTEGER g_sceneBeginTime;
+const char g_stageInfoPath[] = "stage_info.csv";
+const char g_enemyInfoPath[] = "enemy_info.csv";
 
 
 struct Player
@@ -71,14 +71,14 @@ struct Bullet
 	int x, y;
 	bool isEnemy;
 	bool isVisible = false;
-	int speed = DEFAULT_BULLET_SPEED;
+	int speed = kDefaultBulletSpeed;
 	int movedTick = 0;
 };
 
 // 변수
 Player player;
-Enemy enemies[MAX_ENEMY];
-Bullet bullets[MAX_BULLET];
+Enemy enemies[kMaxEnemies];
+Bullet bullets[kMaxBullets];
 
 void titleScene();
 void loadingScene();
@@ -172,8 +172,8 @@ void Sprite_Draw(int iX, int iY, char chSprite);
 void main(void)
 {
 	timeBeginPeriod(1);
-	QueryPerformanceFrequency(&freq);
-	QueryPerformanceCounter(&startTime);
+	QueryPerformanceFrequency(&g_freq);
+	QueryPerformanceCounter(&g_frameStartTime);
 
 	LARGE_INTEGER end;
 
@@ -207,36 +207,14 @@ void main(void)
 			return;
 		}
 
-
-		// 하단은 게임씬의 로직 예시이며 
-		// 이 부분에는 씬 표현을 위한 분기가 들어가시면 됩니다.
-		// 
-		// 
-		// GameUpdate() 내부 예시
-		// 
-		// 1. 키보드 입력부
-		// 2. 로직부 
-		// 3. 랜더부
-			/*  예시
-				// 스크린 버퍼를 지움
-				Buffer_Clear();
-				// 스크린 버퍼에 객체들 출력
-				Sprite_Draw(iX, 10, 'A');
-				// 스크린 버퍼를 화면으로 출력
-				Buffer_Flip();
-			*/
-
-			// 프레임 맞추기용 대기 Sleep(X)
 		QueryPerformanceCounter(&end);
-		double elapsed = static_cast<double>(end.QuadPart - startTime.QuadPart) / freq.QuadPart;
+		double elapsed = static_cast<double>(end.QuadPart - g_frameStartTime.QuadPart) / g_freq.QuadPart;
 
-		if (elapsed < FRAME_TIME_SEC) {
-			// 남은 시간(초 → 밀리초)
-			DWORD sleepTime = static_cast<DWORD>((FRAME_TIME_SEC - elapsed) * 1000.0);
+		if (elapsed < kFrameTimeSec) {
+			DWORD sleepTime = static_cast<DWORD>((kFrameTimeSec - elapsed) * 1000.0);
 			Sleep(sleepTime);
 		}
-		// 기준 시간 갱신 (틱 단위로)
-		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+		g_frameStartTime.QuadPart += static_cast<LONGLONG>(kFrameTimeSec * g_freq.QuadPart);
 
 		Buffer_Flip();
 	}
@@ -302,19 +280,20 @@ void titleScene() {
 	// 1. 키보드 입력부
 	if (GetAsyncKeyState('A') != 0x00) {
 		changeGameState(LOADING);
-	} else if (GetAsyncKeyState(VK_ESCAPE) != 0x8000) {
+	}
+	if (GetAsyncKeyState(VK_ESCAPE) != 0) {
 		changeGameState(EXIT);
 	}
 
 	// 2. 로직부 
-	++LOGIC_FPS_CNT;
+	++g_logicFpsCnt;
 
 	// 3. 랜더부
 
 	// 한 프레임 이상 지연된 경우, 프레임 스킵
-	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
-	if (FRAME_TIME_SEC < secsSinceLastFrame) {
-		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - g_frameStartTime.QuadPart) / static_cast<double>(g_freq.QuadPart);
+	if (kFrameTimeSec < secsSinceLastFrame) {
+		g_frameStartTime.QuadPart += static_cast<LONGLONG>(kFrameTimeSec * g_freq.QuadPart);
 		return;
 	}
 
@@ -339,48 +318,48 @@ void titleScene() {
 	for (int i = 0; i < startGuideLength; i++) {
 		Sprite_Draw(startGuideStartX + i, startGuideStartY, startGuideText[i]);
 	}
-	++RENDER_FPS_CNT;
+	++g_renderFpsCnt;
 }
 
 void loadingScene() {
 	LARGE_INTEGER logicBeginTicks;
 	QueryPerformanceCounter(&logicBeginTicks);
 
-	if (IS_SCENE_BEGIN) {
-		sceneBeginTick = logicBeginTicks;
+	if (g_isSceneBegin) {
+		g_sceneBeginTime = logicBeginTicks;
 	}
 
 	// 1. 키보드 입력부
 
 	// 2. 로직부 
 	char stage_name[256];
-	if (IS_SCENE_BEGIN == true) {
-		++STAGE;
-		if (csvGetValueInTable(STAGE_INFO, STAGE, "stage_name", stage_name, sizeof(stage_name))) {
+	if (g_isSceneBegin == true) {
+		++g_stage;
+		if (csvGetValueInTable(g_stageInfoPath, g_stage, "stage_name", stage_name, sizeof(stage_name))) {
 			csvLoadAll(stage_name);
-			if (MAX_STAGE == 0) {
-				getCsvIdArray(STAGE_INFO, MAX_STAGE);
+			if (g_maxStage == 0) {
+				getCsvIdArray(g_stageInfoPath, g_maxStage);
 			}
 		}
 
-		csvLoadAll(ENEMY_INFO);
-		IS_SCENE_BEGIN = false;
+		csvLoadAll(g_enemyInfoPath);
+		g_isSceneBegin = false;
 	}
-	const double sceneElapedtime = static_cast<double>(logicBeginTicks.QuadPart - sceneBeginTick.QuadPart) / static_cast<double>(freq.QuadPart);
+	const double sceneElapedtime = static_cast<double>(logicBeginTicks.QuadPart - g_sceneBeginTime.QuadPart) / static_cast<double>(g_freq.QuadPart);
 
 	// 한 프레임 이상 지연된 경우, 프레임 스킵
-	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
-	if (FRAME_TIME_SEC < secsSinceLastFrame) {
-		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - g_frameStartTime.QuadPart) / static_cast<double>(g_freq.QuadPart);
+	if (kFrameTimeSec < secsSinceLastFrame) {
+		g_frameStartTime.QuadPart += static_cast<LONGLONG>(kFrameTimeSec * g_freq.QuadPart);
 		return;
 	}
 
 	// 3. 랜더부
 	char loadingText[64];
-	if (MAX_STAGE == STAGE - 2) {
+	if (g_maxStage == g_stage - 2) {
 		snprintf(loadingText, sizeof(loadingText), "LAST STAGE, NOW LOADING...");
 	} else {
-		snprintf(loadingText, sizeof(loadingText), "STAGE %d, NOW LOADING...", STAGE);
+		snprintf(loadingText, sizeof(loadingText), "STAGE %d, NOW LOADING...", g_stage);
 	}
 
 	int loadingTextLength = strlen(loadingText);
@@ -399,7 +378,7 @@ void loadingScene() {
 	const int loadingBarStartY = (dfSCREEN_HEIGHT / 2) + 2;
 
 	// 경과 시간 비율 계산
-	float ratio = (float)sceneElapedtime / (float)MIN_WAIT_TIME_LOADING_SCENE;
+	float ratio = (float)sceneElapedtime / (float)kMinWaitTimeLoadingScene;
 	if (ratio > 1.f) ratio = 1.f;
 	if (ratio < 0.f) ratio = 0.f;
 	int filled = (int)(ratio * loadingBarLength);
@@ -410,7 +389,7 @@ void loadingScene() {
 	}
 
 	// 로딩 창 최소 시간 초과 & 데이터 로드 완료 시 PLAY SCENE으로 전환
-	if (MIN_WAIT_TIME_LOADING_SCENE < sceneElapedtime && csvLoadAll(STAGE_INFO) && csvLoadAll(ENEMY_INFO)) {
+	if (kMinWaitTimeLoadingScene < sceneElapedtime && csvLoadAll(g_stageInfoPath) && csvLoadAll(g_enemyInfoPath)) {
 		changeGameState(PLAY);
 		return;
 	}
@@ -422,14 +401,14 @@ void playScene() {
 
 
 	// 스테이지 시작 판정
-	if (IS_SCENE_BEGIN == true) {
-		player.hp = PLAYER_MAX_HP;
+	if (g_isSceneBegin == true) {
+		player.hp = kPlayerMaxHP;
 		player.isVisible = true;
-		player.x = PLAYER_START_POS_X;
-		player.y = PLAYER_START_POS_Y;
+		player.x = kPlayerStartPosX;
+		player.y = kPlayerStartPosY;
 
 		char stageName[256];
-		csvGetValueInTable(STAGE_INFO, STAGE, "stage_name", stageName, sizeof(stageName));
+		csvGetValueInTable(g_stageInfoPath, g_stage, "stage_name", stageName, sizeof(stageName));
 		csvLoadAll(stageName);
 
 		size_t enemyIArraySize;
@@ -446,24 +425,24 @@ void playScene() {
 			int type = atoi(buf);
 			enemies[i].type = type;
 
-			csvGetValueInTable(ENEMY_INFO, type, "hp", buf, sizeof(buf));
+			csvGetValueInTable(g_enemyInfoPath, type, "hp", buf, sizeof(buf));
 			enemies[i].hp = atoi(buf);
-			csvGetValueInTable(ENEMY_INFO, type, "move_speed", buf, sizeof(buf));
+			csvGetValueInTable(g_enemyInfoPath, type, "move_speed", buf, sizeof(buf));
 			enemies[i].moveSpeed = atoi(buf);
-			csvGetValueInTable(ENEMY_INFO, type, "atk_speed", buf, sizeof(buf));
+			csvGetValueInTable(g_enemyInfoPath, type, "atk_speed", buf, sizeof(buf));
 			enemies[i].atkSpeed = atoi(buf);
-			csvGetValueInTable(ENEMY_INFO, type, "shape", buf, sizeof(buf));
+			csvGetValueInTable(g_enemyInfoPath, type, "shape", buf, sizeof(buf));
 			enemies[i].shape = buf[0];
 
 			enemies[i].isVisible = true;
 		}
 
-		for (size_t i = 0; i < MAX_BULLET; i++)
+		for (size_t i = 0; i < kMaxBullets; i++)
 		{
 			bullets[i].isVisible = false;
 		}
 
-		IS_SCENE_BEGIN = false;
+		g_isSceneBegin = false;
 	}
 
 
@@ -472,18 +451,18 @@ void playScene() {
 	SHORT downKey = GetAsyncKeyState(VK_DOWN);
 	SHORT rightKey = GetAsyncKeyState(VK_RIGHT);
 	SHORT leftKey = GetAsyncKeyState(VK_LEFT);
-	if (player.movedTick + PLAYER_SPEED < LOGIC_FPS_CNT) {
+	if (player.movedTick + kPlayerSpeedCellsPerFrame < g_logicFpsCnt) {
 		if (upKey != 0 && downKey != 0) {}
 		else if (upKey != 0) {
 			if (player.y - 1 >= 0) {
 				player.y -= 1;
-				player.movedTick = LOGIC_FPS_CNT;
+				player.movedTick = g_logicFpsCnt;
 			}
 		}
 		else if (downKey != 0) {
 			if (player.y + 1 < dfSCREEN_HEIGHT) {
 				player.y += 1;
-				player.movedTick = LOGIC_FPS_CNT;
+				player.movedTick = g_logicFpsCnt;
 			}
 		}
 
@@ -491,24 +470,24 @@ void playScene() {
 		else if (rightKey != 0) {
 			if (player.x + 1 < dfSCREEN_WIDTH - 1) {
 				player.x += 1;
-				player.movedTick = LOGIC_FPS_CNT;
+				player.movedTick = g_logicFpsCnt;
 			}
 		}
 		else if (leftKey != 0) {
 			if (player.x - 1 >= 0) {
 				player.x -= 1;
-				player.movedTick = LOGIC_FPS_CNT;
+				player.movedTick = g_logicFpsCnt;
 			}
 		}
 	}
 	// 총알 충돌 확인
-	for (size_t i = 0; i < MAX_BULLET; i++)
+	for (size_t i = 0; i < kMaxBullets; i++)
 	{
 		if (bullets[i].isVisible) {
 			if (player.isVisible) {
-				if (bullets[i].isEnemy && bullets[i].x == player.x && bullets[i].y == player.y && player.damagedTick + PLAYER_INVINCIBLE_FRAMES <= LOGIC_FPS_CNT) {
-					player.hp -= BULLET_DEMAGE;
-					player.damagedTick = LOGIC_FPS_CNT;
+				if (bullets[i].isEnemy && bullets[i].x == player.x && bullets[i].y == player.y && player.damagedTick + kPlayerInvincibleFrames <= g_logicFpsCnt) {
+					player.hp -= kBulletDamage;
+					player.damagedTick = g_logicFpsCnt;
 					if (player.hp <= 0) {
 						player.isVisible = false;
 						changeGameState(GAME_OVER);
@@ -519,13 +498,13 @@ void playScene() {
 		}
 	}
 	// 적과의 충돌 확인 로직
-	for (size_t i = 0; i < MAX_ENEMY; i++)
+	for (size_t i = 0; i < kMaxEnemies; i++)
 	{
 		if (enemies[i].isVisible) {
 			if (player.isVisible) {
-				if (enemies[i].x == player.x && enemies[i].y == player.y && player.damagedTick + PLAYER_INVINCIBLE_FRAMES <= LOGIC_FPS_CNT) {
-					player.hp -= ENEMY_DEMAGE;
-					player.damagedTick = LOGIC_FPS_CNT;
+				if (enemies[i].x == player.x && enemies[i].y == player.y && player.damagedTick + kPlayerInvincibleFrames <= g_logicFpsCnt) {
+					player.hp -= kEnemyDamage;
+					player.damagedTick = g_logicFpsCnt;
 					if (player.hp <= 0) {
 						player.isVisible = false;
 						changeGameState(GAME_OVER);
@@ -536,17 +515,17 @@ void playScene() {
 	}
 
 	// 총알 발사
-	if (GetAsyncKeyState('Z') != 0 and player.atkedTick + PLAYER_ATTACK_SPEED < LOGIC_FPS_CNT) {
-		for (size_t i = 0; i < MAX_BULLET; i++)
+	if (GetAsyncKeyState('Z') != 0 and player.atkedTick + kPlayerAttackSpeed < g_logicFpsCnt) {
+		for (size_t i = 0; i < kMaxBullets; i++)
 		{
 			if (bullets[i].isVisible == false) {
 				bullets[i].isVisible = true;
 				bullets[i].x = player.x;
 				bullets[i].y = player.y - 1;
 				bullets[i].isEnemy = false;
-				bullets[i].movedTick = LOGIC_FPS_CNT;
+				bullets[i].movedTick = g_logicFpsCnt;
 
-				player.atkedTick = LOGIC_FPS_CNT;
+				player.atkedTick = g_logicFpsCnt;
 				break;
 			}
 		}
@@ -561,14 +540,14 @@ void playScene() {
 
 	// 2. 로직부	
 	// 적의 이동 & 공격
-	for (size_t i = 0; i < MAX_ENEMY; i++)
+	for (size_t i = 0; i < kMaxEnemies; i++)
 	{
 		if (enemies[i].isVisible) {
-			if (enemies[i].movedTick + enemies[i].moveSpeed < LOGIC_FPS_CNT) {
+			if (enemies[i].movedTick + enemies[i].moveSpeed < g_logicFpsCnt) {
 
 				int type = enemies[i].type;
-				char movePattern[MAX_PATTERN_CNT] = "";
-				csvGetValueInTable(ENEMY_INFO, type, "move_pattern", movePattern, sizeof(movePattern));
+				char movePattern[kMaxPatternCnt] = "";
+				csvGetValueInTable(g_enemyInfoPath, type, "move_pattern", movePattern, sizeof(movePattern));
 				
 				// 초기값을 현재 좌표로
 				int nx = enemies[i].x;
@@ -603,13 +582,13 @@ void playScene() {
 					enemies[i].currMovePattern = 0;
 				}
 
-				enemies[i].movedTick = LOGIC_FPS_CNT;
+				enemies[i].movedTick = g_logicFpsCnt;
 
 				// 적이 움직였으므로 플레이어와 충돌 로직 확인
 				if (player.isVisible) {
-					if (enemies[i].x == player.x && enemies[i].y == player.y && player.damagedTick + PLAYER_INVINCIBLE_FRAMES <= LOGIC_FPS_CNT) {
-						player.hp -= ENEMY_DEMAGE;
-						player.damagedTick = LOGIC_FPS_CNT;
+					if (enemies[i].x == player.x && enemies[i].y == player.y && player.damagedTick + kPlayerInvincibleFrames <= g_logicFpsCnt) {
+						player.hp -= kEnemyDamage;
+						player.damagedTick = g_logicFpsCnt;
 						if (player.hp <= 0) {
 							player.isVisible = false;
 							changeGameState(GAME_OVER);
@@ -618,17 +597,17 @@ void playScene() {
 				}
 			}
 
-			if (enemies[i].atkedTick + enemies[i].atkSpeed < LOGIC_FPS_CNT) {
-				for (size_t j = 0; j < MAX_BULLET; j++)
+			if (enemies[i].atkedTick + enemies[i].atkSpeed < g_logicFpsCnt) {
+				for (size_t j = 0; j < kMaxBullets; j++)
 				{
 					if (bullets[j].isVisible == false) {
 						bullets[j].isVisible = true;
 						bullets[j].x = enemies[i].x;
 						bullets[j].y = enemies[i].y + 1;
 						bullets[j].isEnemy = true;
-						bullets[j].movedTick = LOGIC_FPS_CNT;
+						bullets[j].movedTick = g_logicFpsCnt;
 
-						enemies[i].atkedTick = LOGIC_FPS_CNT;
+						enemies[i].atkedTick = g_logicFpsCnt;
 						break;
 					}
 				}
@@ -636,14 +615,14 @@ void playScene() {
 		}
 	}
 	// 총알 충돌 확인
-	for (size_t i = 0; i < MAX_BULLET; i++)
+	for (size_t i = 0; i < kMaxBullets; i++)
 	{
 		if (bullets[i].isVisible) {
-			for (size_t j = 0; j < MAX_ENEMY; j++)
+			for (size_t j = 0; j < kMaxEnemies; j++)
 			{
 				if (enemies[j].isVisible) {
 					if (bullets[i].isEnemy == false && bullets[i].x == enemies[j].x && bullets[i].y == enemies[j].y) {
-						enemies[j].hp -= BULLET_DEMAGE;
+						enemies[j].hp -= kBulletDamage;
 						if (enemies[j].hp <= 0) {
 							player.isVisible = false;
 						}
@@ -654,12 +633,12 @@ void playScene() {
 		}
 	}
 
-	for (size_t i = 0; i < MAX_BULLET; i++)
+	for (size_t i = 0; i < kMaxBullets; i++)
 	{
 		if (bullets[i].isVisible) {
 			//  총알 전진
 			if (bullets[i].isEnemy) {
-				if (bullets[i].movedTick + bullets[i].speed < LOGIC_FPS_CNT) {
+				if (bullets[i].movedTick + bullets[i].speed < g_logicFpsCnt) {
 					if (bullets[i].y + 1 < dfSCREEN_HEIGHT) {
 						bullets[i].y += 1;
 					}
@@ -667,11 +646,11 @@ void playScene() {
 						bullets[i].isVisible = false;
 					}
 					// 총알이 멈추는 경우는 없어 무조건 갱신
-					bullets[i].movedTick = LOGIC_FPS_CNT;
+					bullets[i].movedTick = g_logicFpsCnt;
 				}
 			}
 			else {
-				if (bullets[i].movedTick + bullets[i].speed < LOGIC_FPS_CNT) {
+				if (bullets[i].movedTick + bullets[i].speed < g_logicFpsCnt) {
 					if (bullets[i].y - 1 >= 0) {
 						bullets[i].y -= 1;
 					}
@@ -680,16 +659,16 @@ void playScene() {
 					}
 
 					// 총알이 멈추는 경우는 없어 무조건 갱신
-					bullets[i].movedTick = LOGIC_FPS_CNT;
+					bullets[i].movedTick = g_logicFpsCnt;
 				}
 			}
 
 			// 적과 총알 충돌 판정
-			for (size_t j = 0; j < MAX_ENEMY; j++)
+			for (size_t j = 0; j < kMaxEnemies; j++)
 			{
 				if (enemies[j].isVisible) {
 					if (bullets[i].isEnemy == false && bullets[i].x == enemies[j].x && bullets[i].y == enemies[j].y) {
-						enemies[j].hp -= BULLET_DEMAGE;
+						enemies[j].hp -= kBulletDamage;
 						if (enemies[j].hp <= 0) {
 							enemies[j].isVisible = false;
 						}
@@ -700,9 +679,9 @@ void playScene() {
 
 			// 플레이어와 총알 충돌 판정
 			if (player.isVisible) {
-				if (bullets[i].isEnemy && bullets[i].x == player.x && bullets[i].y == player.y && player.damagedTick + PLAYER_INVINCIBLE_FRAMES <= LOGIC_FPS_CNT) {
-					player.hp -= BULLET_DEMAGE;
-					player.damagedTick = LOGIC_FPS_CNT;
+				if (bullets[i].isEnemy && bullets[i].x == player.x && bullets[i].y == player.y && player.damagedTick + kPlayerInvincibleFrames <= g_logicFpsCnt) {
+					player.hp -= kBulletDamage;
+					player.damagedTick = g_logicFpsCnt;
 					if (player.hp <= 0) {
 						player.isVisible = false;
 						changeGameState(GAME_OVER);
@@ -712,49 +691,49 @@ void playScene() {
 			}
 		}
 	}
-	++LOGIC_FPS_CNT;
+	++g_logicFpsCnt;
 
 
 
 	// 3. 랜더부
 	// 한 프레임 이상 지연된 경우, 프레임 스킵
-	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
-	if (FRAME_TIME_SEC < secsSinceLastFrame) {
+	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - g_frameStartTime.QuadPart) / static_cast<double>(g_freq.QuadPart);
+	if (kFrameTimeSec < secsSinceLastFrame) {
 		return;
 	}
 	// 무적 시간에 따른 플레이어 모양 변경
-	if (player.damagedTick != 0 && LOGIC_FPS_CNT - 1 <= player.damagedTick + PLAYER_INVINCIBLE_FRAMES) {
-		Sprite_Draw(player.x, player.y, PLAYER_INVINCIBLE_SHAPE);
+	if (player.damagedTick != 0 && g_logicFpsCnt - 1 <= player.damagedTick + kPlayerInvincibleFrames) {
+		Sprite_Draw(player.x, player.y, kPlayerInvincibleShape);
 	}
 	else {
-		Sprite_Draw(player.x, player.y, PLAYER_SHAPE);
+		Sprite_Draw(player.x, player.y, kPlayerShape);
 	}
 
-	for (size_t i = 0; i < MAX_ENEMY; i++)
+	for (size_t i = 0; i < kMaxEnemies; i++)
 	{
 		if (enemies[i].isVisible) {
 			Sprite_Draw(enemies[i].x, enemies[i].y, enemies[i].shape);
 		}
 	}
-	for (size_t i = 0; i < MAX_BULLET; i++)
+	for (size_t i = 0; i < kMaxBullets; i++)
 	{
 		if (bullets[i].isVisible) {
-			Sprite_Draw(bullets[i].x, bullets[i].y, BULLET_SHAPE);
+			Sprite_Draw(bullets[i].x, bullets[i].y, kBulletShape);
 		}
 	}
-	++RENDER_FPS_CNT;
+	++g_renderFpsCnt;
 
 
 	// 클리어 확인
 	bool isClear = true;
-	for (size_t i = 0; i < MAX_ENEMY; i++)
+	for (size_t i = 0; i < kMaxEnemies; i++)
 	{
 		if (enemies[i].isVisible) {
 			isClear = false;
 		}
 	}
 	if (isClear) {
-		if (STAGE != MAX_STAGE) {
+		if (g_stage != g_maxStage) {
 			changeGameState(LOADING);
 		}
 		else {
@@ -770,7 +749,7 @@ void playScene() {
 		{
 			char left[64];
 			char right[64];
-			snprintf(left, sizeof(left), "STAGE : %d", STAGE);
+			snprintf(left, sizeof(left), "STAGE : %d", g_stage);
 			snprintf(right, sizeof(right), "move : arrows");
 
 			int leftLen = (int)strlen(left);
@@ -802,23 +781,23 @@ void gameOverScene()
 {
 	LARGE_INTEGER logicBeginTicks;
 	QueryPerformanceCounter(&logicBeginTicks);
-	if (IS_SCENE_BEGIN) {
-		sceneBeginTick = logicBeginTicks;
-		IS_SCENE_BEGIN = false;
+	if (g_isSceneBegin) {
+		g_sceneBeginTime = logicBeginTicks;
+		g_isSceneBegin = false;
 	}
 
 	// 1. 키보드 입력부
 	if (GetAsyncKeyState(VK_ESCAPE) != 0x00) {
-		STAGE = 0;
+		g_stage = 0;
 		changeGameState(TITLE);
 	}
 	// 2. 로직부
-	++LOGIC_FPS_CNT;
+	++g_logicFpsCnt;
 
 	// 한 프레임 이상 지연된 경우, 프레임 스킵
-	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
-	if (FRAME_TIME_SEC < secsSinceLastFrame) {
-		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - g_frameStartTime.QuadPart) / static_cast<double>(g_freq.QuadPart);
+	if (kFrameTimeSec < secsSinceLastFrame) {
+		g_frameStartTime.QuadPart += static_cast<LONGLONG>(kFrameTimeSec * g_freq.QuadPart);
 		return;
 	}
 
@@ -843,33 +822,33 @@ void gameOverScene()
 	for (int i = 0; i < exitGuideLength; i++) {
 		Sprite_Draw(exitGuideStartX + i, exitGuideStartY, exitGuideText[i]);
 	}
-	++RENDER_FPS_CNT;
+	++g_renderFpsCnt;
 }
 
 void gameClearScene()
 {
 	LARGE_INTEGER logicBeginTicks;
 	QueryPerformanceCounter(&logicBeginTicks);
-	if (IS_SCENE_BEGIN) {
-		sceneBeginTick = logicBeginTicks;
-		IS_SCENE_BEGIN = false;
+	if (g_isSceneBegin) {
+		g_sceneBeginTime = logicBeginTicks;
+		g_isSceneBegin = false;
 
 	}
 
 	// 1. 키보드 입력부
 	if (GetAsyncKeyState(VK_ESCAPE) != 0x00) {
-		STAGE = 0;
+		g_stage = 0;
 		changeGameState(TITLE);
 		GetAsyncKeyState('A'); // A를 이전에 눌렀다면, esc 클릭 후 바로 게임이 실행됨으로 예외처리
 	}
 
 	// 2. 로직부
-	++LOGIC_FPS_CNT;
+	++g_logicFpsCnt;
 
 	// 한 프레임 이상 지연된 경우, 프레임 스킵
-	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
-	if (FRAME_TIME_SEC < secsSinceLastFrame) {
-		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - g_frameStartTime.QuadPart) / static_cast<double>(g_freq.QuadPart);
+	if (kFrameTimeSec < secsSinceLastFrame) {
+		g_frameStartTime.QuadPart += static_cast<LONGLONG>(kFrameTimeSec * g_freq.QuadPart);
 		return;
 	}
 
@@ -897,7 +876,7 @@ void gameClearScene()
 }
 
 void changeGameState(gameState nextState) {
-	IS_SCENE_BEGIN = true;
+	g_isSceneBegin = true;
 	GAME_STATE = nextState;
 	clearHUD();
 }
@@ -915,8 +894,8 @@ void testFps() { // main으로 대체해서 test
 	int logic_fps = 0, render_fps = 0;
 
 	timeBeginPeriod(1);
-	QueryPerformanceFrequency(&freq);
-	QueryPerformanceCounter(&startTime);
+	QueryPerformanceFrequency(&g_freq);
+	QueryPerformanceCounter(&g_frameStartTime);
 	QueryPerformanceCounter(&windowStart);
 
 	LARGE_INTEGER start, end;
@@ -925,11 +904,11 @@ void testFps() { // main으로 대체해서 test
 	while (true) {
 		QueryPerformanceCounter(&start);
 
-		double checkOneSec = static_cast<double>(startTime.QuadPart - windowStart.QuadPart) / freq.QuadPart;
+		double checkOneSec = static_cast<double>(g_frameStartTime.QuadPart - windowStart.QuadPart) / g_freq.QuadPart;
 		if (1 < checkOneSec) {
-			printf("logic FPS: %d, Render FPS: %d\n", LOGIC_FPS_CNT - logic_fps, RENDER_FPS_CNT - render_fps);
-			logic_fps = LOGIC_FPS_CNT;
-			render_fps = RENDER_FPS_CNT;
+			printf("logic FPS: %d, Render FPS: %d\n", g_logicFpsCnt - logic_fps, g_renderFpsCnt - render_fps);
+			logic_fps = g_logicFpsCnt;
+			render_fps = g_renderFpsCnt;
 			QueryPerformanceCounter(&windowStart);
 		}
 
@@ -940,27 +919,27 @@ void testFps() { // main으로 대체해서 test
 				// busy waiting
 			}
 		}
-		++LOGIC_FPS_CNT;
+		++g_logicFpsCnt;
 
 		// 한 프레임 이상 지연된 경우, 프레임 스킵
 		LARGE_INTEGER logicEndTicks;
 		QueryPerformanceCounter(&logicEndTicks);
-		const double secsSinceLastFrame = static_cast<double>(start.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
-		if (FRAME_TIME_SEC < secsSinceLastFrame) {
-			startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+		const double secsSinceLastFrame = static_cast<double>(start.QuadPart - g_frameStartTime.QuadPart) / static_cast<double>(g_freq.QuadPart);
+		if (kFrameTimeSec < secsSinceLastFrame) {
+			g_frameStartTime.QuadPart += static_cast<LONGLONG>(kFrameTimeSec * g_freq.QuadPart);
 			continue;
 		}
 
 		// 2. 렌더
 		QueryPerformanceCounter(&end);
-		double elapsed = static_cast<double>(end.QuadPart - startTime.QuadPart) / freq.QuadPart;
-		if (elapsed < FRAME_TIME_SEC) {
+		double elapsed = static_cast<double>(end.QuadPart - g_frameStartTime.QuadPart) / g_freq.QuadPart;
+		if (elapsed < kFrameTimeSec) {
 			// 남은 시간(초 → 밀리초)
-			DWORD sleepTime = static_cast<DWORD>((FRAME_TIME_SEC - elapsed) * 1000.0);
+			DWORD sleepTime = static_cast<DWORD>((kFrameTimeSec - elapsed) * 1000.0);
 			Sleep(sleepTime);
 		}
 		// 기준 시간 갱신 (틱 단위로)
-		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
-		++RENDER_FPS_CNT;
+		g_frameStartTime.QuadPart += static_cast<LONGLONG>(kFrameTimeSec * g_freq.QuadPart);
+		++g_renderFpsCnt;
 	}
 }
