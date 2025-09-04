@@ -6,7 +6,7 @@
 #include "csvLoader.h" 
 #pragma comment(lib, "winmm.lib")
 
-enum gameState { TITLE, LOADING, PLAY, GAMEOVER };
+enum gameState { TITLE, LOADING, PLAY, GAME_OVER, GAME_CLEAR };
 gameState GAME_STATE;
 
 const int MAX_ENEMY = 1000;
@@ -84,7 +84,8 @@ Bullet bullets[MAX_BULLET];
 void titleScene();
 void loadingScene();
 void playScene();
-void gameoverScene();
+void gameOverScene();
+void gameClearScene();
 
 
 void frameTest();
@@ -195,8 +196,11 @@ void main(void)
 		case PLAY:
 			playScene();
 			break;
-		case GAMEOVER:
-			gameoverScene();
+		case GAME_OVER:
+			gameOverScene();
+			break;
+		case GAME_CLEAR:
+			gameClearScene();
 			break;
 		}
 
@@ -350,6 +354,7 @@ void loadingScene() {
 				getCsvIdArray(STAGE_INFO, MAX_STAGE);
 			}
 		}
+
 		csvLoadAll(ENEMY_INFO);
 		IS_STAGE_BEGIN = false;
 	}
@@ -370,10 +375,23 @@ void loadingScene() {
 	}
 
 	// 3. 랜더부
-	char startStr[] = "NOW LOADING...";
-	for (size_t i = 0; i < strlen(startStr); i++) {
-		Sprite_Draw(i, 0, startStr[i]);
+	char loadingText[64];
+	if (MAX_STAGE == STAGE - 2) {
+		snprintf(loadingText, sizeof(loadingText), "LAST STAGE, NOW LOADING...");
+	} else {
+		snprintf(loadingText, sizeof(loadingText), "STAGE %d, NOW LOADING...", STAGE);
 	}
+
+	int loadingTextLength = strlen(loadingText);
+
+	// 중앙 좌표 계산
+	int loadingStartX = (dfSCREEN_WIDTH - loadingTextLength) / 2;
+	int loadingStartY = (dfSCREEN_HEIGHT / 2);
+
+	for (int i = 0; i < loadingTextLength; i++) {
+		Sprite_Draw(loadingStartX + i, loadingStartY, loadingText[i]);
+	}
+
 }
 
 void playScene() {
@@ -471,7 +489,7 @@ void playScene() {
 					player.damagedTick = LOGIC_FPS_CNT;
 					if (player.hp <= 0) {
 						player.isVisible = false;
-						GAME_STATE = GAMEOVER;
+						GAME_STATE = GAME_OVER;
 					}
 					bullets[i].isVisible = false;
 				}
@@ -488,7 +506,7 @@ void playScene() {
 					player.damagedTick = LOGIC_FPS_CNT;
 					if (player.hp <= 0) {
 						player.isVisible = false;
-						GAME_STATE = GAMEOVER;
+						GAME_STATE = GAME_OVER;
 					}
 				}
 			}
@@ -573,7 +591,7 @@ void playScene() {
 						player.damagedTick = LOGIC_FPS_CNT;
 						if (player.hp <= 0) {
 							player.isVisible = false;
-							GAME_STATE = GAMEOVER;
+							GAME_STATE = GAME_OVER;
 						}
 					}
 				}
@@ -666,27 +684,12 @@ void playScene() {
 					player.damagedTick = LOGIC_FPS_CNT;
 					if (player.hp <= 0) {
 						player.isVisible = false;
-						GAME_STATE = GAMEOVER;
+						GAME_STATE = GAME_OVER;
 					}
 					bullets[i].isVisible = false;
 				}
 			}
 		}
-	}
-
-	// 클리어 확인
-	bool isClear = true;
-	for (size_t i = 0; i < MAX_ENEMY; i++)
-	{
-		if (enemies[i].isVisible) {
-			isClear = false;
-		}
-	}
-	if (isClear) {
-		IS_STAGE_BEGIN = true;
-		GAME_STATE = LOADING;
-		// 다음 스테이지 있는지 확인 필요
-		return; // TODO 클리어 바로 리턴..?
 	}
 	++LOGIC_FPS_CNT;
 
@@ -720,12 +723,33 @@ void playScene() {
 	}
 	++RENDER_FPS_CNT;
 
+
+	// 클리어 확인
+	bool isClear = true;
+	for (size_t i = 0; i < MAX_ENEMY; i++)
+	{
+		if (enemies[i].isVisible) {
+			isClear = false;
+		}
+	}
+	if (isClear) {
+		IS_STAGE_BEGIN = true;
+		if (STAGE != MAX_STAGE) {
+			GAME_STATE = LOADING;
+		}
+		else {
+			GAME_STATE = GAME_CLEAR;
+		}
+		return;
+	}
+
+
 	// TODO PLAY SCENE 종료 시 제거도 해야됨
 	printf("\nSTAGE : %d\n", STAGE);
 	printf("HP : %d\n", player.hp);
 }
 
-void gameoverScene()
+void gameOverScene()
 {
 	LARGE_INTEGER logicBeginTicks;
 	QueryPerformanceCounter(&logicBeginTicks);
@@ -771,6 +795,58 @@ void gameoverScene()
 		Sprite_Draw(exitGuideStartX + i, exitGuideStartY, exitGuideText[i]);
 	}
 	++RENDER_FPS_CNT;
+}
+
+void gameClearScene()
+{
+	LARGE_INTEGER logicBeginTicks;
+	QueryPerformanceCounter(&logicBeginTicks);
+	if (IS_STAGE_BEGIN) {
+		sceneBeginTick = logicBeginTicks;
+		IS_STAGE_BEGIN = false;
+
+	}
+
+	// 1. 키보드 입력부
+	if (GetAsyncKeyState(VK_ESCAPE) != 0x00) {
+		STAGE = 0;
+		GAME_STATE = TITLE;
+		GetAsyncKeyState('A'); // A를 이전에 눌렀다면, esc 클릭 후 바로 게임이 실행됨으로 예외처리
+
+		IS_STAGE_BEGIN = true;
+	}
+
+	// 2. 로직부
+	++LOGIC_FPS_CNT;
+
+	// 한 프레임 이상 지연된 경우, 프레임 스킵
+	const double secsSinceLastFrame = static_cast<double>(logicBeginTicks.QuadPart - startTime.QuadPart) / static_cast<double>(freq.QuadPart);
+	if (FRAME_TIME_SEC < secsSinceLastFrame) {
+		startTime.QuadPart += static_cast<LONGLONG>(FRAME_TIME_SEC * freq.QuadPart);
+		return;
+	}
+
+	// 3. 랜더부
+	char gameClearText[] = "GAME CLEAR!";
+	char exitGuideText[] = "Press ESC to quit the game.";
+
+	// 문자열 길이 (null 제외)
+	int gameOverLength = strlen(gameClearText);
+	int exitGuideLength = strlen(exitGuideText);
+
+	// 좌표 계산
+	int gameOverStartX = (dfSCREEN_WIDTH - gameOverLength) / 2;
+	int gameOverStartY = (dfSCREEN_HEIGHT / 2) - 1;
+	int exitGuideStartX = (dfSCREEN_WIDTH - exitGuideLength) / 2;
+	int exitGuideStartY = (dfSCREEN_HEIGHT / 2) + 1;
+
+	// "GAME OVER" 출력
+	for (int i = 0; i < gameOverLength; i++) {
+		Sprite_Draw(gameOverStartX + i, gameOverStartY, gameClearText[i]);
+	}
+	for (int i = 0; i < exitGuideLength; i++) {
+		Sprite_Draw(exitGuideStartX + i, exitGuideStartY, exitGuideText[i]);
+	}
 }
 
 void testFps() { // main으로 대체해서 test
