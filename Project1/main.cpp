@@ -20,7 +20,7 @@ const int kMaxPatternCnt = 30;
 const int kPlayerStartPosX = dfSCREEN_WIDTH / 2;
 const int kPlayerStartPosY = dfSCREEN_HEIGHT - 1;
 const int kFps = 50;
-const double kFrameTimeMs = 1000 / kFps; // 1프레임 = 약 20ms
+const double kFrameTimeMs = 1000.0 / kFps; // 1프레임 = 약 20ms
 const double kFrameTimeSec = 1.0 / kFps;
 const int kPlayerSpeedCellsPerFrame = 2;
 const int kPlayerAttackSpeed = 1; // TODO 약 8로 조정, 현재는 테스트를 위해 1로 설정
@@ -36,9 +36,15 @@ int g_logicFpsCnt = 0;
 int g_renderFpsCnt = 0;
 bool g_isSceneBegin = true;
 LARGE_INTEGER g_freq;
+// 다음 프레임의 목표 시작 틱(스케줄 기준, 고정 간격으로 전진)
 LARGE_INTEGER g_frameStartTick;
-LARGE_INTEGER g_sceneFrameStartTick;
-LARGE_INTEGER g_sceneBeginTick; // 이거 없애야겠는데?
+
+// 현재 씬에 진입한 순간의 틱(씬 교체 시에만 갱신)
+LARGE_INTEGER g_sceneStartTick;
+
+// 매번 업데이트 시작에서 순간의 틱(매 루프 갱신)
+LARGE_INTEGER g_updateStartTick;
+
 const char g_stageInfoPath[] = "stage_info.csv";
 const char g_enemyInfoPath[] = "enemy_info.csv";
 
@@ -190,6 +196,7 @@ void main(void)
 	while (1)
 	{
 		Buffer_Clear();
+		QueryPerformanceCounter(&g_updateStartTick);
 		switch (g_gameState)
 		{
 		case TITLE:      titleScene();      break;
@@ -269,7 +276,9 @@ void Sprite_Draw(int iX, int iY, char chSprite)
 
 
 void titleScene() {
-	QueryPerformanceCounter(&g_sceneFrameStartTick);
+	if (g_isSceneBegin) {
+		QueryPerformanceCounter(&g_sceneStartTick);
+	}
 
 	// 1. 키보드 입력부
 	if (isKeyDown('A')) {
@@ -312,15 +321,15 @@ void titleScene() {
 }
 
 void loadingScene() {
-	LARGE_INTEGER logicBeginTicks;
-	QueryPerformanceCounter(&logicBeginTicks);
+	if (g_isSceneBegin) {
+		QueryPerformanceCounter(&g_sceneStartTick);
+	}
 
 	// 1. 키보드 입력부
 
 	// 2. 로직부 
 	char stage_name[256];
 	if (g_isSceneBegin) {
-		g_sceneBeginTick = logicBeginTicks;
 		++g_stage;
 		if (csvGetValueInTable(g_stageInfoPath, g_stage, "stage_name", stage_name, sizeof(stage_name))) {
 			csvLoadAll(stage_name);
@@ -334,7 +343,7 @@ void loadingScene() {
 	}
 
 	// 로딩 창 최소 시간 초과 & 데이터 로드 완료 시 PLAY SCENE으로 전환
-	const double sceneElapedtime = static_cast<double>(logicBeginTicks.QuadPart - g_sceneBeginTick.QuadPart) / static_cast<double>(g_freq.QuadPart);
+	const double sceneElapedtime = static_cast<double>(g_updateStartTick.QuadPart - g_sceneStartTick.QuadPart) / static_cast<double>(g_freq.QuadPart);
 	if (kMinWaitTimeLoadingScene < sceneElapedtime && csvLoadAll(g_stageInfoPath) && csvLoadAll(g_enemyInfoPath)) {
 		changeGameState(PLAY);
 	}
@@ -379,6 +388,8 @@ void loadingScene() {
 void playScene() {
 	// 스테이지 시작 처리
 	if (g_isSceneBegin == true) {
+		QueryPerformanceCounter(&g_sceneStartTick);
+
 		// 플레이어 초기화
 		player.hp = kPlayerMaxHP;
 		player.isVisible = true;
@@ -699,6 +710,10 @@ void playScene() {
 
 void gameOverScene()
 {
+	if (g_isSceneBegin) {
+		QueryPerformanceCounter(&g_sceneStartTick);
+	}
+
 	// 1. 키보드 입력부
 	if (GetAsyncKeyState(VK_ESCAPE) != 0x00) {
 		g_stage = 0;
@@ -739,6 +754,10 @@ void gameOverScene()
 
 void gameClearScene()
 {
+	if (g_isSceneBegin) {
+		QueryPerformanceCounter(&g_sceneStartTick);
+	}
+
 	// 1. 키보드 입력부
 	if (GetAsyncKeyState('Q') != 0x00) {
 		g_stage = 0;
@@ -785,8 +804,8 @@ void changeGameState(gameState nextState) {
 }
 
 bool isFrameSkip() {
-	const long frameTicks = g_freq.QuadPart / kFps;
-	const long behind = g_sceneFrameStartTick.QuadPart - g_frameStartTick.QuadPart;
+	const INT64 frameTicks = g_freq.QuadPart / kFps;
+	const INT64 behind = g_updateStartTick.QuadPart - g_frameStartTick.QuadPart;
 	return (behind >= frameTicks);
 }
 
