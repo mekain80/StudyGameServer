@@ -6,7 +6,7 @@
 #include "csvLoader.h" 
 #pragma comment(lib, "winmm.lib")
 
-enum gameState { TITLE, LOADING, PLAY, GAME_OVER, GAME_CLEAR };
+enum gameState { TITLE, LOADING, PLAY, GAME_OVER, GAME_CLEAR, EXIT };
 gameState GAME_STATE;
 
 const int MAX_ENEMY = 1000;
@@ -203,6 +203,8 @@ void main(void)
 		case GAME_CLEAR:
 			gameClearScene();
 			break;
+		case EXIT:
+			return;
 		}
 
 
@@ -238,6 +240,8 @@ void main(void)
 
 		Buffer_Flip();
 	}
+
+	return;
 }
 
 
@@ -298,7 +302,10 @@ void titleScene() {
 	// 1. 키보드 입력부
 	if (GetAsyncKeyState('A') != 0x00) {
 		changeGameState(LOADING);
+	} else if (GetAsyncKeyState(VK_ESCAPE) != 0x8000) {
+		changeGameState(EXIT);
 	}
+
 	// 2. 로직부 
 	++LOGIC_FPS_CNT;
 
