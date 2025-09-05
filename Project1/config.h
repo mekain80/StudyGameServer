@@ -3,60 +3,60 @@
 #include "Console.h"
 
 // ----------------------------
-// °ÔÀÓ Àü¿ª »ó¼ö Á¤ÀÇ
+// ê²Œì„ ì „ì—­ ìƒìˆ˜ ì •ì˜
 // ----------------------------
-constexpr int    kMaxEnemies = 1000;             // ÃÖ´ë Àû °³¼ö
-constexpr int    kMaxBullets = 100;              // ÃÖ´ë ÃÑ¾Ë °³¼ö
-constexpr int    kBulletDamage = 1;              // ÃÑ¾ËÀÌ Àû¿¡°Ô ÁÖ´Â ÇÇÇØ·®
-constexpr int    kEnemyDamage = 1;               // ÀûÀÌ ÇÃ·¹ÀÌ¾î¿¡°Ô ÁÖ´Â ÇÇÇØ·®
-constexpr int    kPlayerMaxHP = 5;               // ÇÃ·¹ÀÌ¾î ÃÖ´ë Ã¼·Â
-constexpr char   kPlayerShape = 'A';             // ÇÃ·¹ÀÌ¾î Ç¥½Ã ¹®ÀÚ
-constexpr char   kBulletShape = 'I';             // ÃÑ¾Ë Ç¥½Ã ¹®ÀÚ
-constexpr int    kMaxPatternCnt = 30;            // Àû ÆĞÅÏ ÃÖ´ë °³¼ö
+constexpr int    kMaxEnemies = 1000;             // ìµœëŒ€ ì  ê°œìˆ˜
+constexpr int    kMaxBullets = 100;              // ìµœëŒ€ ì´ì•Œ ê°œìˆ˜
+constexpr int    kBulletDamage = 1;              // ì´ì•Œì´ ì ì—ê²Œ ì£¼ëŠ” í”¼í•´ëŸ‰
+constexpr int    kEnemyDamage = 1;               // ì ì´ í”Œë ˆì´ì–´ì—ê²Œ ì£¼ëŠ” í”¼í•´ëŸ‰
+constexpr int    kPlayerMaxHP = 5;               // í”Œë ˆì´ì–´ ìµœëŒ€ ì²´ë ¥
+constexpr char   kPlayerShape = 'A';             // í”Œë ˆì´ì–´ í‘œì‹œ ë¬¸ì
+constexpr char   kBulletShape = 'I';             // ì´ì•Œ í‘œì‹œ ë¬¸ì
+constexpr int    kMaxPatternCnt = 30;            // ì  íŒ¨í„´ ìµœëŒ€ ê°œìˆ˜
 
 // ----------------------------
-// È­¸é ¹× ÇÁ·¹ÀÓ °ü·Ã
+// í™”ë©´ ë° í”„ë ˆì„ ê´€ë ¨
 // ----------------------------
-constexpr int    kPlayerStartPosX = dfSCREEN_WIDTH / 2;		// ÇÃ·¹ÀÌ¾î ½ÃÀÛ X ÁÂÇ¥ (°¡¿îµ¥)
-constexpr int    kPlayerStartPosY = dfSCREEN_HEIGHT - 1;	// ÇÃ·¹ÀÌ¾î ½ÃÀÛ Y ÁÂÇ¥ (È­¸é ÇÏ´Ü)
-constexpr int    kFps = 50;									// ¸ñÇ¥ FPS (ÃÊ´ç ÇÁ·¹ÀÓ ¼ö)
-constexpr double kFrameTimeMs = 1000.0 / kFps;				// 1ÇÁ·¹ÀÓ ½Ã°£ (¹Ğ¸®ÃÊ ´ÜÀ§, ¾à 20ms)
-constexpr double kFrameTimeSec = 1.0 / kFps;				// 1ÇÁ·¹ÀÓ ½Ã°£ (ÃÊ ´ÜÀ§)
+constexpr int    kPlayerStartPosX = dfSCREEN_WIDTH / 2;		// í”Œë ˆì´ì–´ ì‹œì‘ X ì¢Œí‘œ (ê°€ìš´ë°)
+constexpr int    kPlayerStartPosY = dfSCREEN_HEIGHT - 1;	// í”Œë ˆì´ì–´ ì‹œì‘ Y ì¢Œí‘œ (í™”ë©´ í•˜ë‹¨)
+constexpr int    kFps = 50;									// ëª©í‘œ FPS (ì´ˆë‹¹ í”„ë ˆì„ ìˆ˜)
+constexpr double kFrameTimeMs = 1000.0 / kFps;				// 1í”„ë ˆì„ ì‹œê°„ (ë°€ë¦¬ì´ˆ ë‹¨ìœ„, ì•½ 20ms)
+constexpr double kFrameTimeSec = 1.0 / kFps;				// 1í”„ë ˆì„ ì‹œê°„ (ì´ˆ ë‹¨ìœ„)
 
 // ----------------------------
-// ÇÃ·¹ÀÌ¾î °ü·Ã
+// í”Œë ˆì´ì–´ ê´€ë ¨
 // ----------------------------
-constexpr int    kPlayerMoveSpeedCellsPerFrame = 5; // ÇÃ·¹ÀÌ¾î ÀÌµ¿ ¼Óµµ (ÇÁ·¹ÀÓ ´ÜÀ§, 5ÇÁ·¹ÀÓ¸¶´Ù 1Ä­ ÀÌµ¿)
-constexpr int    kPlayerAttackSpeed = 8;            // ÇÃ·¹ÀÌ¾î °ø°İ ¼Óµµ (ÃÑ¾Ë ¹ß»ç °£°İ/ÇÁ·¹ÀÓ)
-constexpr int    kPlayerInvincibleFrames = 30;      // ÇÇ°İ ÈÄ ¹«Àû À¯Áö ÇÁ·¹ÀÓ ¼ö
-constexpr char   kPlayerInvincibleShape = 'B';      // ¹«Àû »óÅÂÀÏ ¶§ ÇÃ·¹ÀÌ¾î Ç¥½Ã ¹®ÀÚ
+constexpr int    kPlayerMoveSpeedCellsPerFrame = 5; // í”Œë ˆì´ì–´ ì´ë™ ì†ë„ (í”„ë ˆì„ ë‹¨ìœ„, 5í”„ë ˆì„ë§ˆë‹¤ 1ì¹¸ ì´ë™)
+constexpr int    kPlayerAttackSpeed = 8;            // í”Œë ˆì´ì–´ ê³µê²© ì†ë„ (ì´ì•Œ ë°œì‚¬ ê°„ê²©/í”„ë ˆì„)
+constexpr int    kPlayerInvincibleFrames = 30;      // í”¼ê²© í›„ ë¬´ì  ìœ ì§€ í”„ë ˆì„ ìˆ˜
+constexpr char   kPlayerInvincibleShape = 'B';      // ë¬´ì  ìƒíƒœì¼ ë•Œ í”Œë ˆì´ì–´ í‘œì‹œ ë¬¸ì
 
 // ----------------------------
-// ÃÑ¾Ë/·Îµù °ü·Ã
+// ì´ì•Œ/ë¡œë”© ê´€ë ¨
 // ----------------------------
-constexpr int    kDefaultBulletSpeed = 5;        // ÃÑ¾Ë ±âº» ¼Óµµ (ÇÁ·¹ÀÓ ´ÜÀ§, 5ÇÁ·¹ÀÓ¸¶´Ù 1Ä­ ÀÌµ¿)
-constexpr int    kMinWaitTimeLoadingScene = 1;   // ·Îµù ¾À ÃÖ¼Ò ´ë±â ½Ã°£(ÃÊ ´ÜÀ§)
-constexpr int    kLoadingBarLength = 10;         // ·Îµù ¹Ù ±æÀÌ (Ä­ ¼ö)
+constexpr int    kDefaultBulletSpeed = 5;        // ì´ì•Œ ê¸°ë³¸ ì†ë„ (í”„ë ˆì„ ë‹¨ìœ„, 5í”„ë ˆì„ë§ˆë‹¤ 1ì¹¸ ì´ë™)
+constexpr int    kMinWaitTimeLoadingScene = 1;   // ë¡œë”© ì”¬ ìµœì†Œ ëŒ€ê¸° ì‹œê°„(ì´ˆ ë‹¨ìœ„)
+constexpr int    kLoadingBarLength = 10;         // ë¡œë”© ë°” ê¸¸ì´ (ì¹¸ ìˆ˜)
 
 // ----------------------------
-// ¿ÜºÎ µ¥ÀÌÅÍ ÆÄÀÏ °æ·Î
+// ì™¸ë¶€ ë°ì´í„° íŒŒì¼ ê²½ë¡œ
 // ----------------------------
-constexpr const char* g_stageInfoPath = "stage_info.csv"; // ½ºÅ×ÀÌÁö Á¤º¸ CSV ÆÄÀÏ °æ·Î
-constexpr const char* g_enemyInfoPath = "enemy_info.csv"; // Àû Á¤º¸ CSV ÆÄÀÏ °æ·Î
+constexpr const char* g_stageInfoPath = "stage_info.csv"; // ìŠ¤í…Œì´ì§€ ì •ë³´ CSV íŒŒì¼ ê²½ë¡œ
+constexpr const char* g_enemyInfoPath = "enemy_info.csv"; // ì  ì •ë³´ CSV íŒŒì¼ ê²½ë¡œ
 
 // ----------------------------
-// ÀÔ·Â °¡»ó Å°
+// ì…ë ¥ ê°€ìƒ í‚¤
 // ----------------------------
-constexpr char kGameStart = 'A';        // °ÔÀÓ ½ÃÀÛ
-constexpr char kAttack = 'Z';           // °ø°İ
-constexpr char kSceneQuit = 'Q';        // ¾À Á¾·á
-constexpr int kUpKey = VK_UP;           // ¡è
-constexpr int kDownKey = VK_DOWN;       // ¡é
-constexpr int kLeftKey = VK_LEFT;       // ¡ç
-constexpr int kRightKey = VK_RIGHT;     // ¡æ
-constexpr int kGameExit = VK_ESCAPE;    // ESC = °ÔÀÓ Á¾·á
+constexpr char kGameStart = 'A';        // ê²Œì„ ì‹œì‘
+constexpr char kAttack = 'Z';           // ê³µê²©
+constexpr char kSceneQuit = 'Q';        // ì”¬ ì¢…ë£Œ
+constexpr int kUpKey = VK_UP;           // â†‘
+constexpr int kDownKey = VK_DOWN;       // â†“
+constexpr int kLeftKey = VK_LEFT;       // â†
+constexpr int kRightKey = VK_RIGHT;     // â†’
+constexpr int kGameExit = VK_ESCAPE;    // ESC = ê²Œì„ ì¢…ë£Œ
 
-// Å° ¹è¿­
+// í‚¤ ë°°ì—´
 constexpr int kKeyArray[] = {
     kGameStart,
     kAttack,
