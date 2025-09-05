@@ -490,7 +490,7 @@ void playScene() {
 			case 'c': nx += 1; ny += 1; break;
 			case 's': /* stay */ break;
 			default:
-				printf("\n%s\n", movePattern);
+				printf("\n%s : %d\n", movePattern, enemies[i].currMovePattern);
 				perror("move pattrean error");
 				break;
 			}
@@ -505,7 +505,7 @@ void playScene() {
 			}
 
 			// 이동 패턴 순환
-			if (movePattern[enemies[i].currMovePattern] != '\0')
+			if (enemies[i].currMovePattern < strlen(movePattern) - 1)
 				++enemies[i].currMovePattern;
 			else
 				enemies[i].currMovePattern = 0;
