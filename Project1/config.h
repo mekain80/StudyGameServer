@@ -47,7 +47,7 @@ constexpr const char* g_enemyInfoPath = "enemy_info.csv"; // 적 정보 CSV 파�
 // ----------------------------
 // 입력 가상 키
 // ----------------------------
-constexpr char kGameStart = 'A';        // 게임 시작
+constexpr char kGameStart = 'Z';        // 게임 시작
 constexpr char kAttack = 'Z';           // 공격
 constexpr char kSceneQuit = 'Q';        // 씬 종료
 constexpr int kUpKey = VK_UP;           // ↑

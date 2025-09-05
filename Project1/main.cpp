@@ -264,7 +264,7 @@ void titleScene() {
 	// "Terminal Shooter Game"
 	// "Press the A key to start the game."
 	char titleText[] = "Terminal Shooter Game";
-	char startGuideText[] = "Press the A key to start the game.";
+	char startGuideText[] = "Press the Z key to start the game.";
 
 	int titleLength = sizeof(titleText) - 1;
 	int startGuideLength = sizeof(startGuideText) - 1;
