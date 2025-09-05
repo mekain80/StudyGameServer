@@ -244,10 +244,10 @@ void titleScene() {
 	}
 
 	// 1. 키보드 입력부
-	if (isKeyDown('A')) {
+	if (isKeyDown(kGameStart)) {
 		changeGameState(LOADING);
 	}
-	if (isKeyDown(VK_ESCAPE)) {
+	if (isKeyDown(kGameExit)) {
 		changeGameState(EXIT);
 	}
 
@@ -413,10 +413,10 @@ void playScene() {
 
 
 	// 1. 키보드 입력부
-	const bool isUp = isKeyDown(VK_UP);
-	const bool isDown = isKeyDown(VK_DOWN);
-	const bool isRight = isKeyDown(VK_RIGHT);
-	const bool isLeft = isKeyDown(VK_LEFT);
+	const bool isUp = isKeyDown(kUpKey);
+	const bool isDown = isKeyDown(kDownKey);
+	const bool isRight = isKeyDown(kRightKey);
+	const bool isLeft = isKeyDown(kLeftKey);
 
 	// 플레이어 이동
 	if (player.movedTick + kPlayerMoveSpeedCellsPerFrame < g_logicFpsCnt) {
@@ -442,7 +442,7 @@ void playScene() {
 	}
 
 	// 총알 발사
-	if (isKeyDown('Z') and player.atkedTick + kPlayerAttackSpeed < g_logicFpsCnt) {
+	if (isKeyDown(kAttack) and player.atkedTick + kPlayerAttackSpeed < g_logicFpsCnt) {
 		for (size_t i = 0; i < kMaxBullets; i++)
 		{
 			if (bullets[i].isVisible == false) {
@@ -459,7 +459,7 @@ void playScene() {
 	}
 
 	// esc로 타이틀로 이동
-	if (GetAsyncKeyState(VK_ESCAPE) != 0) {
+	if (GetAsyncKeyState(kGameExit) != 0) {
 		changeGameState(TITLE);
 	}
 
@@ -685,7 +685,7 @@ void gameOverScene()
 	}
 
 	// 1. 키보드 입력부
-	if (GetAsyncKeyState('Q') != 0x00) {
+	if (GetAsyncKeyState(kSceneQuit) != 0x00) {
 		g_stage = 0;
 		changeGameState(TITLE);
 	}
@@ -729,10 +729,9 @@ void gameClearScene()
 	}
 
 	// 1. 키보드 입력부
-	if (GetAsyncKeyState('Q') != 0x00) {
+	if (GetAsyncKeyState(kSceneQuit) != 0x00) {
 		g_stage = 0;
 		changeGameState(TITLE);
-		GetAsyncKeyState('A'); // A를 이전에 눌렀다면, esc 클릭 후 바로 게임이 실행됨으로 예외처리
 	}
 
 	// 2. 로직부
@@ -771,6 +770,12 @@ void changeGameState(gameState nextState) {
 	g_isSceneBegin = true;
 	g_gameState = nextState;
 	clearHUD();
+
+	// 씬이 바뀔 때 키 입력 초기화
+	size_t keyCount = sizeof(kKeyArray) / sizeof(kKeyArray[0]);
+	for (size_t i = 0; i < keyCount; i++) {
+		GetAsyncKeyState(kKeyArray[i]);
+	}
 }
 
 bool isFrameSkip() {

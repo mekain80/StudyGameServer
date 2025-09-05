@@ -1,4 +1,5 @@
 #pragma once
+#include <Windows.h>
 #include "Console.h"
 
 // ----------------------------
@@ -42,3 +43,27 @@ constexpr int    kLoadingBarLength = 10;         // 로딩 바 길이 (칸 수)
 // ----------------------------
 constexpr const char* g_stageInfoPath = "stage_info.csv"; // 스테이지 정보 CSV 파일 경로
 constexpr const char* g_enemyInfoPath = "enemy_info.csv"; // 적 정보 CSV 파일 경로
+
+// ----------------------------
+// 입력 가상 키
+// ----------------------------
+constexpr char kGameStart = 'A';        // 게임 시작
+constexpr char kAttack = 'Z';           // 공격
+constexpr char kSceneQuit = 'Q';        // 씬 종료
+constexpr int kUpKey = VK_UP;           // ↑
+constexpr int kDownKey = VK_DOWN;       // ↓
+constexpr int kLeftKey = VK_LEFT;       // ←
+constexpr int kRightKey = VK_RIGHT;     // →
+constexpr int kGameExit = VK_ESCAPE;    // ESC = 게임 종료
+
+// 키 배열
+constexpr int kKeyArray[] = {
+    kGameStart,
+    kAttack,
+    kUpKey,
+    kDownKey,
+    kLeftKey,
+    kRightKey,
+    kSceneQuit,
+    kGameExit
+};
