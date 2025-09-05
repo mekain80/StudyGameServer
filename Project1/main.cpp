@@ -685,7 +685,7 @@ void gameOverScene()
 	}
 
 	// 1. 키보드 입력부
-	if (GetAsyncKeyState(VK_ESCAPE) != 0x00) {
+	if (GetAsyncKeyState('Q') != 0x00) {
 		g_stage = 0;
 		changeGameState(TITLE);
 	}
@@ -700,7 +700,7 @@ void gameOverScene()
 
 	// 3. 랜더부
 	char gameOverText[] = "GAME OVER";
-	char exitGuideText[] = "Press ESC to quit the game.";
+	char exitGuideText[] = "Press Q to quit the game.";
 
 	// 문자열 길이 (null 제외)
 	int gameOverLength = sizeof(gameOverText) - 1;
