@@ -1,11 +1,11 @@
 #include <stdio.h>
+#include <stdlib.h> 
 #include <memory.h>
 #include <Windows.h>
 #include "Console.h"
-#include <stdlib.h> 
-#include "csvLoader.h" 
-#include "config.h" 
-#include "entities.h" 
+#include "csvLoader.h"
+#include "config.h"
+#include "entities.h"
 #pragma comment(lib, "winmm.lib")
 
 // 전역 변수
