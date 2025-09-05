@@ -626,22 +626,28 @@ void playScene() {
 	}
 
 	// 3. 랜더부
-	// 무적 시간에 따른 플레이어 모양 변경
-	if (player.isVisible) {
-		const bool invincible = (player.damagedTick != 0) && ((g_logicFpsCnt - player.damagedTick) < kPlayerInvincibleFrames);
-		if (invincible) Sprite_Draw(player.x, player.y, kPlayerInvincibleShape);
-		else Sprite_Draw(player.x, player.y, kPlayerShape);
-	}
-
+	// 적군
 	for (size_t i = 0; i < kMaxEnemies; i++)
 	{
 		if (enemies[i].isVisible)
 			Sprite_Draw(enemies[i].x, enemies[i].y, enemies[i].shape);
 	}
+
+	// 총알
 	for (size_t i = 0; i < kMaxBullets; i++)
 	{
 		if (bullets[i].isVisible)
 			Sprite_Draw(bullets[i].x, bullets[i].y, kBulletShape);
+	}
+
+	// 플레이어
+	if (player.isVisible) {
+		const bool invincible = (player.damagedTick != 0) && ((g_logicFpsCnt - player.damagedTick) < kPlayerInvincibleFrames);
+		// 무적 시간에 따른 플레이어 모양 변경
+		if (invincible)
+			Sprite_Draw(player.x, player.y, kPlayerInvincibleShape);
+		else
+			Sprite_Draw(player.x, player.y, kPlayerShape);
 	}
 
 	// HUD 문자열 생성
