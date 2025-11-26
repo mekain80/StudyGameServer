@@ -27,9 +27,54 @@ RingBuffer::~RingBuffer(void)
 	delete[] mBuffer;
 }
 
-void RingBuffer::Resize(int size)
+void RingBuffer::Resize(int newSize)
 {
+	// 더 작게 줄이는 건 허용 안 함
+	if (newSize <= mBufferSize)
+		return;
+
+	int used = GetUseSize();
+
+	char* newBuf = new char[newSize];
+
+	// 일단 데이터가 있으면 논리 순서대로 복사
+	if (used > 0)
+	{
+		if (mFront < mRear)
+		{
+			// [mFront ... mRear) 가 한 번에 이어져 있는 경우
+			std::memcpy(newBuf, mBuffer + mFront, used);
+		}
+		else
+		{
+			// [mFront ... end) + [0 ... mRear) 로 두 번 나뉘어 있는 경우
+			int first = mBufferSize - mFront;
+			std::memcpy(newBuf, mBuffer + mFront, first);
+			if (mRear > 0)
+			{
+				std::memcpy(newBuf + first, mBuffer, mRear);
+			}
+		}
+	}
+
+	delete[] mBuffer;
+	mBuffer = newBuf;
+	mBufferSize = newSize;
+
+	if (used == 0)
+	{
+		mFront = 0;
+		mRear = 0;
+		mIsEmpty = true;
+	}
+	else
+	{
+		mFront = 0;
+		mRear = used;
+		mIsEmpty = false;
+	}
 }
+
 
 int RingBuffer::GetBufferSize(void)
 {
