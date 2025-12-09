@@ -10,6 +10,7 @@
 
 #include "RingBuffer.h"
 #include "PacketDefine.h"
+#include "CPacket.h"
 
 // 게임프레임 : 50fps
 #define SERVER_PORT 5000
@@ -75,9 +76,9 @@ struct Session
     char        HP;
 };
 
-bool              gbShutdown = false;
-DWORD             gAllocID = 1;
-SOCKET            gListenSocket = INVALID_SOCKET;
+bool                gbShutdown = false;
+DWORD               gAllocID = 1;
+SOCKET              gListenSocket = INVALID_SOCKET;
 std::list<Session*> gSessionList;
 
 // 타이밍(단위: QPC counts)
@@ -110,12 +111,13 @@ void NetProc_Accept() noexcept;
 void NetProc_Recv(Session*) noexcept;
 void NetProc_Send(Session*) noexcept;
 
-bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket);
-bool NetPacketProc_MoveStart(Session* pSession, char* pPacket);
-bool NetPacketProc_MoveStop(Session* pSession, char* pPacket);
-bool NetPacketProc_Attack1(Session* pSession, char* pPacket);
-bool NetPacketProc_Attack2(Session* pSession, char* pPacket);
-bool NetPacketProc_Attack3(Session* pSession, char* pPacket);
+// 직렬화 버퍼 기반 패킷 처리
+bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packetSize);
+bool NetPacketProc_MoveStart(Session* pSession, CPacket& packet);
+bool NetPacketProc_MoveStop(Session* pSession, CPacket& packet);
+bool NetPacketProc_Attack1(Session* pSession, CPacket& packet);
+bool NetPacketProc_Attack2(Session* pSession, CPacket& packet);
+bool NetPacketProc_Attack3(Session* pSession, CPacket& packet);
 
 // 패킷 생성
 void MakePacket_CreateMyCharacter(PacketHeader* pHeader, PacketSCCreateMyCharacter* pPacket, BYTE direction, DWORD ID, int x, int y, int HP);
@@ -503,7 +505,8 @@ void NetProc_Recv(Session* pSession) noexcept
         char packetBuffer[BUFFER_SIZE];
         pSession->recvQ.Dequeue(packetBuffer, packetHeader.size);
 
-        PacketProc(pSession, packetHeader.type, packetBuffer);
+        // packetHeader.size 만큼의 바디를 CPacket으로 감싸서 처리
+        PacketProc(pSession, packetHeader.type, packetBuffer, packetHeader.size);
     }
 }
 
@@ -547,46 +550,61 @@ void NetProc_Send(Session* pSession) noexcept
 }
 
 //===============================================================
-// 패킷 처리
+// 패킷 처리 (직렬화 버퍼 사용)
 //===============================================================
-bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket)
+bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packetSize)
 {
+    // 패킷 바디를 직렬화 버퍼에 적재
+    CPacket packet(static_cast<int>(packetSize));
+    int putRet = packet.PutData(pPacket, packetSize);
+    if (putRet != packetSize)
+    {
+        Logger(L"CPacket PutData fail");
+        Disconnect(pSession);
+        return false;
+    }
+
     switch (byPacketType)
     {
     case dfPACKET_CS_MOVE_START:
-        return NetPacketProc_MoveStart(pSession, pPacket);
+        return NetPacketProc_MoveStart(pSession, packet);
     case dfPACKET_CS_MOVE_STOP:
-        return NetPacketProc_MoveStop(pSession, pPacket);
+        return NetPacketProc_MoveStop(pSession, packet);
     case dfPACKET_CS_ATTACK1:
-        return NetPacketProc_Attack1(pSession, pPacket);
+        return NetPacketProc_Attack1(pSession, packet);
     case dfPACKET_CS_ATTACK2:
-        return NetPacketProc_Attack2(pSession, pPacket);
+        return NetPacketProc_Attack2(pSession, packet);
     case dfPACKET_CS_ATTACK3:
-        return NetPacketProc_Attack3(pSession, pPacket);
+        return NetPacketProc_Attack3(pSession, packet);
     }
     return true;
 }
 
 //===============================================================
-// MoveStart
+// MoveStart (직렬화 버퍼)
 //===============================================================
-bool NetPacketProc_MoveStart(Session* pSession, char* pPacket)
+bool NetPacketProc_MoveStart(Session* pSession, CPacket& packet)
 {
-    PacketCSMoveStart* pMoveStart = (PacketCSMoveStart*)pPacket;
+    PacketCSMoveStart moveStart{};
+
+    // 클라 쪽에서 보낸 순서대로 읽어야 함 (pack(1) 가정)
+    packet >> moveStart.direction
+        >> moveStart.x
+        >> moveStart.y;
 
     {
         wchar_t buf[256];
         _snwprintf_s(buf, 256, _TRUNCATE,
             L"# PACKET_MOVESTART # SessionID:%u / Direction:%u / X:%d / Y:%d",
             pSession->sessionID,
-            pMoveStart->direction,
-            pMoveStart->x,
-            pMoveStart->y);
+            moveStart.direction,
+            moveStart.x,
+            moveStart.y);
         Logger(buf);
     }
 
-    if (abs(pMoveStart->x - pSession->x) > dfERROR_RANGE ||
-        abs(pMoveStart->y - pSession->y) > dfERROR_RANGE)
+    if (abs(moveStart.x - pSession->x) > dfERROR_RANGE ||
+        abs(moveStart.y - pSession->y) > dfERROR_RANGE)
     {
         wchar_t buf[256];
         _snwprintf_s(buf, 256, _TRUNCATE,
@@ -597,17 +615,17 @@ bool NetPacketProc_MoveStart(Session* pSession, char* pPacket)
         return false;
     }
 
-    pSession->action = pMoveStart->direction;
-    pSession->direction = NormalizeViewDir(pMoveStart->direction);
+    pSession->action = moveStart.direction;
+    pSession->direction = NormalizeViewDir(moveStart.direction);
 
-    pSession->x = static_cast<short>(pMoveStart->x);
-    pSession->y = static_cast<short>(pMoveStart->y);
+    pSession->x = static_cast<short>(moveStart.x);
+    pSession->y = static_cast<short>(moveStart.y);
 
-    PacketHeader     packetHeader;
+    PacketHeader      packetHeader;
     PacketSCMoveStart sendMsg;
     MakePacket_MoveStart(&packetHeader, &sendMsg,
         pSession->sessionID,
-        pMoveStart->direction,
+        moveStart.direction,
         pSession->x, pSession->y);
     SendBroadcast(pSession, &packetHeader, (char*)&sendMsg);
 
@@ -615,25 +633,29 @@ bool NetPacketProc_MoveStart(Session* pSession, char* pPacket)
 }
 
 //===============================================================
-// MoveStop
+// MoveStop (직렬화 버퍼)
 //===============================================================
-bool NetPacketProc_MoveStop(Session* pSession, char* pPacket)
+bool NetPacketProc_MoveStop(Session* pSession, CPacket& packet)
 {
-    PacketCSMoveStop* pMoveStop = (PacketCSMoveStop*)pPacket;
+    PacketCSMoveStop moveStop{};
+
+    packet >> moveStop.direction
+        >> moveStop.x
+        >> moveStop.y;
 
     {
         wchar_t buf[256];
         _snwprintf_s(buf, 256, _TRUNCATE,
             L"# PACKET_MOVESTOP # SessionID:%u / Direction:%u / X:%d / Y:%d",
             pSession->sessionID,
-            pMoveStop->direction,
-            pMoveStop->x,
-            pMoveStop->y);
+            moveStop.direction,
+            moveStop.x,
+            moveStop.y);
         Logger(buf);
     }
 
-    if (abs(pMoveStop->x - pSession->x) > dfERROR_RANGE ||
-        abs(pMoveStop->y - pSession->y) > dfERROR_RANGE)
+    if (abs(moveStop.x - pSession->x) > dfERROR_RANGE ||
+        abs(moveStop.y - pSession->y) > dfERROR_RANGE)
     {
         wchar_t buf[256];
         _snwprintf_s(buf, 256, _TRUNCATE,
@@ -645,12 +667,12 @@ bool NetPacketProc_MoveStop(Session* pSession, char* pPacket)
     }
 
     pSession->action = dfACTION_STOP;
-    pSession->direction = NormalizeViewDir(pMoveStop->direction);
+    pSession->direction = NormalizeViewDir(moveStop.direction);
 
-    pSession->x = static_cast<short>(pMoveStop->x);
-    pSession->y = static_cast<short>(pMoveStop->y);
+    pSession->x = static_cast<short>(moveStop.x);
+    pSession->y = static_cast<short>(moveStop.y);
 
-    PacketHeader    packetHeader;
+    PacketHeader     packetHeader;
     PacketSCMoveStop sendMsg;
     MakePacket_MoveStop(&packetHeader, &sendMsg,
         pSession->sessionID,
@@ -662,25 +684,28 @@ bool NetPacketProc_MoveStop(Session* pSession, char* pPacket)
 }
 
 //===============================================================
-// Attack1 (좌우 방향에 따라 판정범위 다름)
+// Attack1 (좌우 방향에 따라 판정범위 다름, 직렬화 버퍼)
 //===============================================================
-bool NetPacketProc_Attack1(Session* pSession, char* pPacket)
+bool NetPacketProc_Attack1(Session* pSession, CPacket& packet)
 {
-    PacketCSAttack1* packetATK1 = (PacketCSAttack1*)pPacket;
+    PacketCSAttack1 atk{};
+    packet >> atk.direction
+        >> atk.x
+        >> atk.y;
 
     {
         wchar_t buf[256];
         _snwprintf_s(buf, 256, _TRUNCATE,
             L"# PACKET_ATTACK1 # SessionID:%u / Direction:%u / X:%d / Y:%d",
             pSession->sessionID,
-            packetATK1->direction,
-            packetATK1->x,
-            packetATK1->y);
+            atk.direction,
+            atk.x,
+            atk.y);
         Logger(buf);
     }
 
-    if (abs(packetATK1->x - pSession->x) > dfERROR_RANGE ||
-        abs(packetATK1->y - pSession->y) > dfERROR_RANGE)
+    if (abs(atk.x - pSession->x) > dfERROR_RANGE ||
+        abs(atk.y - pSession->y) > dfERROR_RANGE)
     {
         wchar_t buf[256];
         _snwprintf_s(buf, 256, _TRUNCATE,
@@ -691,7 +716,7 @@ bool NetPacketProc_Attack1(Session* pSession, char* pPacket)
         return false;
     }
 
-    pSession->direction = NormalizeViewDir(packetATK1->direction);
+    pSession->direction = NormalizeViewDir(atk.direction);
 
     PacketHeader     packetHeader;
     PacketSCAttack1  sendMsg;
@@ -701,8 +726,8 @@ bool NetPacketProc_Attack1(Session* pSession, char* pPacket)
         pSession->x, pSession->y);
     SendBroadcast(pSession, &packetHeader, (char*)&sendMsg);
 
-    const int centerX = packetATK1->x;
-    const int centerY = packetATK1->y;
+    const int centerX = atk.x;
+    const int centerY = atk.y;
 
     for (auto& session : gSessionList)
     {
@@ -726,25 +751,28 @@ bool NetPacketProc_Attack1(Session* pSession, char* pPacket)
 }
 
 //===============================================================
-// Attack2 (중심 기준 직사각형)
+// Attack2 (중심 기준 직사각형, 직렬화 버퍼)
 //===============================================================
-bool NetPacketProc_Attack2(Session* pSession, char* pPacket)
+bool NetPacketProc_Attack2(Session* pSession, CPacket& packet)
 {
-    PacketCSAttack2* packetATK2 = (PacketCSAttack2*)pPacket;
+    PacketCSAttack2 atk{};
+    packet >> atk.direction
+        >> atk.x
+        >> atk.y;
 
     {
         wchar_t buf[256];
         _snwprintf_s(buf, 256, _TRUNCATE,
             L"# PACKET_ATTACK2 # SessionID:%u / Direction:%u / X:%d / Y:%d",
             pSession->sessionID,
-            packetATK2->direction,
-            packetATK2->x,
-            packetATK2->y);
+            atk.direction,
+            atk.x,
+            atk.y);
         Logger(buf);
     }
 
-    if (abs(packetATK2->x - pSession->x) > dfERROR_RANGE ||
-        abs(packetATK2->y - pSession->y) > dfERROR_RANGE)
+    if (abs(atk.x - pSession->x) > dfERROR_RANGE ||
+        abs(atk.y - pSession->y) > dfERROR_RANGE)
     {
         wchar_t buf[256];
         _snwprintf_s(buf, 256, _TRUNCATE,
@@ -755,7 +783,7 @@ bool NetPacketProc_Attack2(Session* pSession, char* pPacket)
         return false;
     }
 
-    pSession->direction = NormalizeViewDir(packetATK2->direction);
+    pSession->direction = NormalizeViewDir(atk.direction);
 
     PacketHeader     packetHeader;
     PacketSCAttack2  sendMsg;
@@ -765,8 +793,8 @@ bool NetPacketProc_Attack2(Session* pSession, char* pPacket)
         pSession->x, pSession->y);
     SendBroadcast(pSession, &packetHeader, (char*)&sendMsg);
 
-    const int centerX = packetATK2->x;
-    const int centerY = packetATK2->y;
+    const int centerX = atk.x;
+    const int centerY = atk.y;
 
     for (auto& session : gSessionList)
     {
@@ -794,25 +822,28 @@ bool NetPacketProc_Attack2(Session* pSession, char* pPacket)
 }
 
 //===============================================================
-// Attack3 (중심 기준 더 넓은 직사각형)
+// Attack3 (중심 기준 더 넓은 직사각형, 직렬화 버퍼)
 //===============================================================
-bool NetPacketProc_Attack3(Session* pSession, char* pPacket)
+bool NetPacketProc_Attack3(Session* pSession, CPacket& packet)
 {
-    PacketCSAttack3* packetATK3 = (PacketCSAttack3*)pPacket;
+    PacketCSAttack3 atk{};
+    packet >> atk.direction
+        >> atk.x
+        >> atk.y;
 
     {
         wchar_t buf[256];
         _snwprintf_s(buf, 256, _TRUNCATE,
             L"# PACKET_ATTACK3 # SessionID:%u / Direction:%u / X:%d / Y:%d",
             pSession->sessionID,
-            packetATK3->direction,
-            packetATK3->x,
-            packetATK3->y);
+            atk.direction,
+            atk.x,
+            atk.y);
         Logger(buf);
     }
 
-    if (abs(packetATK3->x - pSession->x) > dfERROR_RANGE ||
-        abs(packetATK3->y - pSession->y) > dfERROR_RANGE)
+    if (abs(atk.x - pSession->x) > dfERROR_RANGE ||
+        abs(atk.y - pSession->y) > dfERROR_RANGE)
     {
         wchar_t buf[256];
         _snwprintf_s(buf, 256, _TRUNCATE,
@@ -823,7 +854,7 @@ bool NetPacketProc_Attack3(Session* pSession, char* pPacket)
         return false;
     }
 
-    pSession->direction = NormalizeViewDir(packetATK3->direction);
+    pSession->direction = NormalizeViewDir(atk.direction);
 
     PacketHeader     packetHeader;
     PacketSCAttack3  sendMsg;
@@ -833,8 +864,8 @@ bool NetPacketProc_Attack3(Session* pSession, char* pPacket)
         pSession->x, pSession->y);
     SendBroadcast(pSession, &packetHeader, (char*)&sendMsg);
 
-    const int centerX = packetATK3->x;
-    const int centerY = packetATK3->y;
+    const int centerX = atk.x;
+    const int centerY = atk.y;
 
     for (auto& session : gSessionList)
     {
