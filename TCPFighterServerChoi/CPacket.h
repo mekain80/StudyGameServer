@@ -89,23 +89,3 @@ private:
 	int   m_iDataSize;
 	char* m_chpBuffer;
 };
-
-CPacket::CPacket()
-	: m_iBufferSize(eBUFFER_DEFAULT),
-	m_iDataSize(0)
-{
-	m_chpBuffer = new char[m_iBufferSize];
-}
-
-
-inline CPacket::CPacket(int iBUfferSize)
-	: m_iBufferSize(iBUfferSize),
-	m_iDataSize(0)
-{
-	m_chpBuffer = new char[m_iBufferSize];
-}
-
-CPacket::~CPacket()
-{
-	delete[] m_chpBuffer;
-}
