@@ -8,34 +8,26 @@ void CPacket::Clear(void)
     m_iDataSize = 0;
 }
 
-/// 버퍼 Pos 이동 (쓰기 위치 이동)
-/// 현재 데이터 끝에서 iSize 만큼 "쓴 걸로" 간주.
-/// 실제로 버퍼에 뭘 쓰는 건 외부에서 하고,
-/// 여기서는 데이터 크기만 늘려준다.
 int CPacket::MoveWritePos(int iSize)
 {
     if (iSize <= 0)
         return 0;
 
-    // 남은 공간보다 더 많이 이동하라고 하면 남은 만큼만
+    // 남은 공간보다 더 많이 이동하라고 하면 하지 않음
     int freeSize = m_iBufferSize - m_iDataSize;
-    int moveSize = min(iSize, freeSize);
+    if (freeSize < iSize)
+        return 0;
 
-    m_iDataSize += moveSize;
-    return moveSize;
+    m_iDataSize += iSize;
+    return iSize;
 }
 
-/// 버퍼 Pos 이동 (읽기 위치 이동)
-/// 앞에서 iSize 만큼 "읽어버린 것처럼" 처리.
-/// 남은 데이터는 앞쪽으로 땡긴다.
 int CPacket::MoveReadPos(int iSize)
 {
     if (iSize <= 0)
         return 0;
 
     int moveSize = min(iSize, m_iDataSize);
-    if (moveSize <= 0)
-        return 0;
 
     // 사용된 데이터 앞으로 땡기기
     int remain = m_iDataSize - moveSize;
@@ -220,7 +212,7 @@ int CPacket::PutData(char* chpSrc, int iSrcSize)
         return 0;
 
     int freeSize = m_iBufferSize - m_iDataSize;
-    if (freeSize <= 0)
+    if (iSrcSize > freeSize)
         return 0;
 
     int copySize = min(iSrcSize, freeSize);
