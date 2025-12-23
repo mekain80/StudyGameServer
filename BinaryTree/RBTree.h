@@ -39,15 +39,14 @@ namespace RBTree
 		RBTree(int rootKey);
 		~RBTree();
 
-		bool Insert(int key);
-		bool Delete(int key);
-		bool Find(int key, Node*& outNode);
+		bool Insert(int key) noexcept;
+		bool Delete(int key) noexcept;
+		bool Find(int key, Node*& outNode) noexcept;
 
 		Node* FindNode(int key) const noexcept;
 		Node* Minimum(Node* node) const noexcept;
 		void Transplant(Node* u, Node* v) noexcept;
 
-		void DeleteFixup(Node* x) noexcept; // 삭제 보정
 
 		Node* getRoot() const noexcept { return root; }
 		Node* getNil() const noexcept { return nil; }
@@ -57,11 +56,12 @@ namespace RBTree
 		void PrintInOrder(Node* node);
 
 	private:
-		void destroy(Node* node);
-		void insertFixup(Node* node);
+		void destroy(Node* node) noexcept;
+		void deleteFixup(Node* x) noexcept;
+		void insertFixup(Node* node) noexcept;
 
-		void rotateR(Node* node);
-		void rotateL(Node* node);
+		void rotateR(Node* node) noexcept;
+		void rotateL(Node* node) noexcept;
 
 		Node* root;
 		Node* nil;

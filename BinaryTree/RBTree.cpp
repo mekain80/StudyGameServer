@@ -30,7 +30,7 @@ RBTree::RBTree::~RBTree()
 	nil = nullptr;
 }
 
-void RBTree::RBTree::destroy(Node* node)
+void RBTree::RBTree::destroy(Node* node) noexcept
 {
 	if (node == nullptr || node == nil) return;
 
@@ -40,7 +40,7 @@ void RBTree::RBTree::destroy(Node* node)
 }
 
 
-bool RBTree::RBTree::Insert(int key)
+bool RBTree::RBTree::Insert(int key) noexcept
 {
 	Node* link = root;
 	Node* parent = nil;
@@ -74,7 +74,7 @@ bool RBTree::RBTree::Insert(int key)
 	return true;
 }
 
-bool RBTree::RBTree::Delete(int key)
+bool RBTree::RBTree::Delete(int key) noexcept
 {
 	Node* node = FindNode(key);
 	if (node == nil) return false;
@@ -124,13 +124,13 @@ bool RBTree::RBTree::Delete(int key)
 
 	// 삭제된 노드가 BLACK이면 double-black 보정 필요
 	if (originalColor == BLACK)
-		DeleteFixup(fixupNode);
+		deleteFixup(fixupNode);
 
 	root->setColor(BLACK);
 	return true;
 }
 
-void RBTree::RBTree::DeleteFixup(Node* node) noexcept
+void RBTree::RBTree::deleteFixup(Node* node) noexcept
 {
 	while (node != root && node->getColor() == BLACK)
 	{
@@ -140,7 +140,7 @@ void RBTree::RBTree::DeleteFixup(Node* node) noexcept
 		{
 			Node* sibling = parent->getRight();
 
-			// 2.2) 형제가 레드
+			// Case 2) sibling is RED
 			if (sibling->getColor() == RED)
 			{
 				sibling->setColor(BLACK);
@@ -150,7 +150,9 @@ void RBTree::RBTree::DeleteFixup(Node* node) noexcept
 				sibling = parent->getRight();
 			}
 
-			// 2.3) 형제가 블랙이고 형제의 양쪽 자식이 블랙
+			// Case 3) sibling is BLACK,
+			// sibling's left child is BLACK,
+			// sibling's right child is BLACK
 			if (sibling->getLeft()->getColor() == BLACK &&
 				sibling->getRight()->getColor() == BLACK)
 			{
@@ -159,7 +161,9 @@ void RBTree::RBTree::DeleteFixup(Node* node) noexcept
 				continue;
 			}
 
-			// 2.4) 형제가 블랙이고 왼자식 RED, 오른자식 BLACK
+			// Case 4) sibling is BLACK,
+			// sibling's left child is RED,
+			// sibling's right child is BLACK
 			if (sibling->getRight()->getColor() == BLACK)
 			{
 				sibling->getLeft()->setColor(BLACK);
@@ -169,7 +173,8 @@ void RBTree::RBTree::DeleteFixup(Node* node) noexcept
 				sibling = parent->getRight();
 			}
 
-			// 2.5) 형제가 블랙이고 형제의 오른자식이 레드
+			// Case 5) sibling is BLACK,
+			// sibling's right child is RED
 			sibling->setColor(parent->getColor());
 			parent->setColor(BLACK);
 			sibling->getRight()->setColor(BLACK);
@@ -181,34 +186,41 @@ void RBTree::RBTree::DeleteFixup(Node* node) noexcept
 		{
 			Node* sibling = parent->getLeft();
 
-			// 2.2) 형제가 레드
+			// Case 2) sibling is RED
 			if (sibling->getColor() == RED)
 			{
 				sibling->setColor(BLACK);
 				parent->setColor(RED);
 				rotateR(parent);
+
 				sibling = parent->getLeft();
 			}
 
-			// 2.3) 형제가 블랙이고 형제의 양쪽 자식이 블랙
-			if (sibling->getRight()->getColor() == BLACK &&
-				sibling->getLeft()->getColor() == BLACK)
+			// Case 3) sibling is BLACK,
+			// sibling's left child is BLACK,
+			// sibling's right child is BLACK
+			if (sibling->getLeft()->getColor() == BLACK &&
+				sibling->getRight()->getColor() == BLACK)
 			{
 				sibling->setColor(RED);
 				node = parent;
 				continue;
 			}
 
-			// 2.4) 형제가 블랙이고 오른자식 RED, 왼자식 BLACK
+			// Case 4) sibling is BLACK,
+			// sibling's right child is RED,
+			// sibling's left child is BLACK
 			if (sibling->getLeft()->getColor() == BLACK)
 			{
 				sibling->getRight()->setColor(BLACK);
 				sibling->setColor(RED);
 				rotateL(sibling);
+
 				sibling = parent->getLeft();
 			}
 
-			// 2.5) 형제가 블랙이고 형제의 왼자식이 레드
+			// Case 5) sibling is BLACK,
+			// sibling's left child is RED
 			sibling->setColor(parent->getColor());
 			parent->setColor(BLACK);
 			sibling->getLeft()->setColor(BLACK);
@@ -218,12 +230,12 @@ void RBTree::RBTree::DeleteFixup(Node* node) noexcept
 		}
 	}
 
-	// 2.1) 기준 노드가 레드인 경우 → BLACK으로 마무리
+	// Case 1) node is RED
 	node->setColor(BLACK);
 }
 
 
-bool RBTree::RBTree::Find(int key, Node*& outNode)
+bool RBTree::RBTree::Find(int key, Node*& outNode) noexcept
 {
 	Node* node = root;
 
@@ -274,7 +286,7 @@ void RBTree::RBTree::Transplant(Node* u, Node* v) noexcept
 }
 
 
-void RBTree::RBTree::insertFixup(Node* node)
+void RBTree::RBTree::insertFixup(Node* node) noexcept
 {
 	while (node != root && node->getParent() != nil && node->getParent()->getColor() == RED)
 	{
