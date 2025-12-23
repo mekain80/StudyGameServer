@@ -1,4 +1,10 @@
-﻿#include "BinaryTree.h"
+﻿#include <iostream>
+#include "BinaryTree.h"
+
+BinaryTree::BinaryTree::BinaryTree()
+{
+	root = new Node(0);
+}
 
 BinaryTree::BinaryTree::BinaryTree(int rootKey)
 {
@@ -158,10 +164,4 @@ BinaryTree::Node::Node(int key)
 	this->key = key;
 	left = nullptr;
 	right = nullptr;
-}
-
-int BinaryTree::Node::GetChildCnt()
-{
-	int cnt = (this->right != nullptr) + (this->left != nullptr);
-	return cnt;
 }

@@ -1,16 +1,11 @@
 ﻿#pragma once
-#include <iostream>
-// TODO 
-// 2) Rule of 3/5 위반(복사하면 터짐)
-// 3) 헤더에 #include <iostream>은 과하게 무겁다
 
 namespace BinaryTree
 {
 	class Node
 	{
 	public:
-		Node(int key);
-		int GetChildCnt();
+		Node(int key);	
 
 		int key;
 		Node* left;
@@ -20,6 +15,7 @@ namespace BinaryTree
 	class BinaryTree
 	{
 	public:
+		BinaryTree();
 		BinaryTree(int rootKey);
 		~BinaryTree();
 
