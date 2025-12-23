@@ -126,6 +126,7 @@
     <ClCompile Include="App.cpp" />
     <ClCompile Include="BinaryTree.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="RBTree.cpp" />
     <ClCompile Include="TreeRenderer.cpp" />
     <ClCompile Include="TreeScene.cpp" />
   </ItemGroup>
@@ -133,6 +134,7 @@
     <ClInclude Include="App.h" />
     <ClInclude Include="AppConfig.h" />
     <ClInclude Include="BinaryTree.h" />
+    <ClInclude Include="RBTree.h" />
     <ClInclude Include="TreeRenderConfig.h" />
     <ClInclude Include="TreeRenderer.h" />
     <ClInclude Include="TreeScene.h" />
