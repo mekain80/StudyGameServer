@@ -104,7 +104,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
@@ -123,11 +123,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="App.cpp" />
     <ClCompile Include="BinaryTree.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="TreeRenderer.cpp" />
+    <ClCompile Include="TreeScene.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="App.h" />
+    <ClInclude Include="AppConfig.h" />
     <ClInclude Include="BinaryTree.h" />
+    <ClInclude Include="TreeRenderConfig.h" />
+    <ClInclude Include="TreeRenderer.h" />
+    <ClInclude Include="TreeScene.h" />
+    <ClInclude Include="TreeSceneConfig.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

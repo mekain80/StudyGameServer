@@ -28,9 +28,9 @@ bool BinaryTree::BinaryTree::Insert(int key)
 
 	while (*link != nullptr)
 	{
-		if (key < (*link)->key)      
+		if (key < (*link)->key)
 			link = &((*link)->left);
-		else if (key > (*link)->key) 
+		else if (key > (*link)->key)
 			link = &((*link)->right);
 		else
 			return false;
@@ -40,7 +40,6 @@ bool BinaryTree::BinaryTree::Insert(int key)
 	return true;
 }
 
-// TODO 구현하기
 bool BinaryTree::BinaryTree::Delete(int key)
 {
 	Node* parent = nullptr;
