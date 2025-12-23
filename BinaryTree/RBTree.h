@@ -49,6 +49,9 @@ namespace RBTree
 
 		void DeleteFixup(Node* x) noexcept; // 삭제 보정
 
+		Node* getRoot() const noexcept { return root; }
+		Node* getNil() const noexcept { return nil; }
+
 
 		void Print();
 		void PrintInOrder(Node* node);

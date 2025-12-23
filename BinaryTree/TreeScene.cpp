@@ -1,6 +1,6 @@
 ﻿#include "TreeScene.h"
 #include "TreeSceneConfig.h"
-#include "BinaryTree.h"
+#include "RBTree.h"
 #include "TreeRenderer.h"
 
 enum class CommandMode
@@ -45,16 +45,12 @@ static bool TryParseInput(int& outValue) noexcept
 	return true;
 }
 
-static BinaryTree::BinaryTree* g_tree = nullptr;
+static RBTree::RBTree* g_tree = nullptr;
 
 static void ResetTree()
 {
 	delete g_tree;
-	g_tree = new BinaryTree::BinaryTree(50);
-	g_tree->Insert(30);
-	g_tree->Insert(70);
-	g_tree->Insert(20);
-	g_tree->Insert(40);
+	g_tree = new RBTree::RBTree();
 }
 
 void TreeScene::OnCreate(HWND)
@@ -98,7 +94,7 @@ void TreeScene::OnKeyDown(HWND hwnd, WPARAM key)
 	case 'r':   // RESET
 	{
 		delete g_tree;
-		g_tree = new BinaryTree::BinaryTree(50);
+		g_tree = new RBTree::RBTree(50);
 		g_tree->Insert(30);
 		g_tree->Insert(70);
 		g_tree->Insert(20);
@@ -210,7 +206,7 @@ void TreeScene::OnPaint(HWND hwnd)
 	GetClientRect(hwnd, &rc);
 	FillRect(hdc, &rc, (HBRUSH)(COLOR_WINDOW + 1));
 
-	TreeRenderer::DrawTree(hdc, g_tree->root, rc);
+	TreeRenderer::DrawTree(hdc, g_tree, rc);
 
 	// 하단 안내
 	{

@@ -1,8 +1,9 @@
 ﻿#pragma once
 #include <windows.h>
-#include "BinaryTree.h"
+#include "RBTree.h"
 
 namespace TreeRenderer
 {
-    void DrawTree(HDC hdc, const BinaryTree::Node* root, const RECT& clientRc);
+    // RBTree 전체를 넘겨서 nil(센티넬)까지 같이 알 수 있게 처리
+    void DrawTree(HDC hdc, const RBTree::RBTree* tree, const RECT& clientRc);
 }
