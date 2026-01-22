@@ -347,7 +347,7 @@ void RBTree::RBTree::insertFixup(Node* node) noexcept
 }
 
 
-void RBTree::RBTree::rotateR(Node* node)
+void RBTree::RBTree::rotateR(Node* node) noexcept
 {
 	Node* parent = node->getParent();
 	Node* lChild = node->getLeft();
@@ -379,7 +379,7 @@ void RBTree::RBTree::rotateR(Node* node)
 	}
 }
 
-void RBTree::RBTree::rotateL(Node* node)
+void RBTree::RBTree::rotateL(Node* node) noexcept
 {
 	Node* parent = node->getParent();
 	Node* rChild = node->getRight();
