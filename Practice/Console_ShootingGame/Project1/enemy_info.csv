@@ -1,0 +1,4 @@
+id,hp,move_speed,move_pattern,atk_speed,shape
+1,1,60,xss,60,a
+2,2,30,zszscscsesesqsqs,30,b
+3,3,30,xxzzcccc,30,c
