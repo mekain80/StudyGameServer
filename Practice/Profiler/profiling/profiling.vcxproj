@@ -24,6 +24,7 @@
     <ProjectGuid>{774bfe93-cece-48ef-bbb4-c89f3d0e8e72}</ProjectGuid>
     <RootNamespace>profiling</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>Profiler</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -126,10 +127,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="profiling.cpp" />
+    <ClCompile Include="Profiler.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="profiling.h" />
+    <ClInclude Include="Profiler.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

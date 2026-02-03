@@ -7,7 +7,7 @@
 const static int PROFILE_MAX_CNT = 100;
 const static int PROFILE_NAME_LEN = 65;
 const static int PROFILE_DELETE_CNT = 2;
-const static WCHAR PROFILE_FILE_NAME[] = L"profiling_";
+const static WCHAR PROFILE_FILE_NAME[] = L"Profiler_";
 
 struct profile
 {

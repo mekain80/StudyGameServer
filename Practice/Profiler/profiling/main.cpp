@@ -1,7 +1,7 @@
 ﻿#include <iostream>
 #include <windows.h>
 #include <wchar.h>
-#include "profiling.h"
+#include "Profiler.h"
 
 WCHAR currTimestamp[32];
 

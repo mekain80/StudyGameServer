@@ -1,4 +1,4 @@
-﻿#include "profiling.h"
+﻿#include "Profiler.h"
 
 profile gProfileArray[PROFILE_MAX_CNT];
 LARGE_INTEGER gFreq;
