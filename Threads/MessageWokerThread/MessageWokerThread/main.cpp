@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <random>
+#include <winnt.h>
 
 using namespace std;
 
@@ -55,11 +56,11 @@ RingBuffer g_MsgRingBuffer(50000);
 CRITICAL_SECTION g_CS;
 
 // TPS Counters
-int g_ADD_TPS = 0;
-int g_DEL_TPS = 0;
-int g_SORT_TPS = 0;
-int g_FIND_TPS = 0;
-int g_PRINT_TPS = 0;
+long g_ADD_TPS = 0;
+long g_DEL_TPS = 0;
+long g_SORT_TPS = 0;
+long g_FIND_TPS = 0;
+long g_PRINT_TPS = 0;
 
 // Threads
 HANDLE g_MainThreadHandle = nullptr;
@@ -218,6 +219,13 @@ unsigned int WINAPI MainThread(void* /*lpParam*/)
 			quitMsgHead.shPayloadLen = 0;
 
 			Lock();
+			//if (g_MsgRingBuffer.GetFreeSize() < sizeof(st_MSG_HEAD) * 3)
+			//{
+			//	g_MsgRingBuffer.Resize(60000);
+			//}
+
+			g_MsgRingBuffer.Enqueue((const char*)&quitMsgHead, sizeof(quitMsgHead));
+			g_MsgRingBuffer.Enqueue((const char*)&quitMsgHead, sizeof(quitMsgHead));
 			g_MsgRingBuffer.Enqueue((const char*)&quitMsgHead, sizeof(quitMsgHead));
 			Unlock();
 
@@ -228,7 +236,11 @@ unsigned int WINAPI MainThread(void* /*lpParam*/)
 			memcpy(handleArr, g_WorkerThreadHandles, sizeof(g_WorkerThreadHandles));
 			handleArr[3] = g_MonitoringThreadHandle;
 
-			WaitForMultipleObjects(4, handleArr, TRUE, INFINITE);
+			DWORD r = WaitForMultipleObjects(4, handleArr, TRUE, INFINITE);
+			if (r == WAIT_FAILED) {
+				DWORD e = GetLastError();
+				printf("WaitForMultipleObjects FAILED, err=%lu\n", e);
+			}
 			break;
 		}
 
@@ -314,7 +326,7 @@ unsigned int WINAPI WorkerThread(void* /*lpParam*/)
 			{
 				Lock();
 				g_List.push_back(payload);
-				++g_ADD_TPS;
+				InterlockedIncrement((long*)&g_ADD_TPS);
 				Unlock();
 				break;
 			}
@@ -323,7 +335,7 @@ unsigned int WINAPI WorkerThread(void* /*lpParam*/)
 				Lock();
 				if (!g_List.empty())
 					g_List.pop_front();
-				++g_DEL_TPS;
+				InterlockedIncrement((long*)&g_DEL_TPS);
 				Unlock();
 				break;
 			}
@@ -331,7 +343,7 @@ unsigned int WINAPI WorkerThread(void* /*lpParam*/)
 			{
 				Lock();
 				g_List.sort();
-				++g_SORT_TPS;
+				InterlockedIncrement((long*)&g_SORT_TPS);
 				Unlock();
 				break;
 			}
@@ -348,7 +360,7 @@ unsigned int WINAPI WorkerThread(void* /*lpParam*/)
 						break;
 					}
 				}
-				++g_FIND_TPS;
+				InterlockedIncrement((long*)&g_FIND_TPS);
 				Unlock();
 
 				if (found)
@@ -361,7 +373,7 @@ unsigned int WINAPI WorkerThread(void* /*lpParam*/)
 
 				Lock();
 				snapshot.assign(g_List.begin(), g_List.end());
-				++g_PRINT_TPS;
+				InterlockedIncrement((long*)&g_PRINT_TPS);
 				Unlock();
 
 				for (const auto& s : snapshot)
@@ -371,10 +383,6 @@ unsigned int WINAPI WorkerThread(void* /*lpParam*/)
 			}
 			case dfJOB_QUIT:
 				Lock();
-				st_MSG_HEAD quitMsgHead;
-				quitMsgHead.shType = dfJOB_QUIT;
-				quitMsgHead.shPayloadLen = 0;
-				g_MsgRingBuffer.Enqueue((const char*)&quitMsgHead, sizeof(quitMsgHead));
 				SetEvent(g_WorkerEvent);
 				Unlock();
 				return 0;
