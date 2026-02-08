@@ -17,7 +17,8 @@ using namespace std;
 // Constants / Timing
 // ------------------------------------------------------------
 LARGE_INTEGER g_Freq{};
-const double  kDefaultTimeSec = 0.050;
+double  kDefaultTimeSec = 0.050 / 5 / 2;
+const double  kMinTimeSec = 0.0005;
 const int     kStrMaxLen = 50;   // (현재 미사용)
 
 // ------------------------------------------------------------
@@ -236,7 +237,13 @@ unsigned int WINAPI MainThread(void* /*lpParam*/)
 		double seconds = (double)(end.QuadPart - start.QuadPart) / (double)g_Freq.QuadPart;
 		double remain = kDefaultTimeSec - seconds;
 		if (remain > 0)
+		{
 			Sleep((DWORD)(remain * 1000.0));
+
+			// 프레임이 빨라지도록 설정
+			kDefaultTimeSec = kDefaultTimeSec - 0.001;
+			kDefaultTimeSec = std::max(kDefaultTimeSec, kMinTimeSec);
+		}
 	}
 
 	return 0;
