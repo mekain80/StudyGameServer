@@ -79,13 +79,14 @@ int RingBuffer::GetBufferSize(void)
 
 int RingBuffer::GetUseSize(void)
 {
-	if (mFront == mRear)
-		return mBufferSize; // 가득 찬 상태
+	int size = mRear - mFront;
 
-	if (mFront < mRear)
-		return (mRear - mFront);
-	else // mRear < mFront
-		return (mBufferSize - mFront) + mRear;
+	if (size < 0)
+	{
+		size += mBufferSize + 1;
+	}
+
+	return size;
 }
 
 int RingBuffer::GetFreeSize(void)
