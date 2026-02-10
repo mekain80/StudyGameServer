@@ -3,7 +3,89 @@
 #include <cstring>
 #include <cassert>
 
+
+#include <windows.h>
+#include <process.h>
+
+#include <list>
+#include <string>
+#include <vector>
+#include <random>
+#include <queue>
+
 using namespace std;
+
+const int SEED = 1999;
+const int MESSAGE_MAX_SIZE = 100;
+const int MESSAGE_MIN_SIZE = 5;
+const int MESSAGE_SIZE = 81;
+
+char message[MESSAGE_SIZE + 1] = "1234567890 abcdefghijklmnopqrstuvwxyz 1234567890 abcdefghijklmnopqrstuvwxyz 12345";
+
+RingBuffer* ringBuffer = new RingBuffer(10000);
+queue<int>* que = new queue<int>;
+
+unsigned int WINAPI EnqueueThread(LPVOID lpParam)
+{
+    int start = 0;
+
+    while (1)
+    {
+        int size = rand() % (MESSAGE_SIZE + 1);
+
+        int freeSize = ringBuffer->GetFreeSize();
+        if (freeSize < size)
+            __debugbreak();
+
+        if (start + size > MESSAGE_SIZE)
+        {
+            ringBuffer->Enqueue(message + start, MESSAGE_SIZE - start);
+            ringBuffer->Enqueue(message, size - MESSAGE_SIZE + start);
+
+            start += size - MESSAGE_SIZE;
+        }
+        else
+        {
+            ringBuffer->Enqueue(message + start, size);
+
+            start += size;
+        }
+
+        Sleep(10);
+    }
+
+    return 0;
+}
+
+unsigned int WINAPI DequeueThread(LPVOID lpParam)
+{
+    char* dequeueString = new char[RING_DEFAULT_SIZE + 1];
+    while (1)
+    {
+        int useSize = ringBuffer->GetUseSize();
+        if (useSize > 0)
+        {
+            dequeueString[useSize] = '\0';
+
+            ringBuffer->Dequeue(&dequeueString[0], useSize);
+
+            printf("%s", dequeueString);
+        }
+    }
+
+    return 0;
+}
+
+void ThreadTest()
+{
+    srand(SEED);
+
+    HANDLE Threads[3];
+    Threads[0] = (HANDLE)_beginthreadex(nullptr, 0, EnqueueThread, nullptr, 0, nullptr);
+    Threads[1] = (HANDLE)_beginthreadex(nullptr, 0, DequeueThread, nullptr, 0, nullptr);
+
+    WaitForMultipleObjects(2, Threads, true, INFINITE);
+}
 
 void PrintState(RingBuffer& rb, const char* title)
 {
@@ -35,7 +117,7 @@ void PrintState(RingBuffer& rb, const char* title)
     cout << endl;
 }
 
-int main()
+void Test()
 {
     // 테스트용으로 사이즈 8짜리 링버퍼
     RingBuffer rb(8);
@@ -138,5 +220,13 @@ int main()
     }
 
     cout << "All tests finished (no assert failed).\n";
+}
+
+
+int main()
+{
+    //Test();
+    ThreadTest();
+
     return 0;
 }
