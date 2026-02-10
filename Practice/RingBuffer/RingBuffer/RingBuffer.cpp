@@ -94,7 +94,6 @@ int RingBuffer::GetFreeSize(void)
 	return mBufferSize - GetUseSize();
 }
 
-
 int RingBuffer::Enqueue(const char* data, int size)
 {
 	if (size <= 0)
@@ -123,11 +122,11 @@ int RingBuffer::Enqueue(const char* data, int size)
 
 int RingBuffer::Dequeue(char* dest, int size)
 {
-	if (size <= 0) 
+	if (size <= 0)
 		return 0;
 
-	int useSize = GetUseSize();
 	// 정책: 자리가 모자라면 그냥 실패시키고 0 리턴
+	int useSize = GetUseSize();
 	if (size > useSize)
 		return 0;
 
