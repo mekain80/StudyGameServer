@@ -2,117 +2,81 @@
 
 static const int RING_DEFAULT_SIZE = 10000;
 
-/// <summary>
-/// 고성능 송수신용 Ring Buffer 클래스
-/// </summary>
+/// @brief 고성능 송수신용 Ring Buffer 클래스
 class RingBuffer
 {
 public:
-    /// <summary>
-    /// 기본 생성자.
-    /// </summary>
+    /// @brief 기본 생성자.
     RingBuffer(void);
 
-    /// <summary>
-    /// 버퍼 크기를 지정하는 생성자.
-    /// </summary>
-    /// <param name="bufferSize">버퍼 초기 크기</param>
+    /// @brief 버퍼 크기를 지정하는 생성자.
+    /// @param bufferSize 버퍼 초기 크기
     RingBuffer(int bufferSize);
 
-    /// <summary>
-    /// 소멸자.
-    /// </summary>
+    /// @brief 소멸자.
     ~RingBuffer(void);
 
-    /// <summary>
-    /// 버퍼의 크기를 재조정한다.
-    /// </summary>
-    /// <param name="size">새로운 버퍼 크기</param>
+    /// @brief 버퍼의 크기를 재조정한다.
+    /// @param size 새로운 버퍼 크기
     void Resize(int size);
 
-    /// <summary>
-    /// 전체 버퍼 크기를 반환한다.
-    /// </summary>
-    /// <returns>버퍼의 총 크기</returns>
+    /// @brief 전체 버퍼 크기를 반환한다.
+    /// @return 버퍼의 총 크기
     int GetBufferSize(void);
 
-    /// <summary>
-    /// 현재 사용 중인 용량을 반환한다.
-    /// </summary>
-    /// <returns>사용 중인 데이터 크기</returns>
+    /// @brief 현재 사용 중인 용량을 반환한다.
+    /// @return 사용 중인 데이터 크기
     int GetUseSize(void);
 
-    /// <summary>
-    /// 현재 남은 용량을 반환한다.
-    /// </summary>
-    /// <returns>사용 가능한 용량</returns>
+    /// @brief 현재 남은 용량을 반환한다.
+    /// @return 사용 가능한 용량
     int GetFreeSize(void);
 
-    /// <summary>
-    /// Rear 위치에 데이터를 삽입한다.
-    /// </summary>
-    /// <param name="data">입력 데이터 포인터</param>
-    /// <param name="size">입력 데이터 크기</param>
-    /// <returns>실제로 삽입된 크기</returns>
+    /// @brief Rear 위치에 데이터를 삽입한다.
+    /// @param data 입력 데이터 포인터
+    /// @param size 입력 데이터 크기
+    /// @return 실제로 삽입된 크기
     int Enqueue(const char* data, int size);
 
-    /// <summary>
-    /// Front 위치에서 데이터를 가져오고, Front 인덱스를 이동한다.
-    /// </summary>
-    /// <param name="dest">데이터 저장 버퍼</param>
-    /// <param name="size">읽고자 하는 크기</param>
-    /// <returns>가져온 데이터 크기</returns>
+    /// @brief Front 위치에서 데이터를 가져오고, Front 인덱스를 이동한다.
+    /// @param dest 데이터 저장 버퍼
+    /// @param size 읽고자 하는 크기
+    /// @return 가져온 데이터 크기
     int Dequeue(char* dest, int size);
 
-    /// <summary>
-    /// Front 위치에서 데이터를 읽되, Front 인덱스는 이동하지 않는다.
-    /// </summary>
-    /// <param name="dest">데이터 저장 버퍼</param>
-    /// <param name="size">읽고자 하는 크기</param>
-    /// <returns>읽은 데이터 크기</returns>
+    /// @brief Front 위치에서 데이터를 읽되, Front 인덱스는 이동하지 않는다.
+    /// @param dest 데이터 저장 버퍼
+    /// @param size 읽고자 하는 크기
+    /// @return 읽은 데이터 크기
     int Peek(char* dest, int size);
 
-    /// <summary>
-    /// 버퍼의 모든 데이터를 삭제하고 초기화한다.
-    /// </summary>
+    /// @brief 버퍼의 모든 데이터를 삭제하고 초기화한다.
     void ClearBuffer(void);
 
-    /// <summary>
-    /// 끊기지 않고 한 번에 Enqueue 가능한 연속 공간 크기를 반환한다.
-    /// </summary>
-    /// <returns>연속적으로 쓸 수 있는 공간 크기</returns>
+    /// @brief 끊기지 않고 한 번에 Enqueue 가능한 연속 공간 크기를 반환한다.
+    /// @return 연속적으로 쓸 수 있는 공간 크기
     int DirectEnqueueSize(void);
 
-    /// <summary>
-    /// 끊기지 않고 한 번에 Dequeue 가능한 연속 데이터 크기를 반환한다.
-    /// </summary>
-    /// <returns>연속적으로 읽을 수 있는 데이터 크기</returns>
+    /// @brief 끊기지 않고 한 번에 Dequeue 가능한 연속 데이터 크기를 반환한다.
+    /// @return 연속적으로 읽을 수 있는 데이터 크기
     int DirectDequeueSize(void);
 
-    /// <summary>
-    /// Rear 위치를 지정한 크기만큼 이동시킨다. (쓰기 위치 이동)
-    /// </summary>
-    /// <param name="size">이동할 크기</param>
-    /// <returns>이동된 크기</returns>
+    /// @brief Rear 위치를 지정한 크기만큼 이동시킨다. (쓰기 위치 이동)
+    /// @param size 이동할 크기
+    /// @return 이동된 크기
     int MoveRear(int size);
 
-    /// <summary>
-    /// Front 위치를 지정한 크기만큼 이동시킨다. (읽기 위치 이동)
-    /// </summary>
-    /// <param name="size">이동할 크기</param>
-    /// <returns>이동된 크기</returns>
+    /// @brief Front 위치를 지정한 크기만큼 이동시킨다. (읽기 위치 이동)
+    /// @param size 이동할 크기
+    /// @return 이동된 크기
     int MoveFront(int size);
 
-    /// <summary>
-    /// Front 위치의 버퍼 포인터를 반환한다.
-    /// </summary>
-    /// <returns>Front 위치의 char* 포인터</returns>
+    /// @brief Front 위치의 버퍼 포인터를 반환한다.
+    /// @return Front 위치의 char* 포인터
     char* GetFrontBufferPtr(void);
 
-    /// <summary>
-    /// Rear 위치의 버퍼 포인터를 반환한다.
-    /// </summary>
-    /// <returns>Rear 위치의 char* 포인터</returns>
+    /// @brief Rear 위치의 버퍼 포인터를 반환한다.
+    /// @return Rear 위치의 char* 포인터
     char* GetRearBufferPtr(void);
 
 private:
