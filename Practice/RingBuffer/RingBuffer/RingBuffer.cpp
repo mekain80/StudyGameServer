@@ -4,12 +4,11 @@
 
 RingBuffer::RingBuffer(void)
 	: mBuffer(nullptr)
-	, mBufferSize(DEFAULT_SIZE)
+	, mBufferSize(RING_DEFAULT_SIZE)
 	, mFront(0)
 	, mRear(0)
-	, mIsEmpty(true)
 {
-	mBuffer = new char[DEFAULT_SIZE];
+	mBuffer = new char[mBufferSize];
 }
 
 RingBuffer::RingBuffer(int iBufferSize)
@@ -17,9 +16,8 @@ RingBuffer::RingBuffer(int iBufferSize)
 	, mBufferSize(iBufferSize)
 	, mFront(0)
 	, mRear(0)
-	, mIsEmpty(true)
 {
-	mBuffer = new char[iBufferSize];
+	mBuffer = new char[mBufferSize];
 }
 
 RingBuffer::~RingBuffer(void)
@@ -27,15 +25,15 @@ RingBuffer::~RingBuffer(void)
 	delete[] mBuffer;
 }
 
-void RingBuffer::Resize(int newSize)
+void RingBuffer::Resize(int size)
 {
 	// 더 작게 줄이는 건 허용 안 함
-	if (newSize <= mBufferSize)
+	if (size <= mBufferSize)
 		return;
 
 	int used = GetUseSize();
 
-	char* newBuf = new char[newSize];
+	char* newBuf = new char[size];
 
 	// 일단 데이터가 있으면 논리 순서대로 복사
 	if (used > 0)
@@ -59,19 +57,17 @@ void RingBuffer::Resize(int newSize)
 
 	delete[] mBuffer;
 	mBuffer = newBuf;
-	mBufferSize = newSize;
+	mBufferSize = size;
 
 	if (used == 0)
 	{
 		mFront = 0;
 		mRear = 0;
-		mIsEmpty = true;
 	}
 	else
 	{
 		mFront = 0;
 		mRear = used;
-		mIsEmpty = false;
 	}
 }
 
@@ -83,9 +79,6 @@ int RingBuffer::GetBufferSize(void)
 
 int RingBuffer::GetUseSize(void)
 {
-	if (mIsEmpty)
-		return 0;
-
 	if (mFront == mRear)
 		return mBufferSize; // 가득 찬 상태
 
@@ -97,144 +90,141 @@ int RingBuffer::GetUseSize(void)
 
 int RingBuffer::GetFreeSize(void)
 {
-	// 전체 크기 - 사용 중
 	return mBufferSize - GetUseSize();
 }
 
 
-int RingBuffer::Enqueue(const char* chpData, int iSize)
+int RingBuffer::Enqueue(const char* data, int size)
 {
-	if (iSize <= 0)
-		return 0;
-
-	int freeSize = GetFreeSize();
-	if (freeSize <= 0)
+	if (size <= 0)
 		return 0;
 
 	// 정책: 자리가 모자라면 그냥 실패시키고 0 리턴
-	if (iSize > freeSize)
+	int freeSize = GetFreeSize();
+	if (size > freeSize)
 		return 0;
 
-	// 1차 복사: rear ~ 버퍼 끝까지 한 번에 쓸 수 있는 구간
-	int firstSize = mBufferSize - mRear;
-	if (firstSize > iSize)
-		firstSize = iSize;
-
-	std::memcpy(mBuffer + mRear, chpData, firstSize);
-
-	// 2차 복사: 남은 데이터는 버퍼 맨 앞으로 래핑해서 쓰기
-	int remainSize = iSize - firstSize;
-	if (remainSize > 0)
+	if (mRear + size > mBufferSize)
 	{
-		std::memcpy(mBuffer, chpData + firstSize, remainSize);
+		int rest = mBufferSize - mRear;
+		memcpy(&mBuffer[mRear + 1], data, rest);
+		memcpy(&mBuffer[0], data + rest, size - rest);
+		mRear += size - mBufferSize;
+	}
+	else
+	{
+		memcpy(&mBuffer[mRear + 1], data, size);
+		mRear += size;
 	}
 
-	// rear 이동 + 래핑 처리
-	mRear = (mRear + iSize) % mBufferSize;
-
-	// 데이터가 들어왔으니 더 이상 비어 있지 않음
-	mIsEmpty = false;
-
-	return iSize;
+	return size;
 }
 
-int RingBuffer::Dequeue(char* chpDest, int iSize)
+int RingBuffer::Dequeue(char* dest, int size)
 {
-	if (iSize <= 0) 
+	if (size <= 0) 
 		return 0;
 
 	int useSize = GetUseSize();
 	// 정책: 자리가 모자라면 그냥 실패시키고 0 리턴
-	if (iSize > useSize)
+	if (size > useSize)
 		return 0;
 
-	int first = std::min(iSize, mBufferSize - mFront);
-	memcpy(chpDest, mBuffer + mFront, first);
+	int first = std::min(size, mBufferSize - mFront);
+	memcpy(dest, mBuffer + mFront, first);
 
-	int remain = iSize - first;
+	int remain = size - first;
 	if (remain > 0)
-		memcpy(chpDest + first, mBuffer, remain);
+		memcpy(dest + first, mBuffer, remain);
 
-	mFront = (mFront + iSize) % mBufferSize;
-	if (mFront == mRear)
-		mIsEmpty = true;
+	mFront = (mFront + size) % mBufferSize;
 
-	return iSize;
+	return size;
 }
 
-int RingBuffer::Peek(char* chpDest, int iSize)
+int RingBuffer::Peek(char* dest, int size)
 {
-	if (iSize <= 0)
+	if (size <= 0)
 		return 0;
 
 	int useSize = GetUseSize();
-	if (useSize == 0)
-		return 0;
-
-	if (iSize > useSize)
+	if (size > useSize)
 		return 0;  // 정책: 모자라면 실패 (Dequeue와 맞춤)
 
-	int first = std::min(iSize, mBufferSize - mFront);
-	std::memcpy(chpDest, mBuffer + mFront, first);
+	int first = std::min(size, mBufferSize - mFront);
+	std::memcpy(dest, mBuffer + mFront, first);
 
-	int remain = iSize - first;
+	int remain = size - first;
 	if (remain > 0)
-		std::memcpy(chpDest + first, mBuffer, remain);
+		std::memcpy(dest + first, mBuffer, remain);
 
-	return iSize;
+	return size;
 }
 
 void RingBuffer::ClearBuffer(void)
 {
-	memset(mBuffer, 0, mBufferSize);
-	mFront = 0;
-	mRear = 0;
-	mIsEmpty = true;
+	mFront = mRear;
 }
-
 
 int RingBuffer::DirectEnqueueSize()
 {
-	int free = GetFreeSize();
-	if (free == 0) return 0;
-
-	if (mRear >= mFront)
-		return std::min(free, mBufferSize - mRear);
+	int size = mRear - mFront;
+	if (size < 0)
+	{
+		size = mFront - mRear;
+	}
 	else
-		return mFront - mRear;
+	{
+		size = mBufferSize - mRear;
+	}
+
+	return size;
 }
 
 int RingBuffer::DirectDequeueSize()
 {
-	int used = GetUseSize();
-	if (used == 0) return 0;
+	int size = mRear - mFront;
+	if (size < 0)
+	{
+		size = mBufferSize - mFront;
+	}
 
-	if (mRear > mFront)
-		return mRear - mFront;
-	else
-		return mBufferSize - mFront;
+	return size;
 }
 
-int RingBuffer::MoveRear(int iSize)
+int RingBuffer::MoveRear(int size)
 {
-	if (iSize < 0 || iSize > GetFreeSize())
-		return 0;
+	if (size > 0)
+	{
+		if (mRear + size > mBufferSize)
+		{
+			mRear += size - mBufferSize;
+		}
+		else
+		{
+			mRear += size;
+		}
+	}
 
-	mRear = (mRear + iSize) % mBufferSize;
-	if (iSize > 0) mIsEmpty = false;
-	return iSize;
+	return size;
 }
 
-int RingBuffer::MoveFront(int iSize)
+int RingBuffer::MoveFront(int size)
 {
-	if (iSize < 0 || iSize > GetUseSize())
-		return 0;
+	if (size > 0)
+	{
+		if (mFront + size > mBufferSize)
+		{
+			mFront += size - mBufferSize;
+		}
+		else
+		{
+			mFront += size;
+		}
+	}
 
-	mFront = (mFront + iSize) % mBufferSize;
-	if (mFront == mRear) mIsEmpty = true;
-	return iSize;
+	return size;
 }
-
 
 char* RingBuffer::GetFrontBufferPtr(void)
 {
