@@ -13,7 +13,6 @@ public:
 	/// @param bufferSize 버퍼 초기 크기
 	RingBuffer(int bufferSize);
 
-	/// @brief 소멸자.
 	~RingBuffer(void);
 
 	/// @brief 버퍼의 크기를 재조정한다.
@@ -89,4 +88,5 @@ private:
 	int   mBufferSize;  // 전체 버퍼 크기
 	int   mFront;       // Front 인덱스
 	int   mRear;        // Rear 인덱스
+	int   mUseSize;     // 현재 사용 중인 바이트 수
 };
