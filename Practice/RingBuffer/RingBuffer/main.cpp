@@ -13,6 +13,9 @@
 #include <random>
 #include <queue>
 
+
+#include "Profiler.h"
+
 using namespace std;
 
 const int SEED = 1999;
@@ -25,18 +28,35 @@ char message[MESSAGE_SIZE + 1] = "1234567890 abcdefghijklmnopqrstuvwxyz 12345678
 RingBuffer* ringBuffer = new RingBuffer(10000);
 queue<int>* que = new queue<int>;
 
+HANDLE g_ExitEvent = nullptr;
+DWORD g_startTime;
+
 unsigned int WINAPI EnqueueThread(LPVOID lpParam)
 {
     int start = 0;
 
     while (1)
     {
+        // 'Q' 눌림, 종료, 테스트 1분 동안 진행
+        if (GetAsyncKeyState('Q') & 1 || g_startTime + 6'0000 < GetTickCount())
+        {
+            SetEvent(g_ExitEvent);
+            return 0;
+        }
+
+
         int size = rand() % (MESSAGE_SIZE + 1);
 
         int freeSize = ringBuffer->GetFreeSize();
         if (freeSize < size)
+        {
+            SetEvent(g_ExitEvent);
+            return 0;
             __debugbreak();
+        }
+            
 
+        ProfileBegin(L"Noexcept EnqueueThread");
         if (start + size > MESSAGE_SIZE)
         {
             ringBuffer->Enqueue(message + start, MESSAGE_SIZE - start);
@@ -50,8 +70,9 @@ unsigned int WINAPI EnqueueThread(LPVOID lpParam)
 
             start += size;
         }
+        ProfileEnd(L"Noexcept EnqueueThread");
 
-        Sleep(10);
+        Sleep(1);
     }
 
     return 0;
@@ -62,14 +83,21 @@ unsigned int WINAPI DequeueThread(LPVOID lpParam)
     char* dequeueString = new char[RING_DEFAULT_SIZE + 1];
     while (1)
     {
+        DWORD exitResult = WaitForSingleObject(g_ExitEvent, 0);
+        if (exitResult == WAIT_OBJECT_0)
+            return 0;
+
+
         int useSize = ringBuffer->GetUseSize();
         if (useSize > 0)
         {
+            ProfileBegin(L"Noexcept DequeueThread");
             dequeueString[useSize] = '\0';
 
             ringBuffer->Dequeue(&dequeueString[0], useSize);
 
             printf("%s", dequeueString);
+            ProfileEnd(L"Noexcept DequeueThread");
         }
     }
 
@@ -225,8 +253,12 @@ void Test()
 
 int main()
 {
+    g_ExitEvent = CreateEvent(NULL, true, false, NULL);
+    g_startTime = GetTickCount();
+
     //Test();
     ThreadTest();
 
+    ProfileDataOutText(L"Noexcept.txt");
     return 0;
 }
