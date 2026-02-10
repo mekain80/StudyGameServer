@@ -22,7 +22,7 @@ RingBuffer::RingBuffer(int iBufferSize)
 	mBuffer = new char[mBufferSize];
 }
 
-RingBuffer::~RingBuffer(void)
+RingBuffer::~RingBuffer(void) noexcept
 {
 	delete[] mBuffer;
 }
@@ -61,22 +61,22 @@ void RingBuffer::Resize(int size)
 	mUseSize = used;
 }
 
-int RingBuffer::GetBufferSize(void)
+int RingBuffer::GetBufferSize(void) const noexcept
 {
 	return mBufferSize;
 }
 
-int RingBuffer::GetUseSize(void)
+int RingBuffer::GetUseSize(void) const noexcept
 {
 	return mUseSize;
 }
 
-int RingBuffer::GetFreeSize(void)
+int RingBuffer::GetFreeSize(void) const noexcept
 {
 	return mBufferSize - mUseSize;
 }
 
-int RingBuffer::Enqueue(const char* data, int size)
+int RingBuffer::Enqueue(const char* data, int size) noexcept
 {
 	if (size <= 0)
 		return 0;
@@ -98,7 +98,7 @@ int RingBuffer::Enqueue(const char* data, int size)
 	return size;
 }
 
-int RingBuffer::Dequeue(char* dest, int size)
+int RingBuffer::Dequeue(char* dest, int size) noexcept
 {
 	if (size <= 0)
 		return 0;
@@ -114,12 +114,12 @@ int RingBuffer::Dequeue(char* dest, int size)
 		std::memcpy(dest + first, mBuffer, remain);
 
 	mFront = (mFront + size) % mBufferSize;
-	mUseSize -= size;                     // ★ 사용량 감소
+	mUseSize -= size;
 
 	return size;
 }
 
-int RingBuffer::Peek(char* dest, int size)
+int RingBuffer::Peek(char* dest, int size) const noexcept
 {
 	if (size <= 0)
 		return 0;
@@ -137,14 +137,14 @@ int RingBuffer::Peek(char* dest, int size)
 	return size;
 }
 
-void RingBuffer::ClearBuffer(void)
+void RingBuffer::ClearBuffer(void) noexcept
 {
 	mFront = 0;
 	mRear = 0;
 	mUseSize = 0;
 }
 
-int RingBuffer::DirectEnqueueSize()
+int RingBuffer::DirectEnqueueSize() const noexcept
 {
 	int freeSize = GetFreeSize();
 	if (freeSize <= 0)
@@ -153,7 +153,7 @@ int RingBuffer::DirectEnqueueSize()
 	return std::min(freeSize, mBufferSize - mRear);
 }
 
-int RingBuffer::DirectDequeueSize()
+int RingBuffer::DirectDequeueSize() const noexcept
 {
 	if (mUseSize <= 0)
 		return 0;
@@ -161,7 +161,7 @@ int RingBuffer::DirectDequeueSize()
 	return std::min(mUseSize, mBufferSize - mFront);
 }
 
-int RingBuffer::MoveRear(int size)
+int RingBuffer::MoveRear(int size) noexcept
 {
 	if (size <= 0)
 		return 0;
@@ -174,7 +174,7 @@ int RingBuffer::MoveRear(int size)
 	return size;
 }
 
-int RingBuffer::MoveFront(int size)
+int RingBuffer::MoveFront(int size) noexcept
 {
 	if (size <= 0)
 		return 0;
@@ -187,12 +187,12 @@ int RingBuffer::MoveFront(int size)
 	return size;
 }
 
-char* RingBuffer::GetFrontBufferPtr(void)
+char* RingBuffer::GetFrontBufferPtr(void) noexcept
 {
 	return mBuffer + mFront;
 }
 
-char* RingBuffer::GetRearBufferPtr(void)
+char* RingBuffer::GetRearBufferPtr(void) noexcept
 {
 	return mBuffer + mRear;
 }
