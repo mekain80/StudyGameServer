@@ -15,6 +15,8 @@
 
 
 #include "Profiler.h"
+#undef min
+#undef max
 
 using namespace std;
 
@@ -115,140 +117,176 @@ void ThreadTest()
     WaitForMultipleObjects(2, Threads, true, INFINITE);
 }
 
-void PrintState(RingBuffer& rb, const char* title)
+static void PrintState(const RingBuffer& rb, const char* tag, const char* base)
 {
-    cout << "==== " << title << " ====\n";
-    cout << "BufferSize : " << rb.GetBufferSize() << "\n";
-    cout << "UseSize    : " << rb.GetUseSize() << "\n";
-    cout << "FreeSize   : " << rb.GetFreeSize() << "\n";
+    const char* front = rb.GetFront();
+    const char* rear = rb.GetRear();
 
-    int useSize = rb.GetUseSize();
-    if (useSize > 0)
-    {
-        char temp[1024] = { 0 };
-        int peekSize = (useSize < (int)sizeof(temp) - 1) ? useSize : (int)sizeof(temp) - 1;
-        int ret = rb.Peek(temp, peekSize);
-        cout << "Peek(" << ret << ") : ";
-        for (int i = 0; i < ret; ++i)
-        {
-            cout << temp[i];
-        }
-        cout << "\n";
-    }
-    else
-    {
-        cout << "Peek       : (empty)\n";
-    }
+    ptrdiff_t frontIdx = (front - base);
+    ptrdiff_t rearIdx = (rear - base);
 
-    cout << "DirectEnqueueSize : " << rb.DirectEnqueueSize() << "\n";
-    cout << "DirectDequeueSize : " << rb.DirectDequeueSize() << "\n";
-    cout << endl;
+    cout << "---- " << tag << " ----\n";
+    cout << "  size=" << rb.GetBufferSize()
+        << " used=" << rb.GetUseSize()
+        << " free=" << rb.GetFreeSize() << "\n";
+    cout << "  empty=" << rb.IsEmpty()
+        << " full=" << rb.IsFull() << "\n";
+    cout << "  directEnq=" << rb.GetDirectEnqueueSize()
+        << " directDeq=" << rb.GetDirectDequeueSize() << "\n";
+    cout << "  frontIdx=" << frontIdx << " rearIdx=" << rearIdx << "\n";
+    cout << "----------------------\n";
 }
 
 void Test()
 {
-    // 테스트용으로 사이즈 8짜리 링버퍼
     RingBuffer rb(8);
 
-    cout << boolalpha;
+    // base = 버퍼 시작(construct 직후 front==rear==start 라는 전제)
+    const char* base = rb.GetFront();
 
-    PrintState(rb, "After Construct");
+    PrintState(rb, "After Construct", base);
+    assert(rb.IsEmpty());
+    assert(!rb.IsFull());
+    assert(rb.GetUseSize() == 0);
+    assert(rb.GetFreeSize() == rb.GetBufferSize());
 
-    // 1) 기본 Enqueue / Peek 테스트: "ABCD"
+    // 1) Enqueue: "ABCD"
     {
         const char* data = "ABCD";
-        int ret = rb.Enqueue(data, 4);
-        cout << "[Test1] Enqueue(\"ABCD\", 4) ret = " << ret << "\n";
-        assert(ret == 4);
-        PrintState(rb, "After Enqueue ABCD");
+        bool ok = rb.Enqueue(data, 4);
+        cout << "[Test1] Enqueue(\"ABCD\",4) ok=" << ok << "\n";
+        assert(ok);
+        assert(rb.GetUseSize() == 4);
+        PrintState(rb, "After Enqueue ABCD", base);
     }
 
-    // 2) Dequeue 2바이트: "AB"
+    // 2) Peek 4: "ABCD" (소모 X)
     {
-        char buf[8] = { 0 };
-        int ret = rb.Dequeue(buf, 2);
-        cout << "[Test2] Dequeue(2) ret = " << ret << ", data = ";
-        for (int i = 0; i < ret; ++i) cout << buf[i];
-        cout << "\n";
-        assert(ret == 2);
+        char buf[16] = {};
+        bool ok = rb.Peek(buf, 4);
+        cout << "[Test2] Peek(4) ok=" << ok << " data=" << string(buf, buf + 4) << "\n";
+        assert(ok);
+        assert(buf[0] == 'A' && buf[1] == 'B' && buf[2] == 'C' && buf[3] == 'D');
+        assert(rb.GetUseSize() == 4); // Peek이니 그대로
+        PrintState(rb, "After Peek 4 (no consume)", base);
+    }
+
+    // 3) Dequeue 2: "AB"
+    {
+        char buf[16] = {};
+        bool ok = rb.Dequeue(buf, 2);
+        cout << "[Test3] Dequeue(2) ok=" << ok << " data=" << string(buf, buf + 2) << "\n";
+        assert(ok);
         assert(buf[0] == 'A' && buf[1] == 'B');
-        PrintState(rb, "After Dequeue 2 (expect CD left)");
+        assert(rb.GetUseSize() == 2); // "CD" 남음
+        PrintState(rb, "After Dequeue 2 (expect CD left)", base);
     }
 
-    // 3) 다시 Enqueue 해서 래핑(full 상태 만들기): "EFGH"
+    // 4) Enqueue 6: "EFGHIJ" (wrap + full 만들기)
+    // 남은 "CD"(2) + "EFGHIJ"(6) = 8 (full)
     {
-        const char* data = "EFGH";
-        int ret = rb.Enqueue(data, 4);
-        cout << "[Test3] Enqueue(\"EFGH\", 4) ret = " << ret << "\n";
-        assert(ret == 4);
-        PrintState(rb, "After Enqueue EFGH (expect full: CDEFGH)");
+        const char* data = "EFGHIJ";
+        bool ok = rb.Enqueue(data, 6);
+        cout << "[Test4] Enqueue(\"EFGHIJ\",6) ok=" << ok << "\n";
+        assert(ok);
+        assert(rb.GetUseSize() == 8);
+        assert(rb.IsFull());
+        PrintState(rb, "After Enqueue EFGHIJ (expect full, wrap)", base);
     }
 
-    // 4) 가득 찬 상태에서 더 Enqueue 시도 → 실패(0)
+    // 5) Full 상태에서 더 Enqueue 시도 -> 실패
     {
-        const char* data = "ZZ";
-        int ret = rb.Enqueue(data, 2);
-        cout << "[Test4] Enqueue(\"ZZ\", 2) on full buffer ret = " << ret << "\n";
-        PrintState(rb, "After Enqueue fail on full");
+        const char* data = "Z";
+        bool ok = rb.Enqueue(data, 1);
+        cout << "[Test5] Enqueue(\"Z\",1) on full ok=" << ok << "\n";
+        assert(!ok);
+        assert(rb.IsFull());
+        PrintState(rb, "After Enqueue fail on full", base);
     }
 
-    // 5) 래핑 Dequeue 테스트: 3바이트 꺼내기
+    // 6) Dequeue 3 -> "CDE"
     {
-        char buf[8] = { 0 };
-        int ret = rb.Dequeue(buf, 3);
-        cout << "[Test5] Dequeue(3) ret = " << ret << ", data = ";
-        for (int i = 0; i < ret; ++i) cout << buf[i];
+        char buf[16] = {};
+        bool ok = rb.Dequeue(buf, 3);
+        cout << "[Test6] Dequeue(3) ok=" << ok << " data=" << string(buf, buf + 3) << "\n";
+        assert(ok);
+        assert(buf[0] == 'C' && buf[1] == 'D' && buf[2] == 'E');
+        assert(rb.GetUseSize() == 5); // "FGHIJ" 남음
+        PrintState(rb, "After Dequeue 3 (expect FGHIJ left)", base);
+    }
+
+    // 7) DirectEnqueue + MoveRearBuffer: 뒤에 "XYZ" 직접 쓰기 (연속 구간만큼)
+    {
+        int direct = rb.GetDirectEnqueueSize();
+        int freeSz = rb.GetFreeSize();
+        int writeSize = std::min({ 3, direct, freeSz });
+
+        cout << "[Test7] directEnq=" << direct << " free=" << freeSz << " writeSize=" << writeSize << "\n";
+        assert(writeSize > 0);
+
+        char* rearPtr = rb.GetRear();
+        memcpy(rearPtr, "XYZ", writeSize);
+
+        bool moved = rb.MoveRear(writeSize);
+        cout << "[Test7] MoveRearBuffer(" << writeSize << ") moved=" << moved << "\n";
+        assert(moved);
+
+        PrintState(rb, "After DirectEnqueue XYZ + MoveRearBuffer", base);
+    }
+
+    // 8) DirectDequeue + MoveFrontBuffer: 앞 연속 구간만큼 직접 읽고 MoveFrontBuffer로 소모
+    {
+        int direct = rb.GetDirectDequeueSize();
+        int usedSz = rb.GetUseSize();
+        int readSize = std::min(direct, usedSz); // direct는 <= used가 보통이지만 방어적으로
+
+        cout << "[Test8] directDeq=" << direct << " used=" << usedSz << " readSize=" << readSize << "\n";
+        assert(readSize > 0);
+
+        const char* frontPtr = rb.GetFront();
+        cout << "[Test8] Direct front read: ";
+        for (int i = 0; i < readSize; ++i) cout << frontPtr[i];
         cout << "\n";
-        // 여기서 나오는 값은 구현에 따라 "CDE"가 되어야 정상
-        PrintState(rb, "After Dequeue 3");
+
+        bool moved = rb.MoveFront(readSize);
+        cout << "[Test8] MoveFrontBuffer(" << readSize << ") moved=" << moved << "\n";
+        assert(moved);
+
+        PrintState(rb, "After DirectDequeue by MoveFrontBuffer", base);
     }
 
-    // 6) DirectEnqueueSize / MoveRear 사용 테스트
+    // 9) 남은 데이터 전부 Dequeue 해서 내용 검증(최종 정리)
     {
-        int directSize = rb.DirectEnqueueSize();
-        cout << "[Test6] DirectEnqueueSize = " << directSize << "\n";
+        int left = rb.GetUseSize();
+        assert(left >= 0 && left <= rb.GetBufferSize());
 
-        if (directSize > 0)
+        char buf[32] = {};
+        bool ok = true;
+        if (left > 0)
         {
-            char* rearPtr = rb.GetRearBufferPtr();
-            int writeSize = (directSize >= 3) ? 3 : directSize;
-            memcpy(rearPtr, "XYZ", writeSize);
-            int moved = rb.MoveRear(writeSize);
-            cout << "[Test6] Direct write \"XYZ\" (" << writeSize << "), MoveRear ret = " << moved << "\n";
-            PrintState(rb, "After DirectEnqueue XYZ");
+            ok = rb.Dequeue(buf, left);
+            cout << "[Test9] Dequeue(all=" << left << ") ok=" << ok << " data=" << string(buf, buf + left) << "\n";
+            assert(ok);
         }
+
+        assert(rb.IsEmpty());
+        assert(rb.GetUseSize() == 0);
+        PrintState(rb, "After Drain All", base);
     }
 
-    // 7) DirectDequeueSize / MoveFront 사용 테스트
-    {
-        int directSize = rb.DirectDequeueSize();
-        cout << "[Test7] DirectDequeueSize = " << directSize << "\n";
-
-        if (directSize > 0)
-        {
-            char* frontPtr = rb.GetFrontBufferPtr();
-            cout << "[Test7] Direct read front region (up to " << directSize << " bytes): ";
-            for (int i = 0; i < directSize; ++i)
-                cout << frontPtr[i];
-            cout << "\n";
-
-            int moved = rb.MoveFront(directSize);
-            cout << "[Test7] MoveFront(" << directSize << ") ret = " << moved << "\n";
-            PrintState(rb, "After DirectDequeue by MoveFront");
-        }
-    }
-
-    // 8) ClearBuffer 테스트
+    // 10) ClearBuffer 테스트
     {
         rb.ClearBuffer();
-        cout << "[Test8] After ClearBuffer()\n";
-        PrintState(rb, "After ClearBuffer");
+        cout << "[Test10] After ClearBuffer()\n";
         assert(rb.GetUseSize() == 0);
         assert(rb.GetFreeSize() == rb.GetBufferSize());
+        assert(rb.IsEmpty());
+        PrintState(rb, "After ClearBuffer", base);
     }
 
     cout << "All tests finished (no assert failed).\n";
 }
+
 
 
 int main()
@@ -256,8 +294,8 @@ int main()
     g_ExitEvent = CreateEvent(NULL, true, false, NULL);
     g_startTime = GetTickCount();
 
-    //Test();
-    ThreadTest();
+    Test();
+    //ThreadTest();
 
     ProfileDataOutText(L"Noexcept.txt");
     return 0;
