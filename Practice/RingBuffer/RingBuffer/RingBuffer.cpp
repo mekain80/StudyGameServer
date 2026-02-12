@@ -2,197 +2,232 @@
 #include <cstring>
 #include <algorithm>
 
-RingBuffer::RingBuffer(void)
-	: mBuffer(nullptr)
-	, mBufferSize(RING_DEFAULT_SIZE)
-	, mFront(0)
-	, mRear(0)
-	, mUseSize(0)
+RingBuffer::RingBuffer() : RingBuffer(RING_DEFAULT_SIZE)
 {
-	mBuffer = new char[mBufferSize];
 }
 
 RingBuffer::RingBuffer(int iBufferSize)
-	: mBuffer(nullptr)
-	, mBufferSize(iBufferSize)
-	, mFront(0)
-	, mRear(0)
-	, mUseSize(0)
+	: mBufferSize(iBufferSize)
+	, mUsedSize(0)
 {
-	mBuffer = new char[mBufferSize];
+	// 예외 방어: 0 이하 크기 방지
+	if (mBufferSize <= 0)
+	{
+		mBufferSize = RING_DEFAULT_SIZE;
+	}
+
+	// +1: FULL/EMPTY 구분을 위해 "항상 비워두는 칸"을 포함한 실제 할당 크기
+	mBuffer = new char[mBufferSize + 1];
+	mEnd = mBuffer + mBufferSize;
+	mFront = mBuffer;
+	mRear = mBuffer;
 }
 
 RingBuffer::~RingBuffer(void) noexcept
 {
 	delete[] mBuffer;
+	mBuffer = nullptr;
+	mBufferSize = 0;
+	mUsedSize = 0;
 }
 
-void RingBuffer::Resize(int size)
+int RingBuffer::GetDirectEnqueueSize() const
 {
-	if (size <= mBufferSize)
-		return;
+	// [주의] "한 칸 비워두기" 규칙 때문에,
+	// front가 start에 있을 때는 end 칸을 쓰면 FULL 판정이 애매해질 수 있어
+	// 일부 케이스에서 end까지 못 쓰도록 제한한다.
 
-	int used = mUseSize;
-	char* newBuf = new char[size];
-
-	if (used > 0)
+	// front가 start라면 "맨 끝 칸"은 사용 불가로 보는 규칙
+	if (mFront == mBuffer)
 	{
-		if (mFront < mRear)
-		{
-			std::memcpy(newBuf, mBuffer + mFront, used);
-		}
-		else
-		{
-			int first = mBufferSize - mFront;
-			std::memcpy(newBuf, mBuffer + mFront, first);
-			if (mRear > 0)
-			{
-				std::memcpy(newBuf + first, mBuffer, mRear);
-			}
-		}
+		// rear ~ end 직전까지만
+		return (mEnd - mRear);
+	}
+	else if (mFront > mRear)
+	{
+		return (mFront - mRear - 1);
+	}
+	else
+	{
+		// front가 rear보다 앞(또는 같지 않음)이라면,
+		// rear부터 end까지는 연속으로 쓸 수 있음 (end 포함)
+		return (mEnd - mRear + 1);
+	}
+}
+
+int RingBuffer::GetDirectDequeueSize() const
+{
+	if (mFront > mRear)
+	{
+		// front가 뒤쪽(큰 주소)에 있고 rear가 앞쪽(작은 주소)이면,
+		// front~end 까지 읽고 wrap해서 start부터 이어서 읽는 형태가 된다.
+		// 따라서 일단 front~end 까지는 연속 구간
+		return (mEnd - mFront) + 1;
 	}
 
-	delete[] mBuffer;
-	mBuffer = newBuf;
-	mBufferSize = size;
-
-	mFront = 0;
-	mRear = used;
-	mUseSize = used;
+	return (mRear - mFront);
 }
 
-int RingBuffer::GetBufferSize(void) const noexcept
+void RingBuffer::MovePointer(char*& pointer, int addValue)
 {
-	return mBufferSize;
+	// addValue만큼 이동 (wrap 포함)
+	pointer += addValue;
+
+	// end는 "마지막 유효 칸"이므로, end를 넘으면 (mBufferSize + 1)만큼 빼서 start로 랩
+	if (pointer > mEnd)
+	{
+		pointer -= (mBufferSize + 1);
+	}
 }
 
-int RingBuffer::GetUseSize(void) const noexcept
+
+
+// ----------------------------------------------------------------------------
+// 포인터만 이동해서 "논리적으로" 데이터 제거/추가하는 함수
+// (실제로 memcpy는 안 함)
+// ----------------------------------------------------------------------------
+
+bool RingBuffer::MoveFront(int moveSize) noexcept
 {
-	return mUseSize;
+	// 예외 처리
+	if (IsEmpty() || moveSize <= 0 || moveSize > mBufferSize)
+		return false;
+
+	// 실제 사용량보다 더 빼려 하면 실패
+	if (moveSize > mUsedSize)
+		return false;
+
+	MovePointer(mFront, moveSize);
+	mUsedSize -= moveSize;
+	return true;
 }
 
-int RingBuffer::GetFreeSize(void) const noexcept
+
+char* RingBuffer::GetFront() const noexcept
 {
-	return mBufferSize - mUseSize;
+	return mFront;
 }
 
-int RingBuffer::Enqueue(const char* data, int size) noexcept
+bool RingBuffer::MoveRear(int moveSize) noexcept
 {
-	if (size <= 0)
-		return 0;
+	// 예외 처리
+	if (IsFull() || moveSize <= 0 || moveSize > mBufferSize)
+		return false;
 
-	int freeSize = GetFreeSize();
-	if (size > freeSize)
-		return 0;
+	// 남은 공간보다 더 넣으려 하면 실패
+	if (moveSize > GetFreeSize())
+		return false;
 
-	int first = std::min(size, mBufferSize - mRear);
-	std::memcpy(mBuffer + mRear, data, first);
-
-	int remain = size - first;
-	if (remain > 0)
-		std::memcpy(mBuffer, data + first, remain);
-
-	mRear = (mRear + size) % mBufferSize;
-	mUseSize += size;
-
-	return size;
+	MovePointer(mRear, moveSize);
+	mUsedSize += moveSize;
+	return true;
 }
 
-int RingBuffer::Dequeue(char* dest, int size) noexcept
+
+char* RingBuffer::GetRear() const noexcept
 {
-	if (size <= 0)
-		return 0;
-
-	if (size > mUseSize)
-		return 0;
-
-	int first = std::min(size, mBufferSize - mFront);
-	std::memcpy(dest, mBuffer + mFront, first);
-
-	int remain = size - first;
-	if (remain > 0)
-		std::memcpy(dest + first, mBuffer, remain);
-
-	mFront = (mFront + size) % mBufferSize;
-	mUseSize -= size;
-
-	return size;
+	return mRear;
 }
 
-int RingBuffer::Peek(char* dest, int size) const noexcept
+void RingBuffer::ClearBuffer() noexcept
 {
-	if (size <= 0)
-		return 0;
-
-	if (size > mUseSize)
-		return 0;
-
-	int first = std::min(size, mBufferSize - mFront);
-	std::memcpy(dest, mBuffer + mFront, first);
-
-	int remain = size - first;
-	if (remain > 0)
-		std::memcpy(dest + first, mBuffer, remain);
-
-	return size;
+	mRear = mBuffer;
+	mFront = mBuffer;
+	mUsedSize = 0;
 }
 
-void RingBuffer::ClearBuffer(void) noexcept
+
+// ----------------------------------------------------------------------------
+// 상태 판정
+// ----------------------------------------------------------------------------
+
+bool RingBuffer::IsFull() const noexcept
 {
-	mFront = 0;
-	mRear = 0;
-	mUseSize = 0;
+	// rear가 end이고 front가 start이면 "다음 칸"이 start라서 full
+	if (mRear == mEnd && mFront == mBuffer)
+		return true;
+
+	if (mRear + 1 == mFront)
+		return true;
+
+	return false;
 }
 
-int RingBuffer::DirectEnqueueSize() const noexcept
+// ----------------------------------------------------------------------------
+// Enqueue / Dequeue
+// ----------------------------------------------------------------------------
+
+bool RingBuffer::Enqueue(const char* data, int size) noexcept
 {
-	int freeSize = GetFreeSize();
-	if (freeSize <= 0)
-		return 0;
+	// 예외 처리
+	if (data == nullptr || size <= 0 || size > mBufferSize)
+		return false;
 
-	return std::min(freeSize, mBufferSize - mRear);
-}
-
-int RingBuffer::DirectDequeueSize() const noexcept
-{
-	if (mUseSize <= 0)
-		return 0;
-
-	return std::min(mUseSize, mBufferSize - mFront);
-}
-
-int RingBuffer::MoveRear(int size) noexcept
-{
-	if (size <= 0)
-		return 0;
-
+	// 공간이 부족하면 실패
 	if (size > GetFreeSize())
-		return 0;
+		return false;
 
-	mRear = (mRear + size) % mBufferSize;
-	mUseSize += size;
-	return size;
+	// requestSize가 "연속으로 쓸 수 있는 크기"를 넘으면 split해서 2번 memcpy
+	if (size > GetDirectEnqueueSize())
+	{
+		const int firstSize = GetDirectEnqueueSize();
+		const int secondSize = size - firstSize;
+
+		memcpy(mRear, data, firstSize);
+		memcpy(mBuffer, data + firstSize, secondSize);
+	}
+	else
+	{
+		memcpy(mRear, data, size);
+	}
+
+	MovePointer(mRear, size);
+	mUsedSize += size;
+
+	return true;
 }
 
-int RingBuffer::MoveFront(int size) noexcept
+
+bool RingBuffer::Dequeue(char* outData, int size) noexcept
 {
-	if (size <= 0)
-		return 0;
-
-	if (size > mUseSize)
-		return 0;
-
-	mFront = (mFront + size) % mBufferSize;
-	mUseSize -= size;
-	return size;
+	return ReadInternal(outData, size, false);
 }
 
-char* RingBuffer::GetFrontBufferPtr(void) noexcept
+bool RingBuffer::Peek(char* outData, int size) noexcept
 {
-	return mBuffer + mFront;
+	return ReadInternal(outData, size, true);
 }
 
-char* RingBuffer::GetRearBufferPtr(void) noexcept
+// 내부 공통 처리: 복사는 항상 수행, isPeekMode=false일 때만 front/usedSize 이동
+bool RingBuffer::ReadInternal(char* outData, int size, bool isPeekMode) noexcept
 {
-	return mBuffer + mRear;
+	// 예외 처리
+	if (mUsedSize < size || outData == nullptr || size <= 0 || size > mBufferSize)
+		return false;
+
+	// front부터 끊기지 않고 읽을 수 있는 연속 구간
+	const int direct = GetDirectDequeueSize();
+
+	// 요청 크기가 연속 구간을 넘으면 split copy
+	if (size > direct)
+	{
+		const int firstSize = direct;
+		const int secondSize = size - firstSize;
+
+		memcpy(outData, mFront, firstSize);
+		memcpy(outData + firstSize, mBuffer, secondSize);
+	}
+	else
+	{
+		memcpy(outData, mFront, size);
+	}
+
+	// Peek가 아니면 실제로 소모(Front 이동 + Used 감소)
+	if (!isPeekMode)
+	{
+		MovePointer(mFront, size); // wrap 포함 이동
+		mUsedSize -= size;
+	}
+
+	return true;
 }

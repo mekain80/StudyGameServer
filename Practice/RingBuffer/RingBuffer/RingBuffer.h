@@ -2,93 +2,81 @@
 
 static const int RING_DEFAULT_SIZE = 10000;
 
-/// @brief 고성능 송수신용 Ring Buffer 클래스
+/// @brief 고성능 송수신용 Ring Buffer 클래스, 부분 Enqueue/Dequeue 미지원(요청 크기 미만이면 실패).
 class RingBuffer
 {
 public:
 	/// @brief 기본 생성자.
 	RingBuffer(void);
-
-	/// @brief 버퍼 크기를 지정하는 생성자.
-	/// @param bufferSize 버퍼 초기 크기
-	RingBuffer(int bufferSize);
-
+	explicit RingBuffer(int bufferSize);
 	~RingBuffer(void) noexcept;
 
-	/// @brief 버퍼의 크기를 재조정한다.
-	/// @param size 새로운 버퍼 크기
-	/// @note 내부에서 new/delete가 발생하므로 예외가 날 수 있음
-	void Resize(int size);
+	/// @brief 끊기지 않고 한 번에 Enqueue 가능한 연속 공간 크기를 반환
+	/// @brief 내부 버퍼는 (mBufferSize + 1)로 할당하며, Full/Empty 구분을 위해 항상 1칸을 비움
+	/// @return 연속적으로 쓸 수 있는 공간 크기
+	int GetDirectEnqueueSize() const;
 
-	/// @brief 전체 버퍼 크기를 반환한다.
-	/// @return 버퍼의 총 크기
-	int GetBufferSize(void) const noexcept;
+	/// @brief 끊기지 않고 한 번에 Dequeue 가능한 연속 데이터 크기를 반환
+	/// @brief 내부 버퍼는 (mBufferSize + 1)로 할당하며, Full/Empty 구분을 위해 항상 1칸을 비움
+	/// @return 연속적으로 읽을 수 있는 데이터 크기
+	int GetDirectDequeueSize() const;
 
-	/// @brief 현재 사용 중인 용량을 반환한다.
-	/// @return 사용 중인 데이터 크기
-	int GetUseSize(void) const noexcept;
+	void ClearBuffer(void) noexcept;
+	bool IsFull() const noexcept;
+	int GetBufferSize(void) const noexcept { return mBufferSize; }
+	int GetUseSize(void) const noexcept { return mUsedSize; }
+	int GetFreeSize(void) const noexcept { return mBufferSize - mUsedSize; }
+	bool IsEmpty() const noexcept { return mFront == mRear; }
 
-	/// @brief 현재 남은 용량을 반환한다.
-	/// @return 사용 가능한 용량
-	int GetFreeSize(void) const noexcept;
-
-	/// @brief Rear 위치에 데이터를 삽입한다.
+	/// @brief Rear 위치에 데이터를 삽입
 	/// @param data 입력 데이터 포인터
 	/// @param size 입력 데이터 크기
-	/// @return 실제로 삽입된 크기
-	/// @note memcpy만 사용(할당 없음). 단, data/dest는 유효해야 함.
-	int Enqueue(const char* data, int size) noexcept;
+	/// @return Enqueue 여부
+	bool Enqueue(const char* data, int size) noexcept;
 
-	/// @brief Front 위치에서 데이터를 가져오고, Front 인덱스를 이동한다.
-	/// @param dest 데이터 저장 버퍼
+	/// @brief Front 위치에서 데이터를 반환
+	/// @param outData 데이터 저장 포인터
 	/// @param size 읽고자 하는 크기
-	/// @return 가져온 데이터 크기
-	int Dequeue(char* dest, int size) noexcept;
+	/// @return Dequeue 여부
+	bool Dequeue(char* outData, int size) noexcept;
 
-	/// @brief Front 위치에서 데이터를 읽되, Front 인덱스는 이동하지 않는다.
-	/// @param dest 데이터 저장 버퍼
+	/// @brief Front 위치에서 데이터를 읽기
+	/// @param outData 데이터 저장 포인터
 	/// @param size 읽고자 하는 크기
-	/// @return 읽은 데이터 크기
-	int Peek(char* dest, int size) const noexcept;
+	/// @return Peek 여부
+	bool Peek(char* outData, int size) noexcept;
 
-	/// @brief 버퍼의 모든 데이터를 삭제하고 초기화한다.
-	void ClearBuffer(void) noexcept;
 
-	/// @brief 끊기지 않고 한 번에 Enqueue 가능한 연속 공간 크기를 반환한다.
-	/// @return 연속적으로 쓸 수 있는 공간 크기
-	int DirectEnqueueSize(void) const noexcept;
+	/// @brief Front 포인터를 앞으로 이동시켜 데이터를 소비(제거)한다.
+	/// @param moveSize 이동(소비)할 바이트 수
+	/// @return 실행 여부
+	bool MoveFront(int moveSize) noexcept;
+	char* GetFront() const noexcept;
 
-	/// @brief 끊기지 않고 한 번에 Dequeue 가능한 연속 데이터 크기를 반환한다.
-	/// @return 연속적으로 읽을 수 있는 데이터 크기
-	int DirectDequeueSize(void) const noexcept;
-
-	/// @brief Rear 위치를 지정한 크기만큼 이동시킨다. (쓰기 위치 이동)
-	/// @param size 이동할 크기
-	/// @return 이동된 크기
-	int MoveRear(int size) noexcept;
-
-	/// @brief Front 위치를 지정한 크기만큼 이동시킨다. (읽기 위치 이동)
-	/// @param size 이동할 크기
-	/// @return 이동된 크기
-	int MoveFront(int size) noexcept;
-
-	/// @brief Front 위치의 버퍼 포인터를 반환한다.
-	/// @return Front 위치의 char* 포인터
-	char* GetFrontBufferPtr(void) noexcept;
-
-	/// @brief Rear 위치의 버퍼 포인터를 반환한다.
-	/// @return Rear 위치의 char* 포인터
-	char* GetRearBufferPtr(void) noexcept;
+	/// @brief Rear 포인터를 앞으로 이동시켜 “쓰기 완료” 영역을 확장한다.
+	/// @param moveSize 이동(추가)할 바이트 수
+	/// @return 실행 여부
+	bool MoveRear(int moveSize) noexcept;
+	char* GetRear() const noexcept;
 
 private:
-	// 복사 금지
+	// 복사&이동 금지
+	RingBuffer(RingBuffer&&) = delete;
+	RingBuffer& operator=(RingBuffer&&) = delete;
 	RingBuffer(const RingBuffer&) = delete;
 	RingBuffer& operator=(const RingBuffer&) = delete;
 
+	/// @brief 포인터 멤버 변수 이동에 사용
+	void MovePointer(char*& pointer, int addValue);
+
+	/// @brief Dequeue, Peek 구현
+	bool ReadInternal(char* outData, int size, bool isPeekMode) noexcept;
+
 private:
 	char* mBuffer;      // 실제 버퍼 시작 주소
+	char* mEnd;			// 마지막 유효 칸(= &mBuffer[mBufferSize])
+	char* mFront;       // Front 포인터
+	char* mRear;        // Rear 포인터
 	int   mBufferSize;  // 전체 버퍼 크기
-	int   mFront;       // Front 인덱스
-	int   mRear;        // Rear 인덱스
-	int   mUseSize;     // 현재 사용 중인 바이트 수
+	int   mUsedSize;    // 현재 사용 중인 바이트 수
 };
