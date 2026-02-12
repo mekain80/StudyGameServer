@@ -70,14 +70,11 @@ int RingBuffer::GetDirectDequeueSize() const
 
 void RingBuffer::MovePointer(char*& pointer, int addValue)
 {
-	// addValue만큼 이동 (wrap 포함)
-	pointer += addValue;
-
-	// end는 "마지막 유효 칸"이므로, end를 넘으면 (mBufferSize + 1)만큼 빼서 start로 랩
-	if (pointer > mEnd)
-	{
-		pointer -= (mBufferSize + 1);
-	}
+	const int len = mBufferSize + 1;						// 실제 할당 길이
+	int idx = static_cast<int>(pointer - mBuffer);			// 0..mBufferSize
+	idx += addValue;
+	idx %= len;
+	pointer = mBuffer + idx;
 }
 
 
