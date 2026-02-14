@@ -3,6 +3,7 @@
 static const int RING_DEFAULT_SIZE = 10000;
 
 /// @brief 고성능 송수신용 Ring Buffer 클래스, 부분 Enqueue/Dequeue 미지원(요청 크기 미만이면 실패).
+/// @brief 내부 버퍼는 (mBufferSize + 1)로 할당하며, Full/Empty 구분을 위해 항상 1칸을 비움.
 class RingBuffer
 {
 public:
@@ -12,50 +13,36 @@ public:
 	~RingBuffer(void) noexcept;
 
 	/// @brief 끊기지 않고 한 번에 Enqueue 가능한 연속 공간 크기를 반환
-	/// @brief 내부 버퍼는 (mBufferSize + 1)로 할당하며, Full/Empty 구분을 위해 항상 1칸을 비움
 	/// @return 연속적으로 쓸 수 있는 공간 크기
 	int GetDirectEnqueueSize() const;
 
 	/// @brief 끊기지 않고 한 번에 Dequeue 가능한 연속 데이터 크기를 반환
-	/// @brief 내부 버퍼는 (mBufferSize + 1)로 할당하며, Full/Empty 구분을 위해 항상 1칸을 비움
 	/// @return 연속적으로 읽을 수 있는 데이터 크기
 	int GetDirectDequeueSize() const;
 
 	void ClearBuffer(void) noexcept;
 	bool IsFull() const noexcept;
+
 	int GetBufferSize(void) const noexcept { return mBufferSize; }
-	int GetUseSize(void) const noexcept { return mUsedSize; }
-	int GetFreeSize(void) const noexcept { return mBufferSize - mUsedSize; }
+
+	int GetUseSize(void) const noexcept;
+	int GetFreeSize(void) const noexcept { return mBufferSize - GetUseSize(); }
 	bool IsEmpty() const noexcept { return mFront == mRear; }
 
 	/// @brief Rear 위치에 데이터를 삽입
-	/// @param data 입력 데이터 포인터
-	/// @param size 입력 데이터 크기
-	/// @return Enqueue 여부
 	bool Enqueue(const char* data, int size) noexcept;
 
 	/// @brief Front 위치에서 데이터를 반환
-	/// @param outData 데이터 저장 포인터
-	/// @param size 읽고자 하는 크기
-	/// @return Dequeue 여부
 	bool Dequeue(char* outData, int size) noexcept;
 
 	/// @brief Front 위치에서 데이터를 읽기
-	/// @param outData 데이터 저장 포인터
-	/// @param size 읽고자 하는 크기
-	/// @return Peek 여부
 	bool Peek(char* outData, int size) noexcept;
 
-
 	/// @brief Front 포인터를 앞으로 이동시켜 데이터를 소비(제거)한다.
-	/// @param moveSize 이동(소비)할 바이트 수
-	/// @return 실행 여부
 	bool MoveFront(int moveSize) noexcept;
 	char* GetFront() const noexcept;
 
 	/// @brief Rear 포인터를 앞으로 이동시켜 “쓰기 완료” 영역을 확장한다.
-	/// @param moveSize 이동(추가)할 바이트 수
-	/// @return 실행 여부
 	bool MoveRear(int moveSize) noexcept;
 	char* GetRear() const noexcept;
 
@@ -77,6 +64,5 @@ private:
 	char* mEnd;			// 마지막 유효 칸(= &mBuffer[mBufferSize])
 	char* mFront;       // Front 포인터
 	char* mRear;        // Rear 포인터
-	int   mBufferSize;  // 전체 버퍼 크기
-	int   mUsedSize;    // 현재 사용 중인 바이트 수
+	int   mBufferSize;  // 전체 버퍼 크기(논리 capacity = mBufferSize)
 };

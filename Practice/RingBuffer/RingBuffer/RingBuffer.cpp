@@ -1,14 +1,16 @@
 ﻿#include "RingBuffer.h"
 #include <cstring>
-#include <algorithm>
 
 RingBuffer::RingBuffer() : RingBuffer(RING_DEFAULT_SIZE)
 {
 }
 
 RingBuffer::RingBuffer(int iBufferSize)
-	: mBufferSize(iBufferSize)
-	, mUsedSize(0)
+	: mBuffer(nullptr)
+	, mEnd(nullptr)
+	, mFront(nullptr)
+	, mRear(nullptr)
+	, mBufferSize(iBufferSize)
 {
 	// 예외 방어: 0 이하 크기 방지
 	if (mBufferSize <= 0)
@@ -27,8 +29,22 @@ RingBuffer::~RingBuffer(void) noexcept
 {
 	delete[] mBuffer;
 	mBuffer = nullptr;
+	mEnd = nullptr;
+	mFront = nullptr;
+	mRear = nullptr;
 	mBufferSize = 0;
-	mUsedSize = 0;
+}
+
+int RingBuffer::GetUseSize(void) const noexcept
+{
+	// rear와 front의 상대 위치로 사용량 계산 (mEnd는 inclusive)
+	if (mRear >= mFront)
+	{
+		return static_cast<int>(mRear - mFront);
+	}
+
+	// wrap: [front..end] + [start..rear)
+	return static_cast<int>((mEnd - mFront) + 1 + (mRear - mBuffer));
 }
 
 int RingBuffer::GetDirectEnqueueSize() const
@@ -41,17 +57,16 @@ int RingBuffer::GetDirectEnqueueSize() const
 	if (mFront == mBuffer)
 	{
 		// rear ~ end 직전까지만
-		return (mEnd - mRear);
+		return static_cast<int>(mEnd - mRear);
 	}
 	else if (mFront > mRear)
 	{
-		return (mFront - mRear - 1);
+		return static_cast<int>(mFront - mRear - 1);
 	}
 	else
 	{
-		// front가 rear보다 앞(또는 같지 않음)이라면,
 		// rear부터 end까지는 연속으로 쓸 수 있음 (end 포함)
-		return (mEnd - mRear + 1);
+		return static_cast<int>(mEnd - mRear + 1);
 	}
 }
 
@@ -59,13 +74,11 @@ int RingBuffer::GetDirectDequeueSize() const
 {
 	if (mFront > mRear)
 	{
-		// front가 뒤쪽(큰 주소)에 있고 rear가 앞쪽(작은 주소)이면,
-		// front~end 까지 읽고 wrap해서 start부터 이어서 읽는 형태가 된다.
-		// 따라서 일단 front~end 까지는 연속 구간
-		return (mEnd - mFront) + 1;
+		// front~end 까지는 연속 구간
+		return static_cast<int>((mEnd - mFront) + 1);
 	}
 
-	return (mRear - mFront);
+	return static_cast<int>(mRear - mFront);
 }
 
 void RingBuffer::MovePointer(char*& pointer, int addValue)
@@ -76,8 +89,6 @@ void RingBuffer::MovePointer(char*& pointer, int addValue)
 	idx %= len;
 	pointer = mBuffer + idx;
 }
-
-
 
 // ----------------------------------------------------------------------------
 // 포인터만 이동해서 "논리적으로" 데이터 제거/추가하는 함수
@@ -91,14 +102,13 @@ bool RingBuffer::MoveFront(int moveSize) noexcept
 		return false;
 
 	// 실제 사용량보다 더 빼려 하면 실패
-	if (moveSize > mUsedSize)
+	const int used = GetUseSize();
+	if (moveSize > used)
 		return false;
 
 	MovePointer(mFront, moveSize);
-	mUsedSize -= moveSize;
 	return true;
 }
-
 
 char* RingBuffer::GetFront() const noexcept
 {
@@ -112,14 +122,13 @@ bool RingBuffer::MoveRear(int moveSize) noexcept
 		return false;
 
 	// 남은 공간보다 더 넣으려 하면 실패
-	if (moveSize > GetFreeSize())
+	const int free = GetFreeSize();
+	if (moveSize > free)
 		return false;
 
 	MovePointer(mRear, moveSize);
-	mUsedSize += moveSize;
 	return true;
 }
-
 
 char* RingBuffer::GetRear() const noexcept
 {
@@ -130,9 +139,7 @@ void RingBuffer::ClearBuffer() noexcept
 {
 	mRear = mBuffer;
 	mFront = mBuffer;
-	mUsedSize = 0;
 }
-
 
 // ----------------------------------------------------------------------------
 // 상태 판정
@@ -164,13 +171,16 @@ bool RingBuffer::Enqueue(const char* data, int size) noexcept
 	if (size > GetFreeSize())
 		return false;
 
+	const int direct = GetDirectEnqueueSize();
+
 	// requestSize가 "연속으로 쓸 수 있는 크기"를 넘으면 split해서 2번 memcpy
-	if (size > GetDirectEnqueueSize())
+	if (size > direct)
 	{
-		const int firstSize = GetDirectEnqueueSize();
+		const int firstSize = direct;
 		const int secondSize = size - firstSize;
 
-		memcpy(mRear, data, firstSize);
+		if (firstSize > 0)
+			memcpy(mRear, data, firstSize);
 		memcpy(mBuffer, data + firstSize, secondSize);
 	}
 	else
@@ -179,11 +189,8 @@ bool RingBuffer::Enqueue(const char* data, int size) noexcept
 	}
 
 	MovePointer(mRear, size);
-	mUsedSize += size;
-
 	return true;
 }
-
 
 bool RingBuffer::Dequeue(char* outData, int size) noexcept
 {
@@ -195,11 +202,14 @@ bool RingBuffer::Peek(char* outData, int size) noexcept
 	return ReadInternal(outData, size, true);
 }
 
-// 내부 공통 처리: 복사는 항상 수행, isPeekMode=false일 때만 front/usedSize 이동
+// 내부 공통 처리: 복사는 항상 수행, isPeekMode=false일 때만 front 이동
 bool RingBuffer::ReadInternal(char* outData, int size, bool isPeekMode) noexcept
 {
 	// 예외 처리
-	if (mUsedSize < size || outData == nullptr || size <= 0 || size > mBufferSize)
+	if (outData == nullptr || size <= 0 || size > mBufferSize)
+		return false;
+
+	if (GetUseSize() < size)
 		return false;
 
 	// front부터 끊기지 않고 읽을 수 있는 연속 구간
@@ -211,7 +221,8 @@ bool RingBuffer::ReadInternal(char* outData, int size, bool isPeekMode) noexcept
 		const int firstSize = direct;
 		const int secondSize = size - firstSize;
 
-		memcpy(outData, mFront, firstSize);
+		if (firstSize > 0)
+			memcpy(outData, mFront, firstSize);
 		memcpy(outData + firstSize, mBuffer, secondSize);
 	}
 	else
@@ -219,11 +230,10 @@ bool RingBuffer::ReadInternal(char* outData, int size, bool isPeekMode) noexcept
 		memcpy(outData, mFront, size);
 	}
 
-	// Peek가 아니면 실제로 소모(Front 이동 + Used 감소)
+	// Peek가 아니면 실제로 소모(Front 이동)
 	if (!isPeekMode)
 	{
 		MovePointer(mFront, size); // wrap 포함 이동
-		mUsedSize -= size;
 	}
 
 	return true;
