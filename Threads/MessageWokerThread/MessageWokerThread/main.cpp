@@ -13,13 +13,15 @@
 #include <winnt.h>
 
 using namespace std;
+#undef max;
 
 // ------------------------------------------------------------
 // Constants / Timing
 // ------------------------------------------------------------
 LARGE_INTEGER g_Freq{};
-double  kDefaultTimeSec = 0.050 / 5 / 2;
-const double  kMinTimeSec = 0.0005;
+double  kDefaultTimeSec = 0.0011; // 0.050 / 5;
+const double  kMinTimeSec = 0.001;
+const double  kDecreaseTimeSec = 0.0000001;
 const int     kStrMaxLen = 50;   // (현재 미사용)
 
 // ------------------------------------------------------------
@@ -50,7 +52,7 @@ HANDLE g_ExitEvent = nullptr;
 list<string> g_List;
 
 // Message Queue
-RingBuffer g_MsgRingBuffer(50000);
+RingBuffer g_MsgRingBuffer(400000);
 
 // Sync
 CRITICAL_SECTION g_CS;
@@ -80,34 +82,6 @@ inline void Unlock()
 	LeaveCriticalSection(&g_CS);
 }
 
-void PrintState(RingBuffer& rb, const char* title)
-{
-	cout << "==== " << title << " ====\n";
-	cout << "BufferSize : " << rb.GetBufferSize() << "\n";
-	cout << "UseSize    : " << rb.GetUseSize() << "\n";
-	cout << "FreeSize   : " << rb.GetFreeSize() << "\n";
-
-	int useSize = rb.GetUseSize();
-	if (useSize > 0)
-	{
-		char temp[1024] = { 0 };
-		int peekSize = (useSize < (int)sizeof(temp) - 1) ? useSize : (int)sizeof(temp) - 1;
-		int ret = rb.Peek(temp, peekSize);
-
-		cout << "Peek(" << ret << ") : ";
-		for (int i = 0; i < ret; ++i)
-			cout << temp[i];
-		cout << "\n";
-	}
-	else
-	{
-		cout << "Peek       : (empty)\n";
-	}
-
-	cout << "DirectEnqueueSize : " << rb.DirectEnqueueSize() << "\n";
-	cout << "DirectDequeueSize : " << rb.DirectDequeueSize() << "\n";
-	cout << endl;
-}
 
 std::wstring MakeRandomWString(size_t len)
 {
@@ -173,33 +147,58 @@ unsigned int WINAPI MainThread(void* /*lpParam*/)
 		{
 		case dfJOB_ADD:
 		{
-			string str = MakeRandomStringA(5);
+			string str = "ABCD"; // MakeRandomStringA(5);
 			msgHead.shPayloadLen = (short)str.size();
-			g_MsgRingBuffer.Enqueue((const char*)&msgHead, sizeof(msgHead));
-			g_MsgRingBuffer.Enqueue(str.data(), (int)str.size());
+			int size = g_MsgRingBuffer.Enqueue(reinterpret_cast<char*>(&msgHead), sizeof(msgHead));
+			if (size == 0)
+			{
+				cout << "BUFFER MAX!!!!!!!!!!!!!!!!";
+				return 10;
+			}
+			g_MsgRingBuffer.Enqueue(const_cast<char*>(str.data()), (int)str.size());
 			break;
 		}
 		case dfJOB_DEL:
 		{
-			g_MsgRingBuffer.Enqueue((const char*)&msgHead, sizeof(msgHead));
+			int size = g_MsgRingBuffer.Enqueue(reinterpret_cast<char*>(&msgHead), sizeof(msgHead));
+			if (size == 0)
+			{
+				cout << "BUFFER MAX!!!!!!!!!!!!!!!!";
+				return 10;
+			}
 			break;
 		}
 		case dfJOB_SORT:
 		{
-			g_MsgRingBuffer.Enqueue((const char*)&msgHead, sizeof(msgHead));
+			int size = g_MsgRingBuffer.Enqueue(reinterpret_cast<char*>(&msgHead), sizeof(msgHead));
+			if (size == 0)
+			{
+				cout << "BUFFER MAX!!!!!!!!!!!!!!!!";
+				return 10;
+			}
 			break;
 		}
 		case dfJOB_FIND:
 		{
-			string str = MakeRandomStringA(5);
+			string str = MakeRandomStringA(4);
 			msgHead.shPayloadLen = (short)str.size();
-			g_MsgRingBuffer.Enqueue((const char*)&msgHead, sizeof(msgHead));
-			g_MsgRingBuffer.Enqueue(str.data(), (int)str.size());
+			int size = g_MsgRingBuffer.Enqueue(reinterpret_cast<char*>(&msgHead), sizeof(msgHead));
+			if (size == 0)
+			{
+				cout << "BUFFER MAX!!!!!!!!!!!!!!!!";
+				return 10;
+			}
+			g_MsgRingBuffer.Enqueue(const_cast<char*>(str.data()), (int)str.size());
 			break;
 		}
 		case dfJOB_PRINT:
 		{
-			g_MsgRingBuffer.Enqueue((const char*)&msgHead, sizeof(msgHead));
+			int size = g_MsgRingBuffer.Enqueue(reinterpret_cast<char*>(&msgHead), sizeof(msgHead));
+			if (size == 0)
+			{
+				cout << "BUFFER MAX!!!!!!!!!!!!!!!!";
+				return 10;
+			}
 			break;
 		}
 		default:
@@ -223,10 +222,9 @@ unsigned int WINAPI MainThread(void* /*lpParam*/)
 			//{
 			//	g_MsgRingBuffer.Resize(60000);
 			//}
-
-			g_MsgRingBuffer.Enqueue((const char*)&quitMsgHead, sizeof(quitMsgHead));
-			g_MsgRingBuffer.Enqueue((const char*)&quitMsgHead, sizeof(quitMsgHead));
-			g_MsgRingBuffer.Enqueue((const char*)&quitMsgHead, sizeof(quitMsgHead));
+			g_MsgRingBuffer.Enqueue(reinterpret_cast<char*>(&quitMsgHead), sizeof(quitMsgHead));
+			g_MsgRingBuffer.Enqueue(reinterpret_cast<char*>(&quitMsgHead), sizeof(quitMsgHead));
+			g_MsgRingBuffer.Enqueue(reinterpret_cast<char*>(&quitMsgHead), sizeof(quitMsgHead));
 			Unlock();
 
 			SetEvent(g_WorkerEvent);
@@ -253,8 +251,8 @@ unsigned int WINAPI MainThread(void* /*lpParam*/)
 			Sleep((DWORD)(remain * 1000.0));
 
 			// 프레임이 빨라지도록 설정
-			kDefaultTimeSec = kDefaultTimeSec - 0.001;
-			kDefaultTimeSec = std::max(kDefaultTimeSec, kMinTimeSec);
+			kDefaultTimeSec = kDefaultTimeSec - kDecreaseTimeSec;
+			kDefaultTimeSec = max(kDefaultTimeSec, kMinTimeSec);
 		}
 	}
 
@@ -298,19 +296,22 @@ unsigned int WINAPI WorkerThread(void* /*lpParam*/)
 			}
 
 			const int h = g_MsgRingBuffer.Dequeue((char*)&head, sizeof(head));
-			if (h != (int)sizeof(head))
+			if (h == 0)
 			{
 				Unlock();
 				break;
 			}
 
+
+			char* dst;
+			int p;
 			if (head.shPayloadLen > 0)
 			{
 				payload.resize((size_t)head.shPayloadLen);
 
-				char* dst = &payload[0]; // C++11/14 data() const 문제 회피
-				const int p = g_MsgRingBuffer.Dequeue(dst, (int)payload.size());
-				if (p != (int)payload.size())
+				dst = &payload[0]; // C++11/14 data() const 문제 회피
+				p = g_MsgRingBuffer.Dequeue(dst, (int)payload.size());
+				if (p == 0)
 				{
 					Unlock();
 					break;
@@ -325,6 +326,10 @@ unsigned int WINAPI WorkerThread(void* /*lpParam*/)
 			case dfJOB_ADD:
 			{
 				Lock();
+				if (payload != "ABCD")
+				{
+					int a = 1;
+				}
 				g_List.push_back(payload);
 				InterlockedIncrement((long*)&g_ADD_TPS);
 				Unlock();
@@ -377,7 +382,13 @@ unsigned int WINAPI WorkerThread(void* /*lpParam*/)
 				Unlock();
 
 				for (const auto& s : snapshot)
+				{
 					std::cout << s << ' ';
+					if (s != "ABCD")
+					{
+						int a = 1;
+					}
+				}
 				std::cout << "\n";
 				break;
 			}
@@ -391,6 +402,8 @@ unsigned int WINAPI WorkerThread(void* /*lpParam*/)
 			}
 		} while (g_MsgRingBuffer.GetUseSize() > sizeof(st_MSG_HEAD));
 	}
+
+	return 0;
 }
 
 // ------------------------------------------------------------
@@ -413,6 +426,7 @@ unsigned int WINAPI MoniteringThread(void* /*lpParam*/)
 		cout << "dfJOB_SORT TPS : " << g_SORT_TPS << endl;
 		cout << "dfJOB_FIND TPS : " << g_FIND_TPS << endl;
 		cout << "dfJOB_PRINT TPS : " << g_PRINT_TPS << endl;
+		cout << "kDefaultTimeSec : " << kDefaultTimeSec << endl;
 		cout << "==================" << endl;
 
 		g_ADD_TPS = 0;
@@ -441,8 +455,8 @@ int main()
 	g_MainThreadHandle = (HANDLE)_beginthreadex(nullptr, 0, MainThread, nullptr, 0, nullptr);
 
 	g_WorkerThreadHandles[0] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, nullptr, 0, nullptr);
-	g_WorkerThreadHandles[1] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, nullptr, 0, nullptr);
-	g_WorkerThreadHandles[2] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, nullptr, 0, nullptr);
+	//g_WorkerThreadHandles[1] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, nullptr, 0, nullptr);
+	//g_WorkerThreadHandles[2] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, nullptr, 0, nullptr);
 
 	g_MonitoringThreadHandle = (HANDLE)_beginthreadex(nullptr, 0, MoniteringThread, nullptr, 0, nullptr);
 
@@ -460,6 +474,7 @@ int main()
 	// CloseHandle(g_TODO);  // (로직 변경 없이 리팩토링만: 필요 시 사용자 쪽에서 정리)
 
 	DeleteCriticalSection(&g_CS);
+
 
 	return 0;
 }
