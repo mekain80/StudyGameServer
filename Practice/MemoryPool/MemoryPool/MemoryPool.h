@@ -28,6 +28,11 @@ public:
 	/// 현재 사용 중인 노드 수 반환
 	inline int GetUseCount(void) const noexcept { return mUseCount; }
 
+	MemoryPool(const MemoryPool&) = delete;
+	MemoryPool& operator=(const MemoryPool&) = delete;
+	MemoryPool(MemoryPool&&) = delete;
+	MemoryPool& operator=(MemoryPool&&) = delete;
+
 private:
 	struct Node
 	{
