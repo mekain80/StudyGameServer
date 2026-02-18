@@ -10,80 +10,59 @@ public:
 	};
 
 	SerializedBuffer();
-	SerializedBuffer(int iBUfferSize);
-	virtual ~SerializedBuffer();
+	SerializedBuffer(int bufferSize);
+	SerializedBuffer(const SerializedBuffer& src);
+	virtual ~SerializedBuffer() noexcept;
 
 	/// 패킷 청소
-	void Clear();
+	void Clear() noexcept;
 
 	/// 버퍼 사이즈 얻기.
-	/// Return: (int)패킷 버퍼 사이즈 얻기.
-	int	GetBufferSize() { return mBufferSize; }
+	int GetBufferSize() const noexcept { return mBufferSize; }
 
 	/// 현재 사용중인 사이즈 얻기.
-	/// Return: (int)사용중인 데이타 사이즈.
-	int GetDataSize() { return mDataSize; }
+	int GetDataSize() const noexcept { return mDataSize; }
 
 	/// 버퍼 포인터 얻기.
-	/// Return: (char *)버퍼 포인터.
-	char* GetBufferPtr() { return mBuffer; }
+	char* GetBufferPtr() noexcept { return mBuffer; }
+	const char* GetBufferPtr() const noexcept { return mBuffer; }
 
-	/// 버퍼 Pos 이동. (음수이동은 안됨)
-	/// GetBufferPtr 함수를 이용하여 외부에서 강제로 버퍼 내용을 수정할 경우 사용. 
-	int		MoveWritePos(int iSize);
-	int		MoveReadPos(int iSize);
+	/// 버퍼 Pos 이동. (음수이동 불가)
+	int MoveWritePos(int size) noexcept;
+	int MoveReadPos(int size) noexcept;
 
 	/* ============================================================================= */
 	// 연산자 오버로딩
 	/* ============================================================================= */
-	SerializedBuffer& operator = (SerializedBuffer& clSrcPacket);
+	SerializedBuffer& operator=(const SerializedBuffer& src);
 
-	SerializedBuffer& operator << (unsigned char byValue);
-	SerializedBuffer& operator << (char chValue);
-	SerializedBuffer& operator << (unsigned short wValue);
-	SerializedBuffer& operator << (short shValue);
-	SerializedBuffer& operator << (int iValue);
-	SerializedBuffer& operator << (unsigned long lValue);
-	SerializedBuffer& operator << (long lValue);
-	SerializedBuffer& operator << (float fValue);
-	SerializedBuffer& operator << (__int64 iValue);
-	SerializedBuffer& operator << (double dValue);
+	SerializedBuffer& operator<<(unsigned char  byteValue)  noexcept;
+	SerializedBuffer& operator<<(char           charValue)  noexcept;
+	SerializedBuffer& operator<<(unsigned short ushortValue) noexcept;
+	SerializedBuffer& operator<<(short          shortValue) noexcept;
+	SerializedBuffer& operator<<(int            intValue)   noexcept;
+	SerializedBuffer& operator<<(unsigned long  ulongValue) noexcept;
+	SerializedBuffer& operator<<(long           longValue)  noexcept;
+	SerializedBuffer& operator<<(float          floatValue) noexcept;
+	SerializedBuffer& operator<<(__int64        int64Value) noexcept;
+	SerializedBuffer& operator<<(double         doubleValue) noexcept;
 
-	//SerializedBuffer& operator<<(std::uint8_t  v) { writePod(v); return *this; }
-	//SerializedBuffer& operator<<(std::int8_t   v) { writePod(v); return *this; }
-	//SerializedBuffer& operator<<(char          v) { writePod(v); return *this; }
-	//SerializedBuffer& operator<<(std::uint16_t v) { writePod(v); return *this; }
-	//SerializedBuffer& operator<<(std::int16_t  v) { writePod(v); return *this; }
-	//SerializedBuffer& operator<<(std::uint32_t v) { writePod(v); return *this; }
-	//SerializedBuffer& operator<<(std::int32_t  v) { writePod(v); return *this; }
-	//SerializedBuffer& operator<<(std::uint64_t v) { writePod(v); return *this; }
-	//SerializedBuffer& operator<<(std::int64_t  v) { writePod(v); return *this; }
-	//SerializedBuffer& operator<<(float         v) { writePod(v); return *this; }
-	//SerializedBuffer& operator<<(float         v) { writePod(v); return *this; }
-	//SerializedBuffer& operator<<(double        v) { writePod(v); return *this; }
+	SerializedBuffer& operator>>(unsigned char&		byteValue)  noexcept;
+	SerializedBuffer& operator>>(char&				charValue)  noexcept;
+	SerializedBuffer& operator>>(unsigned short&	ushortValue) noexcept;
+	SerializedBuffer& operator>>(short&				shortValue) noexcept;
+	SerializedBuffer& operator>>(int&				intValue)   noexcept;
+	SerializedBuffer& operator>>(unsigned long&		ulongValue) noexcept;
+	SerializedBuffer& operator>>(long&				longValue)  noexcept;
+	SerializedBuffer& operator>>(float&				floatValue) noexcept;
+	SerializedBuffer& operator>>(__int64&			int64Value) noexcept;
+	SerializedBuffer& operator>>(double&			doubleValue) noexcept;
 
+	/// @brief 데이타 얻기.
+	int GetData(char* dest, int size) noexcept;
 
-
-	SerializedBuffer& operator >> (BYTE& byValue);
-	SerializedBuffer& operator >> (char& chValue);
-	SerializedBuffer& operator >> (short& shValue);
-	SerializedBuffer& operator >> (WORD& wValue);
-	SerializedBuffer& operator >> (int& iValue);
-	SerializedBuffer& operator >> (DWORD& dwValue);
-	SerializedBuffer& operator >> (float& fValue);
-	SerializedBuffer& operator >> (__int64& iValue);
-	SerializedBuffer& operator >> (double& dValue);
-
-	/// @breif 데이타 얻기.
-	/// @param (char *)Dest 포인터. (int)Size.
-	/// @return (int)복사한 사이즈.
-	int		GetData(char* chpDest, int iSize);
-
-	/// @breif 데이타 삽입
-	/// @param (char *)Src 포인터. (int)SrcSize.
-	/// @return (int)복사한 사이즈.
-	int		PutData(char* chpSrc, int iSrcSize);
-
+	/// @brief 데이타 삽입
+	int PutData(const char* src, int srcSize) noexcept;
 
 private:
 	int   mBufferSize;
