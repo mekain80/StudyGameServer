@@ -9,9 +9,11 @@ template <class T>
 class MemoryPool
 {
 public:
+	static constexpr int kDefaultInit = 100;
+
 	/// @param initSize 초기 노드 개수
 	/// @param placementNew true면 Alloc에서 생성자, Free에서 소멸자 호출
-	MemoryPool(int initSize, bool placementNew = false) noexcept;
+	MemoryPool(int initSize = kDefaultInit, bool placementNew = true) noexcept;
 
 	/// 반환되지 않은 노드의 객체 소멸자는 호출하지 않음
 	virtual ~MemoryPool() noexcept;
