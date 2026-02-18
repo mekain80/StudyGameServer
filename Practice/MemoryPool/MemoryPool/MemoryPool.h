@@ -64,6 +64,10 @@ inline MemoryPool<T>::MemoryPool(int initSize, bool placementNew) noexcept
 		Node* newNode = static_cast<Node*>(std::malloc(sizeof(Node)));
 		newNode->bufferGuardFront = mbufferGuardValue;
 		newNode->bufferGuardEnd = mbufferGuardValue;
+		if (mIsPlacementNew == false)
+		{
+			T* data = new (&(newNode->data)) T;
+		}
 		newNode->next = mFreeNode;
 		mFreeNode = newNode;
 		++mCapacity;
@@ -77,6 +81,10 @@ inline MemoryPool<T>::~MemoryPool() noexcept
 	while (deleteNode != nullptr)
 	{
 		Node* nextNode = deleteNode->next;
+		if (mIsPlacementNew == false)
+		{
+			deleteNode->data.~T();
+		}
 		std::free(deleteNode);
 		deleteNode = nextNode;
 	}
