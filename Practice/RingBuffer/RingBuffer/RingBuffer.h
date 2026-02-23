@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-static const int RING_DEFAULT_SIZE = 10000;
+static const int RING_DEFAULT_SIZE = 5000;
 
 /// @brief 고성능 송수신용 Ring Buffer 클래스, 부분 Enqueue/Dequeue 미지원(요청 크기 미만이면 실패).
 /// @brief 내부 버퍼는 (mBufferSize + 1)로 할당하며, Full/Empty 구분을 위해 항상 1칸을 비움.
