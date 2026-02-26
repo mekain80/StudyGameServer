@@ -10,8 +10,10 @@
       <Filter>NewFilter1</Filter>
     </ClCompile>
     <ClCompile Include="Profiler.cpp" />
+    <ClCompile Include="RingBuffer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Profiler.h" />
+    <ClInclude Include="RingBuffer.h" />
   </ItemGroup>
 </Project>
