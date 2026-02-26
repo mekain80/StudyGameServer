@@ -9,11 +9,15 @@ template <class T>
 class MemoryPool
 {
 public:
-	static constexpr int kDefaultInit = 100;
+	static constexpr std::uint32_t kDefaultInitSize = 100;
+	static constexpr std::uint32_t kDefaultMaxSize = UINT32_MAX;
 
-	/// @param initSize 초기 노드 개수
 	/// @param placementNew true면 Alloc에서 생성자, Free에서 소멸자 호출
-	MemoryPool(int initSize = kDefaultInit, bool placementNew = true) noexcept;
+	/// @param sizeInitialize 초기 노드 개수
+	/// @param sizeMax 풀이 보유할 수 있는 최대 노드 개수
+	MemoryPool(bool placementNew = true,
+		std::uint32_t sizeInitialize = kDefaultInitSize,
+		std::uint32_t sizeMax = kDefaultMaxSize) noexcept;
 
 	/// 반환되지 않은 노드의 객체 소멸자는 호출하지 않음
 	virtual ~MemoryPool() noexcept;
@@ -46,27 +50,38 @@ private:
 
 	bool mIsPlacementNew;				// 생성자/소멸자 호출 정책
 	std::uint32_t mbufferGuardValue;	// 노드 무결성 검사용 가드 값
+	std::uint32_t mSizeInitialize;		// 초기 노드 개수
+	std::uint32_t mSizeMax;				// 최대 노드 개수
 	Node* mFreeNode;					// 반환된(미사용) 노드 단일 연결 리스트의 헤드
 	int mCapacity;						// 풀이 보유한 전체 노드 수
 	int mUseCount;						// 현재 사용 중인 노드 수
 };
 
 template <class T>
-inline MemoryPool<T>::MemoryPool(int initSize, bool placementNew) noexcept
+inline MemoryPool<T>::MemoryPool(bool placementNew,
+	std::uint32_t sizeInitialize,
+	std::uint32_t sizeMax) noexcept
 	: mIsPlacementNew(placementNew),
 	mbufferGuardValue(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this))),
+	mSizeInitialize(sizeInitialize),
+	mSizeMax(sizeMax),
 	mFreeNode(nullptr),
 	mCapacity(0),
 	mUseCount(0)
 {
-	for (int i = 0; i < initSize; ++i)
+	if (mSizeInitialize > mSizeMax)
+	{
+		mSizeInitialize = mSizeMax;
+	}
+
+	for (std::uint32_t i = 0; i < mSizeInitialize; ++i)
 	{
 		Node* newNode = static_cast<Node*>(std::malloc(sizeof(Node)));
 		newNode->bufferGuardFront = mbufferGuardValue;
 		newNode->bufferGuardEnd = mbufferGuardValue;
 		if (mIsPlacementNew == false)
 		{
-			T* data = new (&(newNode->data)) T;
+			new (&(newNode->data)) T;
 		}
 		newNode->next = mFreeNode;
 		mFreeNode = newNode;
@@ -106,6 +121,11 @@ inline T* MemoryPool<T>::Alloc(void) noexcept
 	}
 	else
 	{
+		if (static_cast<std::uint32_t>(mCapacity) >= mSizeMax)
+		{
+			return nullptr;
+		}
+
 		returnNode = static_cast<Node*>(std::malloc(sizeof(Node)));
 		returnNode->bufferGuardFront = mbufferGuardValue;
 		returnNode->bufferGuardEnd = mbufferGuardValue;
