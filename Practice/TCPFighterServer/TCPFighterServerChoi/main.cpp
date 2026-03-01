@@ -55,6 +55,7 @@
 #define MAX_HP          100
 #define dfACTION_STOP   0xFFFFFFFF  // 이동 안 하는 상태
 
+// 세션: 접속한 클라이언트 한 명의 상태/버퍼 보관
 struct Session
 {
     SOCKET      socket;
@@ -73,13 +74,13 @@ struct Session
     short       x;
     short       y;
 
-    char        HP;
+    int        HP;
 };
 
-bool                gbShutdown = false;
-DWORD               gAllocID = 1;
+bool                gbShutdown = false;           // 서버 종료 플래그
+DWORD               gAllocID = 1;                 // 세션 ID 발급용
 SOCKET              gListenSocket = INVALID_SOCKET;
-std::list<Session*> gSessionList;
+std::list<Session*> gSessionList;                 // 접속 세션 목록
 
 // 타이밍(단위: QPC counts)
 LARGE_INTEGER gFreq;
@@ -149,6 +150,7 @@ int _tmain(int argc, _TCHAR* argv[])
     SetConsoleCP(CP_UTF8);
     system("chcp 65001 > nul");
 
+    // 타이머 해상도/프레임 타이밍 초기화
     timeBeginPeriod(1);
     QueryPerformanceFrequency(&gFreq);
     QueryPerformanceCounter(&gFrameStartTick);
@@ -161,20 +163,24 @@ int _tmain(int argc, _TCHAR* argv[])
     }
     Logger(L"WSAStartup #");
 
+    // 리스닝 소켓 생성
     gListenSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (gListenSocket == INVALID_SOCKET)
         ErrorHandler(L"socket fail");
 
+    // 논블로킹 설정
     u_long on = 1;
     int ioctRet = ioctlsocket(gListenSocket, FIONBIO, &on);
     if (ioctRet == SOCKET_ERROR)
         ErrorHandler(L"ioctlsocket fail");
 
+    // 바인드 주소/포트 설정
     SOCKADDR_IN serverAddr;
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(SERVER_PORT);
     serverAddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
 
+    // 바인드
     int bindRet = bind(gListenSocket, (SOCKADDR*)&serverAddr, sizeof(serverAddr));
     if (bindRet == SOCKET_ERROR)
         ErrorHandler(L"bind fail");
@@ -186,6 +192,7 @@ int _tmain(int argc, _TCHAR* argv[])
         Logger(buf);
     }
 
+    // 리슨 시작
     int listenRet = listen(gListenSocket, SOMAXCONN);
     if (listenRet == SOCKET_ERROR)
         ErrorHandler(L"listen() fail");
@@ -194,6 +201,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
     while (!gbShutdown)
     {
+        // 네트워크 I/O + 게임 로직
         NetIOProcess();
         Update();
     }
@@ -212,6 +220,7 @@ void NetIOProcess() noexcept
     FD_ZERO(&readSet);
     FD_ZERO(&writeSet);
 
+    // 리스닝 소켓 + 모든 세션 소켓 등록
     FD_SET(gListenSocket, &readSet);
 
     for (Session* session : gSessionList)
@@ -227,6 +236,7 @@ void NetIOProcess() noexcept
     time.tv_sec = 0;
     time.tv_usec = 0;
 
+    // 논블로킹 select
     int result = select(0, &readSet, &writeSet, nullptr, &time);
     if (result == SOCKET_ERROR)
     {
@@ -237,6 +247,7 @@ void NetIOProcess() noexcept
     if (result == 0)
         return;
 
+    // 신규 접속 처리
     if (FD_ISSET(gListenSocket, &readSet))
     {
         --result;
@@ -245,6 +256,7 @@ void NetIOProcess() noexcept
             return;
     }
 
+    // 각 세션의 수신/송신 처리
     for (auto it = gSessionList.begin(); it != gSessionList.end() && result > 0; )
     {
         Session* session = *it;
@@ -283,6 +295,7 @@ void Update() noexcept
 
     gFrameStartTick = gFrameEndTick;
 
+    // 세션별 이동 처리
     for (auto it = gSessionList.begin(); it != gSessionList.end(); )
     {
         Session* session = *it;
@@ -307,6 +320,7 @@ void Update() noexcept
         session->x += static_cast<short>(dx);
         session->y += static_cast<short>(dy);
 
+        // 로그용 방향 문자열
         const wchar_t* dirStr = L"STOP";
         switch (session->action)
         {
@@ -374,6 +388,7 @@ void NetProc_Accept() noexcept
     SOCKADDR_IN clientAddr;
     int addrlen = sizeof(clientAddr);
 
+    // 신규 접속 수락
     SOCKET clientSocket = accept(gListenSocket, (SOCKADDR*)&clientAddr, &addrlen);
     if (clientSocket == INVALID_SOCKET)
     {
@@ -381,6 +396,7 @@ void NetProc_Accept() noexcept
         return;
     }
 
+    // 세션 생성/초기화
     Session* pSession = new Session;
     pSession->socket = clientSocket;
     pSession->addr = clientAddr;
@@ -457,6 +473,7 @@ void NetProc_Recv(Session* pSession) noexcept
 {
     char buffer[BUFFER_SIZE] = { 0 };
 
+    // 소켓 수신
     int recvRet = recv(pSession->socket, buffer, sizeof(buffer), 0);
 
     if (recvRet == 0)
@@ -473,8 +490,10 @@ void NetProc_Recv(Session* pSession) noexcept
         return;
     }
 
+    // 링버퍼에 수신 데이터 적재
     pSession->recvQ.Enqueue(buffer, recvRet);
 
+    // 헤더+바디 단위로 패킷 파싱
     while (true)
     {
         size_t headerSize = sizeof(PacketHeader);
@@ -484,6 +503,7 @@ void NetProc_Recv(Session* pSession) noexcept
         PacketHeader packetHeader;
         pSession->recvQ.Peek(reinterpret_cast<char*>(&packetHeader), headerSize);
 
+        // 패킷 코드 검증
         if (packetHeader.code != dfNETWORK_PACKET_CODE)
         {
             Disconnect(pSession);
@@ -496,6 +516,7 @@ void NetProc_Recv(Session* pSession) noexcept
 
         pSession->recvQ.MoveFront(headerSize);
 
+        // 비정상 크기 체크
         if (packetHeader.size > BUFFER_SIZE)
         {
             Disconnect(pSession);
@@ -517,6 +538,7 @@ void NetProc_Send(Session* pSession) noexcept
 {
     char buffer[BUFFER_SIZE];
 
+    // 송신 큐가 빌 때까지 반복
     while (true)
     {
         int useSize = static_cast<int>(pSession->sendQ.GetUseSize());
@@ -527,6 +549,7 @@ void NetProc_Send(Session* pSession) noexcept
         if (sendSize > BUFFER_SIZE)
             sendSize = BUFFER_SIZE;
 
+        // 연속된 구간을 미리 읽어서 send
         pSession->sendQ.Peek(buffer, sendSize);
 
         int sendRet = send(pSession->socket, buffer, sendSize, 0);
@@ -545,6 +568,7 @@ void NetProc_Send(Session* pSession) noexcept
             return;
         }
 
+        // 실제 전송된 만큼만 큐에서 제거
         pSession->sendQ.MoveFront(sendRet);
     }
 }
@@ -564,6 +588,7 @@ bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packet
         return false;
     }
 
+    // 패킷 타입별 처리
     switch (byPacketType)
     {
     case dfPACKET_CS_MOVE_START:
@@ -603,6 +628,7 @@ bool NetPacketProc_MoveStart(Session* pSession, CPacket& packet)
         Logger(buf);
     }
 
+    // 위치 오차 체크 (핵/비정상 패킷 방지)
     if (abs(moveStart.x - pSession->x) > dfERROR_RANGE ||
         abs(moveStart.y - pSession->y) > dfERROR_RANGE)
     {
@@ -615,6 +641,7 @@ bool NetPacketProc_MoveStart(Session* pSession, CPacket& packet)
         return false;
     }
 
+    // 서버 권한으로 이동 상태 갱신
     pSession->action = moveStart.direction;
     pSession->direction = NormalizeViewDir(moveStart.direction);
 
@@ -627,6 +654,7 @@ bool NetPacketProc_MoveStart(Session* pSession, CPacket& packet)
         pSession->sessionID,
         moveStart.direction,
         pSession->x, pSession->y);
+    // 다른 클라에 이동 시작 브로드캐스트
     SendBroadcast(pSession, &packetHeader, (char*)&sendMsg);
 
     return true;
@@ -654,6 +682,7 @@ bool NetPacketProc_MoveStop(Session* pSession, CPacket& packet)
         Logger(buf);
     }
 
+    // 위치 오차 체크
     if (abs(moveStop.x - pSession->x) > dfERROR_RANGE ||
         abs(moveStop.y - pSession->y) > dfERROR_RANGE)
     {
@@ -666,6 +695,7 @@ bool NetPacketProc_MoveStop(Session* pSession, CPacket& packet)
         return false;
     }
 
+    // 이동 정지 처리
     pSession->action = dfACTION_STOP;
     pSession->direction = NormalizeViewDir(moveStop.direction);
 
@@ -678,6 +708,7 @@ bool NetPacketProc_MoveStop(Session* pSession, CPacket& packet)
         pSession->sessionID,
         pSession->direction,
         pSession->x, pSession->y);
+    // 다른 클라에 이동 정지 브로드캐스트
     SendBroadcast(pSession, &packetHeader, (char*)&sendMsg);
 
     return true;
@@ -704,6 +735,7 @@ bool NetPacketProc_Attack1(Session* pSession, CPacket& packet)
         Logger(buf);
     }
 
+    // 위치 오차 체크
     if (abs(atk.x - pSession->x) > dfERROR_RANGE ||
         abs(atk.y - pSession->y) > dfERROR_RANGE)
     {
@@ -716,6 +748,7 @@ bool NetPacketProc_Attack1(Session* pSession, CPacket& packet)
         return false;
     }
 
+    // 공격 방향 정규화(좌/우)
     pSession->direction = NormalizeViewDir(atk.direction);
 
     PacketHeader     packetHeader;
@@ -724,11 +757,13 @@ bool NetPacketProc_Attack1(Session* pSession, CPacket& packet)
         pSession->direction,
         pSession->sessionID,
         pSession->x, pSession->y);
+    // 공격 애니메이션 브로드캐스트
     SendBroadcast(pSession, &packetHeader, (char*)&sendMsg);
 
     const int centerX = atk.x;
     const int centerY = atk.y;
 
+    // 피격 판정 및 데미지 브로드캐스트
     for (auto& session : gSessionList)
     {
         if (session == pSession)
@@ -771,6 +806,7 @@ bool NetPacketProc_Attack2(Session* pSession, CPacket& packet)
         Logger(buf);
     }
 
+    // 위치 오차 체크
     if (abs(atk.x - pSession->x) > dfERROR_RANGE ||
         abs(atk.y - pSession->y) > dfERROR_RANGE)
     {
@@ -783,6 +819,7 @@ bool NetPacketProc_Attack2(Session* pSession, CPacket& packet)
         return false;
     }
 
+    // 공격 방향 정규화(좌/우)
     pSession->direction = NormalizeViewDir(atk.direction);
 
     PacketHeader     packetHeader;
@@ -791,11 +828,13 @@ bool NetPacketProc_Attack2(Session* pSession, CPacket& packet)
         pSession->direction,
         pSession->sessionID,
         pSession->x, pSession->y);
+    // 공격 애니메이션 브로드캐스트
     SendBroadcast(pSession, &packetHeader, (char*)&sendMsg);
 
     const int centerX = atk.x;
     const int centerY = atk.y;
 
+    // 피격 판정 및 데미지 브로드캐스트
     for (auto& session : gSessionList)
     {
         if (session == pSession)
@@ -842,6 +881,7 @@ bool NetPacketProc_Attack3(Session* pSession, CPacket& packet)
         Logger(buf);
     }
 
+    // 위치 오차 체크
     if (abs(atk.x - pSession->x) > dfERROR_RANGE ||
         abs(atk.y - pSession->y) > dfERROR_RANGE)
     {
@@ -854,6 +894,7 @@ bool NetPacketProc_Attack3(Session* pSession, CPacket& packet)
         return false;
     }
 
+    // 공격 방향 정규화(좌/우)
     pSession->direction = NormalizeViewDir(atk.direction);
 
     PacketHeader     packetHeader;
@@ -862,11 +903,13 @@ bool NetPacketProc_Attack3(Session* pSession, CPacket& packet)
         pSession->direction,
         pSession->sessionID,
         pSession->x, pSession->y);
+    // 공격 애니메이션 브로드캐스트
     SendBroadcast(pSession, &packetHeader, (char*)&sendMsg);
 
     const int centerX = atk.x;
     const int centerY = atk.y;
 
+    // 피격 판정 및 데미지 브로드캐스트
     for (auto& session : gSessionList)
     {
         if (session == pSession)
@@ -1004,6 +1047,7 @@ bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexc
 {
     const int totalSize = static_cast<int>(sizeof(PacketHeader)) + pHeader->size;
 
+    // 송신 큐 용량 확인
     if (session->sendQ.GetFreeSize() < totalSize)
     {
         Logger(L"sendQ is full, disconnect");
@@ -1017,6 +1061,7 @@ bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexc
         return false;
     }
 
+    // 헤더 + 바디 순서로 큐에 적재
     session->sendQ.Enqueue(reinterpret_cast<char*>(pHeader), sizeof(PacketHeader));
     session->sendQ.Enqueue(pPacket, pHeader->size);
     return true;
@@ -1024,6 +1069,7 @@ bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexc
 
 void SendUnicast(Session* pSession, PacketHeader* pHeader, char* pPacket) noexcept
 {
+    // 단일 대상 전송
     if (pSession == nullptr)
         return;
 
@@ -1032,6 +1078,7 @@ void SendUnicast(Session* pSession, PacketHeader* pHeader, char* pPacket) noexce
 
 void SendBroadcast(Session* pSession, PacketHeader* pHeader, char* pPacket) noexcept
 {
+    // 발신자 제외 전체 브로드캐스트
     for (auto it = gSessionList.begin(); it != gSessionList.end(); )
     {
         Session* session = *it;
@@ -1052,6 +1099,7 @@ void Disconnect(Session* pSession) noexcept
     if (pSession == nullptr)
         return;
 
+    // 캐릭터 삭제 브로드캐스트
     PacketHeader        header;
     PacketSCDeleteCharacter packet;
     MakePacket_DeleteCharacter(&header, &packet, pSession->sessionID);
@@ -1069,6 +1117,7 @@ void Disconnect(Session* pSession) noexcept
 //===============================================================
 BYTE NormalizeViewDir(BYTE direction) noexcept
 {
+    // 대각선 입력은 좌/우로 정규화
     switch (direction)
     {
     case dfPACKET_MOVE_DIR_RR:
@@ -1091,6 +1140,7 @@ void GetMoveDelta(BYTE direction, int& dx, int& dy) noexcept
     dx = 0;
     dy = 0;
 
+    // 방향에 따른 이동 벡터 계산
     switch (direction)
     {
     case dfPACKET_MOVE_DIR_UU: dy = -dfMOVE_Y; break;
@@ -1112,6 +1162,7 @@ void GetMoveDelta(BYTE direction, int& dx, int& dy) noexcept
 bool IsHitAttack1(const Session* attacker, const Session* target,
     int centerX, int centerY) noexcept
 {
+    // Y축 범위 체크
     if (abs(centerY - target->y) > dfATTACK1_RANGE_Y)
         return false;
 
@@ -1135,6 +1186,7 @@ bool IsInAttackRect(int centerX, int centerY,
     int targetX, int targetY,
     int rangeX, int rangeY) noexcept
 {
+    // 중심 기준 직사각형 판정
     if (abs(centerX - targetX) > rangeX)
         return false;
     if (abs(centerY - targetY) > rangeY)
