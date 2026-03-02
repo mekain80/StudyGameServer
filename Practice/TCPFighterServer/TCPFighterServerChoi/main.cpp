@@ -10,11 +10,11 @@
 
 #include "RingBuffer.h"
 #include "PacketDefine.h"
-#include "CPacket.h"
+#include "SerializedBuffer.h"
 
 // 게임프레임 : 50fps
 #define SERVER_PORT 5000
-#define BUFFER_SIZE 10000
+#define BUFFER_SIZE RING_DEFAULT_SIZE
 #define dfNETWORK_PACKET_CODE 0x89
 
 // 화면 이동영역--------------------------
@@ -117,11 +117,11 @@ void NetProc_Send(Session*) noexcept;
 
 // 직렬화 버퍼 기반 패킷 처리
 bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packetSize);
-bool NetPacketProc_MoveStart(Session* pSession, CPacket& packet);
-bool NetPacketProc_MoveStop(Session* pSession, CPacket& packet);
-bool NetPacketProc_Attack1(Session* pSession, CPacket& packet);
-bool NetPacketProc_Attack2(Session* pSession, CPacket& packet);
-bool NetPacketProc_Attack3(Session* pSession, CPacket& packet);
+bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet);
+bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet);
+bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet);
+bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet);
+bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet);
 
 // 패킷 생성
 void MakePacket_CreateMyCharacter(PacketHeader* pHeader, PacketSCCreateMyCharacter* pPacket, BYTE direction, DWORD ID, int x, int y, int HP);
@@ -503,8 +503,8 @@ void NetProc_Recv(Session* pSession) noexcept
     }
 
     // 링버퍼에 수신 데이터 적재
-    int enqueueRet = pSession->recvQ.Enqueue(buffer, recvRet);
-    if (enqueueRet != recvRet)
+    bool isEnqueued = pSession->recvQ.Enqueue(buffer, recvRet);
+    if (isEnqueued == false)
     {
         Logger(L"recvQ enqueue fail");
         Disconnect(pSession);
@@ -519,7 +519,12 @@ void NetProc_Recv(Session* pSession) noexcept
             break;
 
         PacketHeader packetHeader;
-        pSession->recvQ.Peek(reinterpret_cast<char*>(&packetHeader), headerSize);
+        bool isPeeked = pSession->recvQ.Peek(reinterpret_cast<char*>(&packetHeader), static_cast<int>(headerSize));
+        if (!isPeeked)
+        {
+            Disconnect(pSession);
+            return;
+        }
 
         // 패킷 코드 검증
         if (packetHeader.code != dfNETWORK_PACKET_CODE)
@@ -539,7 +544,7 @@ void NetProc_Recv(Session* pSession) noexcept
         if (pSession->recvQ.GetUseSize() < totalSize)
             return;
 
-        pSession->recvQ.MoveFront(headerSize);
+        pSession->recvQ.MoveFront(static_cast<int>(headerSize));
 
         // 비정상 크기 체크
         if (packetHeader.size > BUFFER_SIZE)
@@ -549,8 +554,8 @@ void NetProc_Recv(Session* pSession) noexcept
         }
 
         char packetBuffer[BUFFER_SIZE];
-        int dequeueRet = pSession->recvQ.Dequeue(packetBuffer, packetHeader.size);
-        if (dequeueRet != packetHeader.size)
+        bool isDequeued = pSession->recvQ.Dequeue(packetBuffer, packetHeader.size);
+        if (!isDequeued)
         {
             Disconnect(pSession);
             return;
@@ -581,7 +586,12 @@ void NetProc_Send(Session* pSession) noexcept
             sendSize = BUFFER_SIZE;
 
         // 연속된 구간을 미리 읽어서 send
-        pSession->sendQ.Peek(buffer, sendSize);
+        bool isPeeked = pSession->sendQ.Peek(buffer, sendSize);
+        if (!isPeeked)
+        {
+            Disconnect(pSession);
+            return;
+        }
 
         int sendRet = send(pSession->socket, buffer, sendSize, 0);
         if (sendRet == 0)
@@ -610,11 +620,11 @@ void NetProc_Send(Session* pSession) noexcept
 bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packetSize)
 {
     // 패킷 바디를 직렬화 버퍼에 적재
-    CPacket packet(static_cast<int>(packetSize));
+    SerializedBuffer packet(static_cast<int>(packetSize));
     int putRet = packet.PutData(pPacket, packetSize);
     if (putRet != packetSize)
     {
-        Logger(L"CPacket PutData fail");
+        Logger(L"SerializedBuffer PutData fail");
         Disconnect(pSession);
         return false;
     }
@@ -639,7 +649,7 @@ bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packet
 //===============================================================
 // MoveStart (직렬화 버퍼)
 //===============================================================
-bool NetPacketProc_MoveStart(Session* pSession, CPacket& packet)
+bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 {
     PacketCSMoveStart moveStart{};
 
@@ -700,7 +710,7 @@ bool NetPacketProc_MoveStart(Session* pSession, CPacket& packet)
 //===============================================================
 // MoveStop (직렬화 버퍼)
 //===============================================================
-bool NetPacketProc_MoveStop(Session* pSession, CPacket& packet)
+bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 {
     PacketCSMoveStop moveStop{};
 
@@ -760,7 +770,7 @@ bool NetPacketProc_MoveStop(Session* pSession, CPacket& packet)
 //===============================================================
 // Attack1 (좌우 방향에 따라 판정범위 다름, 직렬화 버퍼)
 //===============================================================
-bool NetPacketProc_Attack1(Session* pSession, CPacket& packet)
+bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 {
     PacketCSAttack1 atk{};
     packet >> atk.direction
@@ -839,7 +849,7 @@ bool NetPacketProc_Attack1(Session* pSession, CPacket& packet)
 //===============================================================
 // Attack2 (중심 기준 직사각형, 직렬화 버퍼)
 //===============================================================
-bool NetPacketProc_Attack2(Session* pSession, CPacket& packet)
+bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 {
     PacketCSAttack2 atk{};
     packet >> atk.direction
@@ -922,7 +932,7 @@ bool NetPacketProc_Attack2(Session* pSession, CPacket& packet)
 //===============================================================
 // Attack3 (중심 기준 더 넓은 직사각형, 직렬화 버퍼)
 //===============================================================
-bool NetPacketProc_Attack3(Session* pSession, CPacket& packet)
+bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 {
     PacketCSAttack3 atk{};
     packet >> atk.direction
@@ -1129,8 +1139,14 @@ bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexc
     }
 
     // 헤더 + 바디 순서로 큐에 적재
-    session->sendQ.Enqueue(reinterpret_cast<char*>(pHeader), sizeof(PacketHeader));
-    session->sendQ.Enqueue(pPacket, pHeader->size);
+    bool isHeaderEnqueued = session->sendQ.Enqueue(reinterpret_cast<char*>(pHeader), sizeof(PacketHeader));
+    bool isBodyEnqueued = session->sendQ.Enqueue(pPacket, pHeader->size);
+    if (!isHeaderEnqueued || !isBodyEnqueued)
+    {
+        Disconnect(session);
+        return false;
+    }
+
     return true;
 }
 
