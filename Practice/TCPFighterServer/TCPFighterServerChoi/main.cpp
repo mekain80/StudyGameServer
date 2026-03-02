@@ -92,6 +92,9 @@ LARGE_INTEGER gFrameEndTick;
 //---------------------------------------------------------------
 BYTE NormalizeViewDir(BYTE direction) noexcept;
 void GetMoveDelta(BYTE direction, int& dx, int& dy) noexcept;
+bool IsValidMoveDirection(BYTE direction) noexcept;
+bool IsValidViewDirection(BYTE direction) noexcept;
+WORD GetExpectedBodySize(BYTE packetType) noexcept;
 
 bool IsHitAttack1(const Session* attacker, const Session* target,
     int centerX, int centerY) noexcept;
@@ -396,6 +399,15 @@ void NetProc_Accept() noexcept
         return;
     }
 
+    // 클라이언트 소켓도 논블로킹으로 운용
+    u_long on = 1;
+    if (ioctlsocket(clientSocket, FIONBIO, &on) == SOCKET_ERROR)
+    {
+        closesocket(clientSocket);
+        Logger(L"clientSocket ioctlsocket fail");
+        return;
+    }
+
     // 세션 생성/초기화
     Session* pSession = new Session;
     pSession->socket = clientSocket;
@@ -491,7 +503,13 @@ void NetProc_Recv(Session* pSession) noexcept
     }
 
     // 링버퍼에 수신 데이터 적재
-    pSession->recvQ.Enqueue(buffer, recvRet);
+    int enqueueRet = pSession->recvQ.Enqueue(buffer, recvRet);
+    if (enqueueRet != recvRet)
+    {
+        Logger(L"recvQ enqueue fail");
+        Disconnect(pSession);
+        return;
+    }
 
     // 헤더+바디 단위로 패킷 파싱
     while (true)
@@ -505,6 +523,13 @@ void NetProc_Recv(Session* pSession) noexcept
 
         // 패킷 코드 검증
         if (packetHeader.code != dfNETWORK_PACKET_CODE)
+        {
+            Disconnect(pSession);
+            return;
+        }
+
+        WORD expectedSize = GetExpectedBodySize(packetHeader.type);
+        if (expectedSize == 0 || packetHeader.size != expectedSize)
         {
             Disconnect(pSession);
             return;
@@ -524,10 +549,16 @@ void NetProc_Recv(Session* pSession) noexcept
         }
 
         char packetBuffer[BUFFER_SIZE];
-        pSession->recvQ.Dequeue(packetBuffer, packetHeader.size);
+        int dequeueRet = pSession->recvQ.Dequeue(packetBuffer, packetHeader.size);
+        if (dequeueRet != packetHeader.size)
+        {
+            Disconnect(pSession);
+            return;
+        }
 
         // packetHeader.size 만큼의 바디를 CPacket으로 감싸서 처리
-        PacketProc(pSession, packetHeader.type, packetBuffer, packetHeader.size);
+        if (!PacketProc(pSession, packetHeader.type, packetBuffer, packetHeader.size))
+            return;
     }
 }
 
@@ -628,6 +659,12 @@ bool NetPacketProc_MoveStart(Session* pSession, CPacket& packet)
         Logger(buf);
     }
 
+    if (!IsValidMoveDirection(moveStart.direction))
+    {
+        Disconnect(pSession);
+        return false;
+    }
+
     // 위치 오차 체크 (핵/비정상 패킷 방지)
     if (abs(moveStart.x - pSession->x) > dfERROR_RANGE ||
         abs(moveStart.y - pSession->y) > dfERROR_RANGE)
@@ -680,6 +717,12 @@ bool NetPacketProc_MoveStop(Session* pSession, CPacket& packet)
             moveStop.x,
             moveStop.y);
         Logger(buf);
+    }
+
+    if (!IsValidViewDirection(moveStop.direction))
+    {
+        Disconnect(pSession);
+        return false;
     }
 
     // 위치 오차 체크
@@ -735,6 +778,12 @@ bool NetPacketProc_Attack1(Session* pSession, CPacket& packet)
         Logger(buf);
     }
 
+    if (!IsValidViewDirection(atk.direction))
+    {
+        Disconnect(pSession);
+        return false;
+    }
+
     // 위치 오차 체크
     if (abs(atk.x - pSession->x) > dfERROR_RANGE ||
         abs(atk.y - pSession->y) > dfERROR_RANGE)
@@ -776,6 +825,8 @@ bool NetPacketProc_Attack1(Session* pSession, CPacket& packet)
         PacketSCDamage dmgMsg;
 
         session->HP -= dfATTACK1_DAMAGE;
+        if (session->HP < 0)
+            session->HP = 0;
         MakePacket_Damage(&dmgHeader, &dmgMsg,
             pSession->sessionID, session->sessionID,
             session->HP);
@@ -804,6 +855,12 @@ bool NetPacketProc_Attack2(Session* pSession, CPacket& packet)
             atk.x,
             atk.y);
         Logger(buf);
+    }
+
+    if (!IsValidViewDirection(atk.direction))
+    {
+        Disconnect(pSession);
+        return false;
     }
 
     // 위치 오차 체크
@@ -851,6 +908,8 @@ bool NetPacketProc_Attack2(Session* pSession, CPacket& packet)
         PacketSCDamage dmgMsg;
 
         session->HP -= dfATTACK2_DAMAGE;
+        if (session->HP < 0)
+            session->HP = 0;
         MakePacket_Damage(&dmgHeader, &dmgMsg,
             pSession->sessionID, session->sessionID,
             session->HP);
@@ -879,6 +938,12 @@ bool NetPacketProc_Attack3(Session* pSession, CPacket& packet)
             atk.x,
             atk.y);
         Logger(buf);
+    }
+
+    if (!IsValidViewDirection(atk.direction))
+    {
+        Disconnect(pSession);
+        return false;
     }
 
     // 위치 오차 체크
@@ -926,6 +991,8 @@ bool NetPacketProc_Attack3(Session* pSession, CPacket& packet)
         PacketSCDamage dmgMsg;
 
         session->HP -= dfATTACK3_DAMAGE;
+        if (session->HP < 0)
+            session->HP = 0;
         MakePacket_Damage(&dmgHeader, &dmgMsg,
             pSession->sessionID, session->sessionID,
             session->HP);
@@ -1153,6 +1220,43 @@ void GetMoveDelta(BYTE direction, int& dx, int& dy) noexcept
     case dfPACKET_MOVE_DIR_LD: dx = -dfMOVE_X; dy = +dfMOVE_Y; break;
     default:
         break;
+    }
+}
+
+bool IsValidMoveDirection(BYTE direction) noexcept
+{
+    switch (direction)
+    {
+    case dfPACKET_MOVE_DIR_UU:
+    case dfPACKET_MOVE_DIR_DD:
+    case dfPACKET_MOVE_DIR_RR:
+    case dfPACKET_MOVE_DIR_LL:
+    case dfPACKET_MOVE_DIR_RU:
+    case dfPACKET_MOVE_DIR_RD:
+    case dfPACKET_MOVE_DIR_LU:
+    case dfPACKET_MOVE_DIR_LD:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool IsValidViewDirection(BYTE direction) noexcept
+{
+    return (direction == dfPACKET_MOVE_DIR_LL || direction == dfPACKET_MOVE_DIR_RR);
+}
+
+WORD GetExpectedBodySize(BYTE packetType) noexcept
+{
+    switch (packetType)
+    {
+    case dfPACKET_CS_MOVE_START: return sizeof(PacketCSMoveStart);
+    case dfPACKET_CS_MOVE_STOP:  return sizeof(PacketCSMoveStop);
+    case dfPACKET_CS_ATTACK1:    return sizeof(PacketCSAttack1);
+    case dfPACKET_CS_ATTACK2:    return sizeof(PacketCSAttack2);
+    case dfPACKET_CS_ATTACK3:    return sizeof(PacketCSAttack3);
+    default:
+        return 0;
     }
 }
 
