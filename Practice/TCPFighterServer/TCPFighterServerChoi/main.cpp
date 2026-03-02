@@ -98,8 +98,8 @@ WORD GetExpectedBodySize(BYTE packetType) noexcept;
 
 bool IsHitAttack1(const Session* attacker, const Session* target,
     int centerX, int centerY) noexcept;
-bool IsInAttackRect(int centerX, int centerY,
-    int targetX, int targetY,
+bool IsHitDirectionalAttack(const Session* attacker, const Session* target,
+    int centerX, int centerY,
     int rangeX, int rangeY) noexcept;
 
 void InitHeader(PacketHeader* pHeader, WORD type, WORD bodySize) noexcept;
@@ -112,8 +112,8 @@ bool MoveCheck(BYTE direction, int x, int y) noexcept;
 
 void NetIOProcess() noexcept;
 void NetProc_Accept() noexcept;
-void NetProc_Recv(Session*) noexcept;
-void NetProc_Send(Session*) noexcept;
+bool NetProc_Recv(Session*) noexcept;
+bool NetProc_Send(Session*) noexcept;
 
 // 직렬화 버퍼 기반 패킷 처리
 bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packetSize);
@@ -269,7 +269,8 @@ void NetIOProcess() noexcept
         if (FD_ISSET(s, &readSet))
         {
             --result;
-            NetProc_Recv(session);
+            if (!NetProc_Recv(session))
+                continue;
             if (result <= 0)
                 break;
         }
@@ -277,7 +278,8 @@ void NetIOProcess() noexcept
         if (result > 0 && FD_ISSET(s, &writeSet))
         {
             --result;
-            NetProc_Send(session);
+            if (!NetProc_Send(session))
+                continue;
             if (result <= 0)
                 break;
         }
@@ -481,7 +483,7 @@ void NetProc_Accept() noexcept
 //===============================================================
 // Recv
 //===============================================================
-void NetProc_Recv(Session* pSession) noexcept
+bool NetProc_Recv(Session* pSession) noexcept
 {
     char buffer[BUFFER_SIZE] = { 0 };
 
@@ -491,15 +493,23 @@ void NetProc_Recv(Session* pSession) noexcept
     if (recvRet == 0)
     {
         Disconnect(pSession);
-        return;
+        return false;
     }
     else if (recvRet == SOCKET_ERROR)
     {
-        if (WSAGetLastError() == WSAEWOULDBLOCK)
-            return;
+        int err = WSAGetLastError();
+        if (err == WSAEWOULDBLOCK)
+            return true;
+
+        if (err == WSAECONNRESET || err == WSAECONNABORTED ||
+            err == WSAENETRESET || err == WSAESHUTDOWN || err == WSAENOTCONN)
+        {
+            Disconnect(pSession);
+            return false;
+        }
 
         Disconnect(pSession);
-        return;
+        return false;
     }
 
     // 링버퍼에 수신 데이터 적재
@@ -508,7 +518,7 @@ void NetProc_Recv(Session* pSession) noexcept
     {
         Logger(L"recvQ enqueue fail");
         Disconnect(pSession);
-        return;
+        return false;
     }
 
     // 헤더+바디 단위로 패킷 파싱
@@ -523,26 +533,26 @@ void NetProc_Recv(Session* pSession) noexcept
         if (!isPeeked)
         {
             Disconnect(pSession);
-            return;
+            return false;
         }
 
         // 패킷 코드 검증
         if (packetHeader.code != dfNETWORK_PACKET_CODE)
         {
             Disconnect(pSession);
-            return;
+            return false;
         }
 
         WORD expectedSize = GetExpectedBodySize(packetHeader.type);
         if (expectedSize == 0 || packetHeader.size != expectedSize)
         {
             Disconnect(pSession);
-            return;
+            return false;
         }
 
         int totalSize = static_cast<int>(headerSize) + packetHeader.size;
         if (pSession->recvQ.GetUseSize() < totalSize)
-            return;
+            return true;
 
         pSession->recvQ.MoveFront(static_cast<int>(headerSize));
 
@@ -550,7 +560,7 @@ void NetProc_Recv(Session* pSession) noexcept
         if (packetHeader.size > BUFFER_SIZE)
         {
             Disconnect(pSession);
-            return;
+            return false;
         }
 
         char packetBuffer[BUFFER_SIZE];
@@ -558,19 +568,21 @@ void NetProc_Recv(Session* pSession) noexcept
         if (!isDequeued)
         {
             Disconnect(pSession);
-            return;
+            return false;
         }
 
         // packetHeader.size 만큼의 바디를 CPacket으로 감싸서 처리
         if (!PacketProc(pSession, packetHeader.type, packetBuffer, packetHeader.size))
-            return;
+            return false;
     }
+
+    return true;
 }
 
 //===============================================================
 // Send
 //===============================================================
-void NetProc_Send(Session* pSession) noexcept
+bool NetProc_Send(Session* pSession) noexcept
 {
     char buffer[BUFFER_SIZE];
 
@@ -590,28 +602,37 @@ void NetProc_Send(Session* pSession) noexcept
         if (!isPeeked)
         {
             Disconnect(pSession);
-            return;
+            return false;
         }
 
         int sendRet = send(pSession->socket, buffer, sendSize, 0);
         if (sendRet == 0)
         {
             Disconnect(pSession);
-            return;
+            return false;
         }
         else if (sendRet == SOCKET_ERROR)
         {
             int err = WSAGetLastError();
             if (err == WSAEWOULDBLOCK)
-                return;
+                return true;
+
+            if (err == WSAECONNRESET || err == WSAECONNABORTED ||
+                err == WSAENETRESET || err == WSAESHUTDOWN || err == WSAENOTCONN)
+            {
+                Disconnect(pSession);
+                return false;
+            }
 
             Disconnect(pSession);
-            return;
+            return false;
         }
 
         // 실제 전송된 만큼만 큐에서 제거
         pSession->sendQ.MoveFront(sendRet);
     }
+
+    return true;
 }
 
 //===============================================================
@@ -819,8 +840,8 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
     // 공격 애니메이션 브로드캐스트
     SendBroadcast(pSession, &packetHeader, (char*)&sendMsg);
 
-    const int centerX = atk.x;
-    const int centerY = atk.y;
+    const int centerX = pSession->x;
+    const int centerY = pSession->y;
 
     // 피격 판정 및 데미지 브로드캐스트
     for (auto& session : gSessionList)
@@ -898,8 +919,8 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
     // 공격 애니메이션 브로드캐스트
     SendBroadcast(pSession, &packetHeader, (char*)&sendMsg);
 
-    const int centerX = atk.x;
-    const int centerY = atk.y;
+    const int centerX = pSession->x;
+    const int centerY = pSession->y;
 
     // 피격 판정 및 데미지 브로드캐스트
     for (auto& session : gSessionList)
@@ -907,8 +928,8 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
         if (session == pSession)
             continue;
 
-        if (!IsInAttackRect(centerX, centerY,
-            session->x, session->y,
+        if (!IsHitDirectionalAttack(pSession, session,
+            centerX, centerY,
             dfATTACK2_RANGE_X, dfATTACK2_RANGE_Y))
         {
             continue;
@@ -981,8 +1002,8 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
     // 공격 애니메이션 브로드캐스트
     SendBroadcast(pSession, &packetHeader, (char*)&sendMsg);
 
-    const int centerX = atk.x;
-    const int centerY = atk.y;
+    const int centerX = pSession->x;
+    const int centerY = pSession->y;
 
     // 피격 판정 및 데미지 브로드캐스트
     for (auto& session : gSessionList)
@@ -990,8 +1011,8 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
         if (session == pSession)
             continue;
 
-        if (!IsInAttackRect(centerX, centerY,
-            session->x, session->y,
+        if (!IsHitDirectionalAttack(pSession, session,
+            centerX, centerY,
             dfATTACK3_RANGE_X, dfATTACK3_RANGE_Y))
         {
             continue;
@@ -1302,14 +1323,23 @@ bool IsHitAttack1(const Session* attacker, const Session* target,
     return true;
 }
 
-bool IsInAttackRect(int centerX, int centerY,
-    int targetX, int targetY,
+bool IsHitDirectionalAttack(const Session* attacker, const Session* target,
+    int centerX, int centerY,
     int rangeX, int rangeY) noexcept
 {
-    // 중심 기준 직사각형 판정
-    if (abs(centerX - targetX) > rangeX)
+    if (abs(centerY - target->y) > rangeY)
         return false;
-    if (abs(centerY - targetY) > rangeY)
-        return false;
+
+    if (attacker->direction == dfPACKET_MOVE_DIR_RR)
+    {
+        if (target->x < centerX || target->x > centerX + rangeX)
+            return false;
+    }
+    else
+    {
+        if (target->x > centerX || target->x < centerX - rangeX)
+            return false;
+    }
+
     return true;
 }
