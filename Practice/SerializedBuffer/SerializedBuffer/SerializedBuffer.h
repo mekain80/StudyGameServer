@@ -14,20 +14,20 @@ public:
 	SerializedBuffer(const SerializedBuffer& src);
 	virtual ~SerializedBuffer() noexcept;
 
-	/// 패킷 청소
+	// 패킷 청소
 	void Clear() noexcept;
 
-	/// 버퍼 사이즈 얻기.
+	// 버퍼 사이즈 얻기.
 	int GetBufferSize() const noexcept { return mBufferSize; }
 
-	/// 현재 사용중인 사이즈 얻기.
+	// 현재 사용중인 사이즈 얻기.
 	int GetDataSize() const noexcept { return mDataSize; }
 
-	/// 버퍼 포인터 얻기.
+	// 버퍼 포인터 얻기.
 	char* GetBufferPtr() noexcept { return mBuffer; }
 	const char* GetBufferPtr() const noexcept { return mBuffer; }
 
-	/// 버퍼 Pos 이동. (음수이동 불가)
+	// 버퍼 Pos 이동. (음수이동 불가)
 	int MoveWritePos(int size) noexcept;
 	int MoveReadPos(int size) noexcept;
 
@@ -58,10 +58,10 @@ public:
 	SerializedBuffer& operator>>(__int64&			int64Value) noexcept;
 	SerializedBuffer& operator>>(double&			doubleValue) noexcept;
 
-	/// @brief 데이타 얻기.
+	// 데이타 얻기.
 	int GetData(char* dest, int size) noexcept;
 
-	/// @brief 데이타 삽입
+	// 데이타 삽입
 	int PutData(const char* src, int srcSize) noexcept;
 
 private:

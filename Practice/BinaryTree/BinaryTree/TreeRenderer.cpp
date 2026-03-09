@@ -12,9 +12,9 @@ struct NodePos
 
 using PosMap = std::unordered_map<const RBTree::Node*, NodePos>;
 
-/// 중위 순회(in-order)로 x 좌표를 배치한다.
-/// - nil(센티넬) 노드는 그리지 않는다.
-/// - y = startY + (트리 깊이) * yGap
+// 중위 순회(in-order)로 x 좌표를 배치한다.
+// - nil(센티넬) 노드는 그리지 않는다.
+// - y = startY + (트리 깊이) * yGap
 static void LayoutInOrder(
     const RBTree::Node* node,
     const RBTree::Node* nil,

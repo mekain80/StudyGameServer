@@ -29,7 +29,7 @@ extern HBRUSH gRouteBrush;
 extern HBRUSH gStartBrush;
 extern HBRUSH gEndBrush;
 
-/// Open List 상태인 타일들을 gOpenBrush로 채워서 그림
+// Open List 상태인 타일들을 gOpenBrush로 채워서 그림
 void RenderOpen(HDC hdc);
 // Close List 상태인 타일들을 gCloseBrush로 채워서 그림
 void RenderClose(HDC hdc);

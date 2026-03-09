@@ -12,26 +12,26 @@ public:
 	static constexpr std::uint32_t kDefaultInitSize = 100;
 	static constexpr std::uint32_t kDefaultMaxSize = UINT32_MAX;
 
-	/// @param placementNew true면 Alloc에서 생성자, Free에서 소멸자 호출
-	/// @param sizeInitialize 초기 노드 개수
-	/// @param sizeMax 풀이 보유할 수 있는 최대 노드 개수
+	// @param placementNew true면 Alloc에서 생성자, Free에서 소멸자 호출
+	// @param sizeInitialize 초기 노드 개수
+	// @param sizeMax 풀이 보유할 수 있는 최대 노드 개수
 	MemoryPool(bool placementNew = true,
 		std::uint32_t sizeInitialize = kDefaultInitSize,
 		std::uint32_t sizeMax = kDefaultMaxSize) noexcept;
 
-	/// 반환되지 않은 노드의 객체 소멸자는 호출하지 않음
+	// 반환되지 않은 노드의 객체 소멸자는 호출하지 않음
 	virtual ~MemoryPool() noexcept;
 
-	/// 노드 하나를 할당하고 데이터 포인터 반환
+	// 노드 하나를 할당하고 데이터 포인터 반환
 	T* Alloc(void) noexcept;
 
-	/// 사용 중인 데이터 포인터를 풀에 반환
+	// 사용 중인 데이터 포인터를 풀에 반환
 	bool Free(T* data) noexcept;
 
-	/// 풀이 보유한 전체 노드 수 반환
+	// 풀이 보유한 전체 노드 수 반환
 	inline int GetCapacityCount(void) const noexcept { return mCapacity; }
 
-	/// 현재 사용 중인 노드 수 반환
+	// 현재 사용 중인 노드 수 반환
 	inline int GetUseCount(void) const noexcept { return mUseCount; }
 
 	MemoryPool(const MemoryPool&) = delete;
