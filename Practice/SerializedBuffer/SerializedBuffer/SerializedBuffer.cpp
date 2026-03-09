@@ -1,5 +1,5 @@
 ﻿#include "SerializedBuffer.h"
-#include <cstring> // memcpy, memmove
+#include <cstring>
 
 SerializedBuffer::SerializedBuffer()
 	: SerializedBuffer(eBUFFER_DEFAULT)
@@ -7,29 +7,41 @@ SerializedBuffer::SerializedBuffer()
 }
 
 SerializedBuffer::SerializedBuffer(int bufferSize)
-	: mBufferSize(bufferSize),
-	mDataSize(0),
-	mBuffer(nullptr)
-{
-	if (mBufferSize <= 0)
-		mBufferSize = eBUFFER_DEFAULT;
-
-	mBuffer = new char[mBufferSize]; // new는 예외 가능
-}
-
-SerializedBuffer::SerializedBuffer(const SerializedBuffer& src)
-	: mBufferSize(src.mBufferSize),
-	mDataSize(src.mDataSize),
-	mBuffer(nullptr)
+	: mBuffer(nullptr),
+	mBegin(nullptr),
+	mRead(nullptr),
+	mWrite(nullptr),
+	mEnd(nullptr),
+	mBufferSize(bufferSize)
 {
 	if (mBufferSize <= 0)
 		mBufferSize = eBUFFER_DEFAULT;
 
 	mBuffer = new char[mBufferSize];
+	InitializePointers();
+}
 
-	if (mDataSize > 0)
+SerializedBuffer::SerializedBuffer(const SerializedBuffer& src)
+	: mBuffer(nullptr),
+	mBegin(nullptr),
+	mRead(nullptr),
+	mWrite(nullptr),
+	mEnd(nullptr),
+	mBufferSize(src.mBufferSize)
+{
+	if (mBufferSize <= 0)
+		mBufferSize = eBUFFER_DEFAULT;
+
+	mBuffer = new char[mBufferSize];
+	InitializePointers();
+
+	const int readOffset = static_cast<int>(src.mRead - src.mBegin);
+	const int writeOffset = static_cast<int>(src.mWrite - src.mBegin);
+	if (writeOffset > 0)
 	{
-		std::memcpy(mBuffer, src.mBuffer, static_cast<size_t>(mDataSize));
+		std::memcpy(mBuffer, src.mBuffer, static_cast<size_t>(writeOffset));
+		mRead = mBegin + readOffset;
+		mWrite = mBegin + writeOffset;
 	}
 }
 
@@ -37,11 +49,29 @@ SerializedBuffer::~SerializedBuffer() noexcept
 {
 	delete[] mBuffer;
 	mBuffer = nullptr;
+	mBegin = nullptr;
+	mRead = nullptr;
+	mWrite = nullptr;
+	mEnd = nullptr;
+}
+
+void SerializedBuffer::InitializePointers() noexcept
+{
+	mBegin = mBuffer;
+	mRead = mBuffer;
+	mWrite = mBuffer;
+	mEnd = mBuffer + mBufferSize;
+}
+
+void SerializedBuffer::ResetPointers() noexcept
+{
+	mRead = mBegin;
+	mWrite = mBegin;
 }
 
 void SerializedBuffer::Clear() noexcept
 {
-	mDataSize = 0;
+	ResetPointers();
 }
 
 int SerializedBuffer::MoveWritePos(int size) noexcept
@@ -49,11 +79,10 @@ int SerializedBuffer::MoveWritePos(int size) noexcept
 	if (size <= 0)
 		return 0;
 
-	const int freeSize = mBufferSize - mDataSize;
-	if (size > freeSize)
+	if (size > GetFreeSize())
 		return 0;
 
-	mDataSize += size;
+	mWrite += size;
 	return size;
 }
 
@@ -63,16 +92,17 @@ int SerializedBuffer::MoveReadPos(int size) noexcept
 		return 0;
 
 	int moveSize = size;
-	if (moveSize > mDataSize)
-		moveSize = mDataSize;
+	const int dataSize = GetDataSize();
+	if (moveSize > dataSize)
+		moveSize = dataSize;
 
-	const int remain = mDataSize - moveSize;
-	if (remain > 0)
-	{
-		std::memmove(mBuffer, mBuffer + moveSize, static_cast<size_t>(remain));
-	}
+	if (moveSize <= 0)
+		return 0;
 
-	mDataSize -= moveSize;
+	mRead += moveSize;
+	if (mRead == mWrite)
+		ResetPointers();
+
 	return moveSize;
 }
 
@@ -84,25 +114,26 @@ SerializedBuffer& SerializedBuffer::operator=(const SerializedBuffer& src)
 	if (mBufferSize != src.mBufferSize)
 	{
 		delete[] mBuffer;
-
 		mBufferSize = src.mBufferSize;
 		if (mBufferSize <= 0)
 			mBufferSize = eBUFFER_DEFAULT;
 
-		mBuffer = new char[mBufferSize]; // 예외 가능
+		mBuffer = new char[mBufferSize];
 	}
 
-	mDataSize = src.mDataSize;
+	InitializePointers();
 
-	if (mDataSize > 0)
+	const int readOffset = static_cast<int>(src.mRead - src.mBegin);
+	const int writeOffset = static_cast<int>(src.mWrite - src.mBegin);
+	if (writeOffset > 0)
 	{
-		std::memcpy(mBuffer, src.mBuffer, static_cast<size_t>(mDataSize));
+		std::memcpy(mBuffer, src.mBuffer, static_cast<size_t>(writeOffset));
+		mRead = mBegin + readOffset;
+		mWrite = mBegin + writeOffset;
 	}
 
 	return *this;
 }
-
-// ======================= Put 연산자 (<<) =======================
 
 SerializedBuffer& SerializedBuffer::operator<<(unsigned char byteValue) noexcept
 {
@@ -164,81 +195,75 @@ SerializedBuffer& SerializedBuffer::operator<<(double doubleValue) noexcept
 	return *this;
 }
 
-// ======================= Get 연산자 (>>) =======================
-// GetData는 "가능한 만큼" 복사하는 성격이라,
-// operator>>에서는 데이터가 충분할 때만 읽도록 가드.
-
 SerializedBuffer& SerializedBuffer::operator>>(unsigned char& byteValue) noexcept
 {
-	if (mDataSize >= static_cast<int>(sizeof(byteValue)))
+	if (GetDataSize() >= static_cast<int>(sizeof(byteValue)))
 		GetData(reinterpret_cast<char*>(&byteValue), sizeof(byteValue));
 	return *this;
 }
 
 SerializedBuffer& SerializedBuffer::operator>>(char& charValue) noexcept
 {
-	if (mDataSize >= static_cast<int>(sizeof(charValue)))
+	if (GetDataSize() >= static_cast<int>(sizeof(charValue)))
 		GetData(&charValue, sizeof(charValue));
 	return *this;
 }
 
 SerializedBuffer& SerializedBuffer::operator>>(unsigned short& ushortValue) noexcept
 {
-	if (mDataSize >= static_cast<int>(sizeof(ushortValue)))
+	if (GetDataSize() >= static_cast<int>(sizeof(ushortValue)))
 		GetData(reinterpret_cast<char*>(&ushortValue), sizeof(ushortValue));
 	return *this;
 }
 
 SerializedBuffer& SerializedBuffer::operator>>(short& shortValue) noexcept
 {
-	if (mDataSize >= static_cast<int>(sizeof(shortValue)))
+	if (GetDataSize() >= static_cast<int>(sizeof(shortValue)))
 		GetData(reinterpret_cast<char*>(&shortValue), sizeof(shortValue));
 	return *this;
 }
 
 SerializedBuffer& SerializedBuffer::operator>>(int& intValue) noexcept
 {
-	if (mDataSize >= static_cast<int>(sizeof(intValue)))
+	if (GetDataSize() >= static_cast<int>(sizeof(intValue)))
 		GetData(reinterpret_cast<char*>(&intValue), sizeof(intValue));
 	return *this;
 }
 
 SerializedBuffer& SerializedBuffer::operator>>(unsigned long& ulongValue) noexcept
 {
-	if (mDataSize >= static_cast<int>(sizeof(ulongValue)))
+	if (GetDataSize() >= static_cast<int>(sizeof(ulongValue)))
 		GetData(reinterpret_cast<char*>(&ulongValue), sizeof(ulongValue));
 	return *this;
 }
 
 SerializedBuffer& SerializedBuffer::operator>>(long& longValue) noexcept
 {
-	if (mDataSize >= static_cast<int>(sizeof(longValue)))
+	if (GetDataSize() >= static_cast<int>(sizeof(longValue)))
 		GetData(reinterpret_cast<char*>(&longValue), sizeof(longValue));
 	return *this;
 }
 
 SerializedBuffer& SerializedBuffer::operator>>(float& floatValue) noexcept
 {
-	if (mDataSize >= static_cast<int>(sizeof(floatValue)))
+	if (GetDataSize() >= static_cast<int>(sizeof(floatValue)))
 		GetData(reinterpret_cast<char*>(&floatValue), sizeof(floatValue));
 	return *this;
 }
 
 SerializedBuffer& SerializedBuffer::operator>>(__int64& int64Value) noexcept
 {
-	if (mDataSize >= static_cast<int>(sizeof(int64Value)))
+	if (GetDataSize() >= static_cast<int>(sizeof(int64Value)))
 		GetData(reinterpret_cast<char*>(&int64Value), sizeof(int64Value));
 	return *this;
 }
 
 SerializedBuffer& SerializedBuffer::operator>>(double& doubleValue) noexcept
 {
-	if (mDataSize >= static_cast<int>(sizeof(doubleValue)))
+	if (GetDataSize() >= static_cast<int>(sizeof(doubleValue)))
 		GetData(reinterpret_cast<char*>(&doubleValue), sizeof(doubleValue));
 	return *this;
 }
-
-// ======================= GetData / PutData =======================
 
 int SerializedBuffer::GetData(char* dest, int size) noexcept
 {
@@ -246,21 +271,15 @@ int SerializedBuffer::GetData(char* dest, int size) noexcept
 		return 0;
 
 	int copySize = size;
-	if (copySize > mDataSize)
-		copySize = mDataSize;
+	const int dataSize = GetDataSize();
+	if (copySize > dataSize)
+		copySize = dataSize;
 
 	if (copySize <= 0)
 		return 0;
 
-	std::memcpy(dest, mBuffer, static_cast<size_t>(copySize));
-
-	const int remain = mDataSize - copySize;
-	if (remain > 0)
-	{
-		std::memmove(mBuffer, mBuffer + copySize, static_cast<size_t>(remain));
-	}
-
-	mDataSize -= copySize;
+	std::memcpy(dest, mRead, static_cast<size_t>(copySize));
+	MoveReadPos(copySize);
 	return copySize;
 }
 
@@ -269,11 +288,10 @@ int SerializedBuffer::PutData(const char* src, int srcSize) noexcept
 	if (srcSize <= 0 || src == nullptr)
 		return 0;
 
-	const int freeSize = mBufferSize - mDataSize;
-	if (srcSize > freeSize)
+	if (srcSize > GetFreeSize())
 		return 0;
 
-	std::memcpy(mBuffer + mDataSize, src, static_cast<size_t>(srcSize));
-	mDataSize += srcSize;
+	std::memcpy(mWrite, src, static_cast<size_t>(srcSize));
+	mWrite += srcSize;
 	return srcSize;
 }
