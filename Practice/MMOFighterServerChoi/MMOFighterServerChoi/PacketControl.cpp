@@ -71,7 +71,8 @@ void Disconnect(Session* pSession) noexcept
 
     closesocket(pSession->socket);
     gSessionMap.erase(pSession->socket);
-    gCharacterMap.erase(pSession->sessionID);
-
+    Character* pCharacter = FindCharacter(pSession->sessionID);
+    gCharacterMap.erase(pCharacter->sessionID);
+    delete pCharacter;
     delete pSession;
 }
