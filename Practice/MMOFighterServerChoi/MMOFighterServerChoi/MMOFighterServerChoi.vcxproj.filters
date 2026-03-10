@@ -39,9 +39,6 @@
     <ClCompile Include="Network.cpp">
       <Filter>Network</Filter>
     </ClCompile>
-    <ClCompile Include="Packet.cpp">
-      <Filter>Network</Filter>
-    </ClCompile>
     <ClCompile Include="PacketControl.cpp">
       <Filter>Network</Filter>
     </ClCompile>
@@ -81,9 +78,6 @@
       <Filter>Util</Filter>
     </ClInclude>
     <ClInclude Include="Network.h">
-      <Filter>Network</Filter>
-    </ClInclude>
-    <ClInclude Include="Packet.h">
       <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="PacketControl.h">
