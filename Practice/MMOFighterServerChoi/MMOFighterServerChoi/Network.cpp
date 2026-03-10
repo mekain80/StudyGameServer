@@ -18,26 +18,43 @@ std::list<Session*> gSessionList;
 
 void NetStartUp() noexcept
 {
+    auto failStartUp = [](const WCHAR* const message) noexcept
+        {
+            _LOG(LOG_LEVEL_ERROR, message);
+
+            if (gListenSocket != INVALID_SOCKET)
+            {
+                closesocket(gListenSocket);
+                gListenSocket = INVALID_SOCKET;
+            }
+
+            WSACleanup();
+            gShutdown = true;
+        };
+
     QueryPerformanceFrequency(&gFreq);
     QueryPerformanceCounter(&gFrameStartTick);
 
     WSADATA wsa;
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
     {
-        ErrorHandler(L"WSAStartup fail");
+        failStartUp(L"WSAStartup fail");
+        return;
     }
-    Logger(L"WSAStartup #");
+    _LOG(LOG_LEVEL_SYSTEM, L"WSAStartup #");
 
     gListenSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (gListenSocket == INVALID_SOCKET)
     {
-        ErrorHandler(L"socket fail");
+        failStartUp(L"socket fail");
+        return;
     }
 
     u_long on = 1;
     if (ioctlsocket(gListenSocket, FIONBIO, &on) == SOCKET_ERROR)
     {
-        ErrorHandler(L"ioctlsocket fail");
+        failStartUp(L"ioctlsocket fail");
+        return;
     }
 
     SOCKADDR_IN serverAddr{};
@@ -47,21 +64,19 @@ void NetStartUp() noexcept
 
     if (bind(gListenSocket, reinterpret_cast<SOCKADDR*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
     {
-        ErrorHandler(L"bind fail");
+        failStartUp(L"bind fail");
+        return;
     }
 
-    {
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"BIND OK # Port:%d", SERVER_PORT);
-        Logger(buf);
-    }
+    _LOG(LOG_LEVEL_SYSTEM, L"BIND OK # Port:%d", SERVER_PORT);
 
     if (listen(gListenSocket, SOMAXCONN_HINT(20000)) == SOCKET_ERROR)
     {
-        ErrorHandler(L"listen() fail");
+        failStartUp(L"listen() fail");
+        return;
     }
 
-    Logger(L"Listen OK #");
+    _LOG(LOG_LEVEL_SYSTEM, L"Listen OK #");
 }
 
 void NetEnd() noexcept
@@ -94,7 +109,7 @@ void NetIOProcess() noexcept
     int result = select(0, &readSet, &writeSet, nullptr, &time);
     if (result == SOCKET_ERROR)
     {
-        ErrorHandler(L"Select fail");
+        _LOG(LOG_LEVEL_ERROR, L"Select fail");
         return;
     }
 
@@ -155,7 +170,7 @@ void NetProc_Accept() noexcept
     SOCKET clientSocket = accept(gListenSocket, reinterpret_cast<SOCKADDR*>(&clientAddr), &addrlen);
     if (clientSocket == INVALID_SOCKET)
     {
-        Logger(L"clientSocket accept fail");
+        _LOG(LOG_LEVEL_ERROR, L"clientSocket accept fail");
         return;
     }
 
@@ -163,7 +178,7 @@ void NetProc_Accept() noexcept
     if (ioctlsocket(clientSocket, FIONBIO, &on) == SOCKET_ERROR)
     {
         closesocket(clientSocket);
-        Logger(L"clientSocket ioctlsocket fail");
+        _LOG(LOG_LEVEL_ERROR, L"clientSocket ioctlsocket fail");
         return;
     }
 
@@ -216,13 +231,9 @@ void NetProc_Accept() noexcept
     MakePacket_CreateOtherCharacter(&broadHeader, &broadPacket, pSession->direction, pSession->sessionID, pSession->x, pSession->y, pSession->HP);
     SendBroadcast(pSession, &broadHeader, reinterpret_cast<char*>(&broadPacket));
 
-    wchar_t buf[256];
-    _snwprintf_s(buf, 256, _TRUNCATE, L"Connect # IP:%s / SessionID:%d", pSession->ipStr, pSession->sessionID);
-    Logger(buf);
-    _snwprintf_s(buf, 256, _TRUNCATE, L"# PACKET_CONNECT # SessionID:%d", pSession->sessionID);
-    Logger(buf);
-    _snwprintf_s(buf, 256, _TRUNCATE, L"Create Character # SessionID:%d    X:%d    Y:%d", pSession->sessionID, pSession->x, pSession->y);
-    Logger(buf);
+    _LOG(LOG_LEVEL_SYSTEM, L"Connect # IP:%s / SessionID:%d", pSession->ipStr, pSession->sessionID);
+    _LOG(LOG_LEVEL_DEBUG, L"# PACKET_CONNECT # SessionID:%d", pSession->sessionID);
+    _LOG(LOG_LEVEL_DEBUG, L"Create Character # SessionID:%d    X:%d    Y:%d", pSession->sessionID, pSession->x, pSession->y);
 }
 
 bool NetProc_Recv(Session* pSession) noexcept
@@ -246,9 +257,7 @@ bool NetProc_Recv(Session* pSession) noexcept
         if (err == WSAECONNRESET || err == WSAECONNABORTED ||
             err == WSAENETRESET || err == WSAESHUTDOWN || err == WSAENOTCONN)
         {
-            wchar_t buf[256];
-            _snwprintf_s(buf, 256, _TRUNCATE, L"WSAGetLastError # SessionID:%d    WSA NUM:%d", pSession->sessionID, err);
-            Logger(buf);
+            _LOG(LOG_LEVEL_ERROR, L"WSAGetLastError # SessionID:%d    WSA NUM:%d", pSession->sessionID, err);
             Disconnect(pSession);
             return false;
         }
@@ -259,7 +268,7 @@ bool NetProc_Recv(Session* pSession) noexcept
 
     if (!pSession->recvQ.Enqueue(buffer, recvRet))
     {
-        Logger(L"recvQ enqueue fail");
+        _LOG(LOG_LEVEL_ERROR, L"recvQ enqueue fail");
         Disconnect(pSession);
         return false;
     }

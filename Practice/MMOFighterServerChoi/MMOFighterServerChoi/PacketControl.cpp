@@ -12,10 +12,8 @@ bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexc
 
     if (session->sendQ.GetFreeSize() < totalSize)
     {
-        Logger(L"sendQ is full, disconnect");
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"sendQ is full ID=%d IP=%s", session->sessionID, session->ipStr);
-        Logger(buf);
+        _LOG(LOG_LEVEL_ERROR, L"sendQ is full, disconnect");
+        _LOG(LOG_LEVEL_ERROR, L"sendQ is full ID=%d IP=%s", session->sessionID, session->ipStr);
 
         Disconnect(session);
         return false;

@@ -47,4 +47,4 @@
 // [캐릭터 기본 설정]
 // ------------------------------------------------------------------
 #define MAX_HP          100
-#define dfACTION_STOP   0xFFFFFFFF  // 이동하지 않는 상태
+#define dfACTION_STOP   0xFF        // 이동하지 않는 상태

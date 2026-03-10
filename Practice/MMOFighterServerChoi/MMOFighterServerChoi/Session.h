@@ -17,7 +17,7 @@ struct Session
     RingBuffer recvQ;
     RingBuffer sendQ;
 
-    DWORD action = 0;
+    BYTE action = 0;
     BYTE direction = 0;
     short x = 0;
     short y = 0;

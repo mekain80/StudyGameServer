@@ -16,7 +16,7 @@ bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packet
     int putRet = packet.PutData(pPacket, packetSize);
     if (putRet != packetSize)
     {
-        Logger(L"SerializedBuffer PutData fail");
+        _LOG(LOG_LEVEL_ERROR, L"SerializedBuffer PutData fail");
         Disconnect(pSession);
         return false;
     }
@@ -46,11 +46,7 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
         >> moveStart.x
         >> moveStart.y;
 
-    {
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"# PACKET_MOVESTART # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, moveStart.direction, moveStart.x, moveStart.y);
-        Logger(buf);
-    }
+    _LOG(LOG_LEVEL_DEBUG, L"# PACKET_MOVESTART # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, moveStart.direction, moveStart.x, moveStart.y);
 
     if (!IsValidMoveDirection(moveStart.direction))
     {
@@ -61,9 +57,7 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
     if (abs(moveStart.x - pSession->x) > dfERROR_RANGE ||
         abs(moveStart.y - pSession->y) > dfERROR_RANGE)
     {
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
-        Logger(buf);
+        _LOG(LOG_LEVEL_ERROR, L"dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
         Disconnect(pSession);
         return false;
     }
@@ -89,11 +83,7 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
         >> moveStop.x
         >> moveStop.y;
 
-    {
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"# PACKET_MOVESTOP # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, moveStop.direction, moveStop.x, moveStop.y);
-        Logger(buf);
-    }
+    _LOG(LOG_LEVEL_DEBUG, L"# PACKET_MOVESTOP # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, moveStop.direction, moveStop.x, moveStop.y);
 
     if (!IsValidViewDirection(moveStop.direction))
     {
@@ -104,9 +94,7 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
     if (abs(moveStop.x - pSession->x) > dfERROR_RANGE ||
         abs(moveStop.y - pSession->y) > dfERROR_RANGE)
     {
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
-        Logger(buf);
+        _LOG(LOG_LEVEL_ERROR, L"dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
         Disconnect(pSession);
         return false;
     }
@@ -131,11 +119,7 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
         >> atk.x
         >> atk.y;
 
-    {
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"# PACKET_ATTACK1 # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, atk.direction, atk.x, atk.y);
-        Logger(buf);
-    }
+    _LOG(LOG_LEVEL_DEBUG, L"# PACKET_ATTACK1 # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, atk.direction, atk.x, atk.y);
 
     if (!IsValidViewDirection(atk.direction))
     {
@@ -146,9 +130,7 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
     if (abs(atk.x - pSession->x) > dfERROR_RANGE ||
         abs(atk.y - pSession->y) > dfERROR_RANGE)
     {
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"Attack dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
-        Logger(buf);
+        _LOG(LOG_LEVEL_ERROR, L"Attack dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
         Disconnect(pSession);
         return false;
     }
@@ -198,11 +180,7 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
         >> atk.x
         >> atk.y;
 
-    {
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"# PACKET_ATTACK2 # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, atk.direction, atk.x, atk.y);
-        Logger(buf);
-    }
+    _LOG(LOG_LEVEL_DEBUG, L"# PACKET_ATTACK2 # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, atk.direction, atk.x, atk.y);
 
     if (!IsValidViewDirection(atk.direction))
     {
@@ -213,9 +191,7 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
     if (abs(atk.x - pSession->x) > dfERROR_RANGE ||
         abs(atk.y - pSession->y) > dfERROR_RANGE)
     {
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"Attack dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
-        Logger(buf);
+        _LOG(LOG_LEVEL_ERROR, L"Attack dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
         Disconnect(pSession);
         return false;
     }
@@ -265,11 +241,7 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
         >> atk.x
         >> atk.y;
 
-    {
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"# PACKET_ATTACK3 # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, atk.direction, atk.x, atk.y);
-        Logger(buf);
-    }
+    _LOG(LOG_LEVEL_DEBUG, L"# PACKET_ATTACK3 # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, atk.direction, atk.x, atk.y);
 
     if (!IsValidViewDirection(atk.direction))
     {
@@ -280,9 +252,7 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
     if (abs(atk.x - pSession->x) > dfERROR_RANGE ||
         abs(atk.y - pSession->y) > dfERROR_RANGE)
     {
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"Attack dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
-        Logger(buf);
+        _LOG(LOG_LEVEL_ERROR, L"Attack dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
         Disconnect(pSession);
         return false;
     }

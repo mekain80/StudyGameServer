@@ -19,6 +19,7 @@ int _tmain(int argc, _TCHAR* argv[])
     SetConsoleCP(CP_UTF8);
     system("chcp 65001 > nul");
 
+    LogFileInit();
     timeBeginPeriod(1);
     // LoadData(); // 설정 및 게임데이터, DB 데이터 로딩
     NetStartUp(); // 네트워크 초기화, 리슨소켓 생성 및 listen

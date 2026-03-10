@@ -61,17 +61,13 @@ void Update() noexcept
         default:                   dirStr = L"STOP"; break;
         }
 
-        wchar_t buf[256];
-        _snwprintf_s(
-            buf,
-            256,
-            _TRUNCATE,
+        _LOG(
+            LOG_LEVEL_DEBUG,
             L"# gameRun : %s # SessionID : %u / X : %d / Y : %d",
             dirStr,
             session->sessionID,
             session->x,
             session->y);
-        Logger(buf);
 
         ++it;
     }
