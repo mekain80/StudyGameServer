@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include <cstddef>
-#include <cstdint>
 #include <cstdlib>
 #include <new>
 
@@ -9,30 +8,21 @@ template <class T>
 class MemoryPool
 {
 public:
-	static constexpr std::uint32_t kDefaultInitSize = 100;
-	static constexpr std::uint32_t kDefaultMaxSize = UINT32_MAX;
+	static constexpr unsigned int kDefaultInitSize = 100;
+	static constexpr unsigned int kDefaultMaxSize = static_cast<unsigned int>(-1);
 
-	// @param placementNew true면 Alloc에서 생성자, Free에서 소멸자 호출
-	// @param sizeInitialize 초기 노드 개수
-	// @param sizeMax 풀이 보유할 수 있는 최대 노드 개수
-	MemoryPool(bool placementNew = true,
-		std::uint32_t sizeInitialize = kDefaultInitSize,
-		std::uint32_t sizeMax = kDefaultMaxSize) noexcept;
+	MemoryPool(
+		bool placementNew = true,
+		unsigned int sizeInitialize = kDefaultInitSize,
+		unsigned int sizeMax = kDefaultMaxSize) noexcept;
 
-	// 반환되지 않은 노드의 객체 소멸자는 호출하지 않음
 	virtual ~MemoryPool() noexcept;
 
-	// 노드 하나를 할당하고 데이터 포인터 반환
 	T* Alloc(void) noexcept;
-
-	// 사용 중인 데이터 포인터를 풀에 반환
 	bool Free(T* data) noexcept;
 
-	// 풀이 보유한 전체 노드 수 반환
-	inline int GetCapacityCount(void) const noexcept { return mCapacity; }
-
-	// 현재 사용 중인 노드 수 반환
-	inline int GetUseCount(void) const noexcept { return mUseCount; }
+	inline unsigned int GetCapacityCount(void) const noexcept { return mCapacity; }
+	inline unsigned int GetUseCount(void) const noexcept { return mUseCount; }
 
 	MemoryPool(const MemoryPool&) = delete;
 	MemoryPool& operator=(const MemoryPool&) = delete;
@@ -42,27 +32,28 @@ public:
 private:
 	struct Node
 	{
-		std::uint32_t bufferGuardFront = 0;
+		unsigned int bufferGuardFront = 0;
 		T data;
-		std::uint32_t bufferGuardEnd = 0;
+		unsigned int bufferGuardEnd = 0;
 		Node* next = nullptr;
 	};
 
-	bool mIsPlacementNew;				// 생성자/소멸자 호출 정책
-	std::uint32_t mbufferGuardValue;	// 노드 무결성 검사용 가드 값
-	std::uint32_t mSizeInitialize;		// 초기 노드 개수
-	std::uint32_t mSizeMax;				// 최대 노드 개수
-	Node* mFreeNode;					// 반환된(미사용) 노드 단일 연결 리스트의 헤드
-	int mCapacity;						// 풀이 보유한 전체 노드 수
-	int mUseCount;						// 현재 사용 중인 노드 수
+	bool mIsPlacementNew;
+	unsigned int mBufferGuardValue;
+	unsigned int mSizeInitialize;
+	unsigned int mSizeMax;
+	Node* mFreeNode;
+	unsigned int mCapacity;
+	unsigned int mUseCount;
 };
 
 template <class T>
-inline MemoryPool<T>::MemoryPool(bool placementNew,
-	std::uint32_t sizeInitialize,
-	std::uint32_t sizeMax) noexcept
+inline MemoryPool<T>::MemoryPool(
+	bool placementNew,
+	unsigned int sizeInitialize,
+	unsigned int sizeMax) noexcept
 	: mIsPlacementNew(placementNew),
-	mbufferGuardValue(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(this))),
+	mBufferGuardValue(static_cast<unsigned int>(reinterpret_cast<size_t>(this))),
 	mSizeInitialize(sizeInitialize),
 	mSizeMax(sizeMax),
 	mFreeNode(nullptr),
@@ -74,11 +65,11 @@ inline MemoryPool<T>::MemoryPool(bool placementNew,
 		mSizeInitialize = mSizeMax;
 	}
 
-	for (std::uint32_t i = 0; i < mSizeInitialize; ++i)
+	for (unsigned int i = 0; i < mSizeInitialize; ++i)
 	{
 		Node* newNode = static_cast<Node*>(std::malloc(sizeof(Node)));
-		newNode->bufferGuardFront = mbufferGuardValue;
-		newNode->bufferGuardEnd = mbufferGuardValue;
+		newNode->bufferGuardFront = mBufferGuardValue;
+		newNode->bufferGuardEnd = mBufferGuardValue;
 		if (mIsPlacementNew == false)
 		{
 			new (&(newNode->data)) T;
@@ -121,14 +112,14 @@ inline T* MemoryPool<T>::Alloc(void) noexcept
 	}
 	else
 	{
-		if (static_cast<std::uint32_t>(mCapacity) >= mSizeMax)
+		if (mCapacity >= mSizeMax)
 		{
 			return nullptr;
 		}
 
 		returnNode = static_cast<Node*>(std::malloc(sizeof(Node)));
-		returnNode->bufferGuardFront = mbufferGuardValue;
-		returnNode->bufferGuardEnd = mbufferGuardValue;
+		returnNode->bufferGuardFront = mBufferGuardValue;
+		returnNode->bufferGuardEnd = mBufferGuardValue;
 		returnNode->next = nullptr;
 		new (&(returnNode->data)) T;
 		++mCapacity;
@@ -149,8 +140,8 @@ inline bool MemoryPool<T>::Free(T* data) noexcept
 	Node* ptrNode = reinterpret_cast<Node*>(
 		reinterpret_cast<char*>(data) - offsetof(Node, data));
 
-	if (ptrNode->bufferGuardFront != mbufferGuardValue ||
-		ptrNode->bufferGuardEnd != mbufferGuardValue)
+	if (ptrNode->bufferGuardFront != mBufferGuardValue ||
+		ptrNode->bufferGuardEnd != mBufferGuardValue)
 	{
 		return false;
 	}
