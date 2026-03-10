@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#include <list>
 #include <conio.h>
 
 #include <WinSock2.h>
@@ -10,7 +9,6 @@
 extern bool gShutdown;
 extern DWORD gAllocID;
 extern SOCKET gListenSocket;
-extern std::list<Session*> gSessionList;
 
 void NetStartUp() noexcept;
 void NetEnd() noexcept;

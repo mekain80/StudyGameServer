@@ -1,7 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <WinSock2.h>
 #include <WS2tcpip.h>
+#include <unordered_map>
 
 #include "RingBuffer.h"
 
@@ -16,10 +17,8 @@ struct Session
     DWORD sessionID = 0;
     RingBuffer recvQ;
     RingBuffer sendQ;
-
-    BYTE action = 0;
-    BYTE direction = 0;
-    short x = 0;
-    short y = 0;
-    int HP = 0;
+    DWORD lastRecvTime; // 메시지 수신 체크를 위한 시간 (타임아웃용)
 };
+
+extern SOCKET gListenSocket;
+extern std::unordered_map<SOCKET, Session*> gSessionMap;

@@ -2,6 +2,7 @@
 
 #include "Game.h"
 
+#include "Character.h"
 #include "GameInfo.h"
 #include "Log.h"
 #include "Network.h"
@@ -24,31 +25,30 @@ void Update() noexcept
 
     gFrameStartTick = gFrameEndTick;
 
-    for (auto it = gSessionList.begin(); it != gSessionList.end();)
+    for (auto it = gCharacterMap.begin(); it != gCharacterMap.end();)
     {
-        Session* session = *it;
+        Character* pCharacter = it->second;
+        ++it;
 
-        if (session->HP <= 0)
+        if (pCharacter->HP <= 0)
         {
-            ++it;
-            Disconnect(session);
+            Disconnect(pCharacter->session);
             continue;
         }
 
-        if (!MoveCheck(session->action, session->x, session->y))
+        if (!MoveCheck(pCharacter->action, pCharacter->x, pCharacter->y))
         {
-            ++it;
             continue;
         }
 
         int dx = 0;
         int dy = 0;
-        GetMoveDelta(session->action, dx, dy);
-        session->x += static_cast<short>(dx);
-        session->y += static_cast<short>(dy);
+        GetMoveDelta(pCharacter->action, dx, dy);
+        pCharacter->x += static_cast<short>(dx);
+        pCharacter->y += static_cast<short>(dy);
 
         const wchar_t* dirStr = L"STOP";
-        switch (session->action)
+        switch (pCharacter->action)
         {
         case dfPACKET_MOVE_DIR_UU: dirStr = L"UU"; break;
         case dfPACKET_MOVE_DIR_DD: dirStr = L"DD"; break;
@@ -65,11 +65,9 @@ void Update() noexcept
             LOG_LEVEL_DEBUG,
             L"# gameRun : %s # SessionID : %u / X : %d / Y : %d",
             dirStr,
-            session->sessionID,
-            session->x,
-            session->y);
-
-        ++it;
+            pCharacter->sessionID,
+            pCharacter->x,
+            pCharacter->y);
     }
 }
 
@@ -183,7 +181,7 @@ WORD GetExpectedBodySize(BYTE packetType) noexcept
     }
 }
 
-bool IsHitAttack1(const Session* attacker, const Session* target, int centerX, int centerY) noexcept
+bool IsHitAttack1(const Character* attacker, const Character* target, int centerX, int centerY) noexcept
 {
     if (abs(centerY - target->y) > dfATTACK1_RANGE_Y)
     {
@@ -208,7 +206,7 @@ bool IsHitAttack1(const Session* attacker, const Session* target, int centerX, i
     return true;
 }
 
-bool IsHitDirectionalAttack(const Session* attacker, const Session* target, int centerX, int centerY, int rangeX, int rangeY) noexcept
+bool IsHitDirectionalAttack(const Character* attacker, const Character* target, int centerX, int centerY, int rangeX, int rangeY) noexcept
 {
     if (abs(centerY - target->y) > rangeY)
     {

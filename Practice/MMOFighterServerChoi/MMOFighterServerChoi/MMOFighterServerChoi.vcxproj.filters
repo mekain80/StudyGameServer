@@ -60,6 +60,9 @@
     <ClCompile Include="ServerControl.cpp">
       <Filter>Server</Filter>
     </ClCompile>
+    <ClCompile Include="Session.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">

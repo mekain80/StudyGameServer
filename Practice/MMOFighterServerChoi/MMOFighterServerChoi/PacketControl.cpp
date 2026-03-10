@@ -1,10 +1,11 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 
 #include "PacketControl.h"
 
 #include "Log.h"
 #include "Network.h"
 #include "Proxy.h"
+#include "Character.h"
 
 bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexcept
 {
@@ -42,10 +43,9 @@ void SendUnicast(Session* pSession, PacketHeader* pHeader, char* pPacket) noexce
 
 void SendBroadcast(Session* pSession, PacketHeader* pHeader, char* pPacket) noexcept
 {
-    for (auto it = gSessionList.begin(); it != gSessionList.end();)
+    for (auto it = gSessionMap.begin(); it != gSessionMap.end(); ++it)
     {
-        Session* session = *it;
-        ++it;
+        Session* session = it->second;
 
         if (session == pSession)
         {
@@ -70,6 +70,8 @@ void Disconnect(Session* pSession) noexcept
     SendBroadcast(pSession, &header, reinterpret_cast<char*>(&packet));
 
     closesocket(pSession->socket);
-    gSessionList.remove(pSession);
+    gSessionMap.erase(pSession->socket);
+    gCharacterMap.erase(pSession->sessionID);
+
     delete pSession;
 }

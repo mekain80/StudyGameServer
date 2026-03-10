@@ -2,7 +2,7 @@
 
 #include <Windows.h>
 
-#include "Session.h"
+#include "Character.h"
 
 extern bool gShutdown;
 extern LARGE_INTEGER gFreq;
@@ -18,5 +18,5 @@ bool IsValidMoveDirection(BYTE direction) noexcept;
 bool IsValidViewDirection(BYTE direction) noexcept;
 WORD GetExpectedBodySize(BYTE packetType) noexcept;
 
-bool IsHitAttack1(const Session* attacker, const Session* target, int centerX, int centerY) noexcept;
-bool IsHitDirectionalAttack(const Session* attacker, const Session* target, int centerX, int centerY, int rangeX, int rangeY) noexcept;
+bool IsHitAttack1(const Character* attacker, const Character* target, int centerX, int centerY) noexcept;
+bool IsHitDirectionalAttack(const Character* attacker, const Character* target, int centerX, int centerY, int rangeX, int rangeY) noexcept;
