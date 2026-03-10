@@ -30,6 +30,7 @@
     <ClCompile Include="Proxy.cpp" />
     <ClCompile Include="RingBuffer.cpp" />
     <ClCompile Include="SerializedBuffer.cpp" />
+    <ClCompile Include="ServerControl.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
@@ -50,6 +51,7 @@
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="Proxy.h" />
     <ClInclude Include="RingBuffer.h" />
+    <ClInclude Include="ServerControl.h" />
     <ClInclude Include="Session.h" />
     <ClInclude Include="SerializedBuffer.h" />
     <ClInclude Include="stdafx.h" />

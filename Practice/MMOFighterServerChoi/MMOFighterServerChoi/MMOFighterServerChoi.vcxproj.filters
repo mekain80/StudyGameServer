@@ -16,6 +16,9 @@
     <Filter Include="Game">
       <UniqueIdentifier>{38115986-7f3e-4788-af2e-81734e5b2c07}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Server">
+      <UniqueIdentifier>{7ed147f8-55a8-4ce9-9db3-ea111d1d3fe6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -56,6 +59,9 @@
     </ClCompile>
     <ClCompile Include="SerializedBuffer.cpp">
       <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="ServerControl.cpp">
+      <Filter>Server</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -103,6 +109,9 @@
     </ClInclude>
     <ClInclude Include="SerializedBuffer.h">
       <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="ServerControl.h">
+      <Filter>Server</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

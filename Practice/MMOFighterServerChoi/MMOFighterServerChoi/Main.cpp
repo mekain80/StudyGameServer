@@ -8,6 +8,7 @@
 #include "GameInfo.h"
 #include "Log.h"
 #include "Network.h"
+#include "ServerControl.h"
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -19,56 +20,18 @@ int _tmain(int argc, _TCHAR* argv[])
     system("chcp 65001 > nul");
 
     timeBeginPeriod(1);
-    QueryPerformanceFrequency(&gFreq);
-    QueryPerformanceCounter(&gFrameStartTick);
+    // LoadData(); // 설정 및 게임데이터, DB 데이터 로딩
+    NetStartUp(); // 네트워크 초기화, 리슨소켓 생성 및 listen
 
-    WSADATA wsa;
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+    while (!gShutdown)
     {
-        ErrorHandler(L"WSAStartup fail");
-    }
-    Logger(L"WSAStartup #");
-
-    gListenSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (gListenSocket == INVALID_SOCKET)
-    {
-        ErrorHandler(L"socket fail");
+        NetIOProcess();     // 네트워크 송수신 처리
+        Update();           // 게임 로직 업데이트
+        ServerControl();    // 키보드 입력을 통해서 서버를 제어할 경우 사용
+        //Monitor();          // 모니터링 정보를 표시,저장, 전송하는 경우 사용
     }
 
-    u_long on = 1;
-    if (ioctlsocket(gListenSocket, FIONBIO, &on) == SOCKET_ERROR)
-    {
-        ErrorHandler(L"ioctlsocket fail");
-    }
-
-    SOCKADDR_IN serverAddr{};
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(SERVER_PORT);
-    serverAddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-
-    if (bind(gListenSocket, reinterpret_cast<SOCKADDR*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
-    {
-        ErrorHandler(L"bind fail");
-    }
-
-    {
-        wchar_t buf[256];
-        _snwprintf_s(buf, 256, _TRUNCATE, L"BIND OK # Port:%d", SERVER_PORT);
-        Logger(buf);
-    }
-
-    if (listen(gListenSocket, SOMAXCONN) == SOCKET_ERROR)
-    {
-        ErrorHandler(L"listen() fail");
-    }
-
-    Logger(L"Listen OK #");
-
-    while (!gbShutdown)
-    {
-        NetIOProcess();
-        Update();
-    }
+    NetEnd();
 
     return 0;
 }

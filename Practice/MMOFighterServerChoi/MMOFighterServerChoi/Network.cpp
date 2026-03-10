@@ -1,9 +1,8 @@
 ﻿#include "stdafx.h"
 
-#include "Network.h"
-
 #include <WS2tcpip.h>
 
+#include "Network.h"
 #include "Game.h"
 #include "GameInfo.h"
 #include "Log.h"
@@ -12,10 +11,64 @@
 #include "Proxy.h"
 #include "Stub.h"
 
-bool gbShutdown = false;
+bool gShutdown = false;
 DWORD gAllocID = 1;
 SOCKET gListenSocket = INVALID_SOCKET;
 std::list<Session*> gSessionList;
+
+void NetStartUp() noexcept
+{
+    QueryPerformanceFrequency(&gFreq);
+    QueryPerformanceCounter(&gFrameStartTick);
+
+    WSADATA wsa;
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+    {
+        ErrorHandler(L"WSAStartup fail");
+    }
+    Logger(L"WSAStartup #");
+
+    gListenSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (gListenSocket == INVALID_SOCKET)
+    {
+        ErrorHandler(L"socket fail");
+    }
+
+    u_long on = 1;
+    if (ioctlsocket(gListenSocket, FIONBIO, &on) == SOCKET_ERROR)
+    {
+        ErrorHandler(L"ioctlsocket fail");
+    }
+
+    SOCKADDR_IN serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(SERVER_PORT);
+    serverAddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+
+    if (bind(gListenSocket, reinterpret_cast<SOCKADDR*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR)
+    {
+        ErrorHandler(L"bind fail");
+    }
+
+    {
+        wchar_t buf[256];
+        _snwprintf_s(buf, 256, _TRUNCATE, L"BIND OK # Port:%d", SERVER_PORT);
+        Logger(buf);
+    }
+
+    if (listen(gListenSocket, SOMAXCONN_HINT(20000)) == SOCKET_ERROR)
+    {
+        ErrorHandler(L"listen() fail");
+    }
+
+    Logger(L"Listen OK #");
+}
+
+void NetEnd() noexcept
+{
+    closesocket(gListenSocket);
+    WSACleanup();
+}
 
 void NetIOProcess() noexcept
 {

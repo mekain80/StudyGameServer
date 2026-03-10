@@ -1,9 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include <Windows.h>
 
 #include "Session.h"
 
+extern bool gShutdown;
 extern LARGE_INTEGER gFreq;
 extern LARGE_INTEGER gFrameStartTick;
 extern LARGE_INTEGER gFrameEndTick;
