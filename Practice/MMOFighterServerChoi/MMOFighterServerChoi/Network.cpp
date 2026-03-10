@@ -87,46 +87,47 @@ void NetEnd() noexcept
 
 void NetIOProcess() noexcept
 {
-	FD_SET readSet;
-	FD_SET writeSet;
+	auto sessionIter = gSessionMap.begin();
 
-	int counter = 0;
-	auto beginIter = gSessionMap.begin();
-	auto endIter = gSessionMap.begin();
 	do
 	{
+		FD_SET readSet;
+		FD_SET writeSet;
 		FD_ZERO(&readSet);
 		FD_ZERO(&writeSet);
 
 		FD_SET(gListenSocket, &readSet);
-		for (auto it = endIter; it != gSessionMap.end(); ++it)
+
+		std::vector<Session*> sessionBatch;
+		sessionBatch.reserve(FD_SETSIZE - 1);
+
+		int batchCount = 0;
+		while (sessionIter != gSessionMap.end() && batchCount < FD_SETSIZE - 1)
 		{
-			if (it == endIter)
+			Session* session = sessionIter->second;
+			++sessionIter;
+
+			if (session == nullptr)
 			{
-				beginIter = it;
+				continue;
 			}
 
-			Session* session = it->second;
+			sessionBatch.push_back(session);
 			FD_SET(session->socket, &readSet);
 			if (session->sendQ.GetUseSize() > 0)
 			{
 				FD_SET(session->socket, &writeSet);
 			}
 
-			endIter = it;
-			counter++;
-			if (counter % 64 == 0)
-			{
-				break;
-			}
+			++batchCount;
 		}
 
 		timeval time{};
-
 		int selectResult = select(0, &readSet, &writeSet, nullptr, &time);
 		if (selectResult == SOCKET_ERROR)
 		{
 			_LOG(LOG_LEVEL_ERROR, L"Select fail");
+			continue;
 		}
 
 		if (FD_ISSET(gListenSocket, &readSet))
@@ -134,11 +135,14 @@ void NetIOProcess() noexcept
 			NetProc_Accept();
 		}
 
-		for (auto it = beginIter; it != endIter; it++)
+		for (Session* session : sessionBatch)
 		{
-			Session* session = it->second;
-			SOCKET socket = session->socket;
+			if (session == nullptr)
+			{
+				continue;
+			}
 
+			SOCKET socket = session->socket;
 			if (FD_ISSET(socket, &readSet))
 			{
 				if (!NetProc_Recv(session))
@@ -155,7 +159,7 @@ void NetIOProcess() noexcept
 				}
 			}
 		}
-	} while (endIter != gSessionMap.end());
+	} while (sessionIter != gSessionMap.end());
 }
 
 void NetProc_Accept() noexcept
