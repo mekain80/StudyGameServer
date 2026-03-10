@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include "Protocol.h"
 
-void InitHeader(PacketHeader* pHeader, WORD type, WORD bodySize) noexcept;
+void InitHeader(PacketHeader* pHeader, BYTE type, BYTE bodySize) noexcept;
 
 void MakePacket_CreateMyCharacter(PacketHeader* pHeader, PacketSCCreateMyCharacter* pPacket, BYTE direction, DWORD ID, int x, int y, int HP);
 void MakePacket_CreateOtherCharacter(PacketHeader* pHeader, PacketSCCreateOtherCharacter* pPacket, BYTE direction, DWORD ID, int x, int y, int HP);

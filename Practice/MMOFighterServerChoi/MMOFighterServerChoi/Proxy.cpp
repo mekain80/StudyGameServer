@@ -1,10 +1,10 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 
 #include "Proxy.h"
 
 #include "GameInfo.h"
 
-void InitHeader(PacketHeader* pHeader, WORD type, WORD bodySize) noexcept
+void InitHeader(PacketHeader* pHeader, BYTE type, BYTE bodySize) noexcept
 {
     pHeader->code = dfNETWORK_PACKET_CODE;
     pHeader->size = bodySize;
