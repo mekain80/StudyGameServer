@@ -35,7 +35,7 @@ DWORD g_startTime;
 
 unsigned int WINAPI EnqueueThread(LPVOID lpParam)
 {
-    int start = 0;
+    std::size_t start = 0;
 
     while (1)
     {
@@ -47,9 +47,9 @@ unsigned int WINAPI EnqueueThread(LPVOID lpParam)
         }
 
 
-        int size = rand() % (MESSAGE_SIZE + 1);
+        const std::size_t size = static_cast<std::size_t>(rand() % (MESSAGE_SIZE + 1));
 
-        int freeSize = ringBuffer->GetFreeSize();
+        const std::size_t freeSize = ringBuffer->GetFreeSize();
         if (freeSize < size)
         {
             SetEvent(g_ExitEvent);
@@ -90,7 +90,7 @@ unsigned int WINAPI DequeueThread(LPVOID lpParam)
             return 0;
 
 
-        int useSize = ringBuffer->GetUseSize();
+        const std::size_t useSize = ringBuffer->GetUseSize();
         if (useSize > 0)
         {
             ProfileBegin(L"Noexcept DequeueThread");
@@ -119,11 +119,11 @@ void ThreadTest()
 
 static void PrintState(const RingBuffer& rb, const char* tag, const char* base)
 {
-    const char* front = rb.GetFront();
-    const char* rear = rb.GetRear();
+    const char* readWindow = rb.GetFront();
+    const char* writeWindow = rb.GetRear();
 
-    ptrdiff_t frontIdx = (front - base);
-    ptrdiff_t rearIdx = (rear - base);
+    const std::ptrdiff_t readWindowIdx = readWindow - base;
+    const std::ptrdiff_t writeWindowIdx = writeWindow - base;
 
     cout << "---- " << tag << " ----\n";
     cout << "  size=" << rb.GetBufferSize()
@@ -131,9 +131,9 @@ static void PrintState(const RingBuffer& rb, const char* tag, const char* base)
         << " free=" << rb.GetFreeSize() << "\n";
     cout << "  empty=" << rb.IsEmpty()
         << " full=" << rb.IsFull() << "\n";
-    cout << "  directEnq=" << rb.GetDirectEnqueueSize()
-        << " directDeq=" << rb.GetDirectDequeueSize() << "\n";
-    cout << "  frontIdx=" << frontIdx << " rearIdx=" << rearIdx << "\n";
+    cout << "  writeWindow=" << rb.GetDirectEnqueueSize()
+        << " readWindow=" << rb.GetDirectDequeueSize() << "\n";
+    cout << "  readIdx=" << readWindowIdx << " writeIdx=" << writeWindowIdx << "\n";
     cout << "----------------------\n";
 }
 
@@ -141,7 +141,7 @@ void Test()
 {
     RingBuffer rb(8);
 
-    // base = 버퍼 시작(construct 직후 front==rear==start 라는 전제)
+    // base = 버퍼 시작(construct 직후 read/write window == start 라는 전제)
     const char* base = rb.GetFront();
 
     PrintState(rb, "After Construct", base);
@@ -215,17 +215,17 @@ void Test()
         PrintState(rb, "After Dequeue 3 (expect FGHIJ left)", base);
     }
 
-    // 7) DirectEnqueue + MoveRearBuffer: 뒤에 "XYZ" 직접 쓰기 (연속 구간만큼)
+    // 7) DirectEnqueue + MoveRearBuffer: write window에 "XYZ" 직접 쓰기 (연속 구간만큼)
     {
-        int direct = rb.GetDirectEnqueueSize();
-        int freeSz = rb.GetFreeSize();
-        int writeSize = std::min({ 3, direct, freeSz });
+        const std::size_t writeWindowSize = rb.GetDirectEnqueueSize();
+        const std::size_t freeSz = rb.GetFreeSize();
+        const std::size_t writeSize = std::min<std::size_t>({ 3, writeWindowSize, freeSz });
 
-        cout << "[Test7] directEnq=" << direct << " free=" << freeSz << " writeSize=" << writeSize << "\n";
+        cout << "[Test7] writeWindow=" << writeWindowSize << " free=" << freeSz << " writeSize=" << writeSize << "\n";
         assert(writeSize > 0);
 
-        char* rearPtr = rb.GetRear();
-        memcpy(rearPtr, "XYZ", writeSize);
+        char* writeWindowPtr = rb.GetRear();
+        memcpy(writeWindowPtr, "XYZ", writeSize);
 
         bool moved = rb.MoveRear(writeSize);
         cout << "[Test7] MoveRearBuffer(" << writeSize << ") moved=" << moved << "\n";
@@ -234,18 +234,18 @@ void Test()
         PrintState(rb, "After DirectEnqueue XYZ + MoveRearBuffer", base);
     }
 
-    // 8) DirectDequeue + MoveFrontBuffer: 앞 연속 구간만큼 직접 읽고 MoveFrontBuffer로 소모
+    // 8) DirectDequeue + MoveFrontBuffer: read window에서 연속 구간만큼 직접 읽고 MoveFrontBuffer로 소모
     {
-        int direct = rb.GetDirectDequeueSize();
-        int usedSz = rb.GetUseSize();
-        int readSize = std::min(direct, usedSz); // direct는 <= used가 보통이지만 방어적으로
+        const std::size_t readWindowSize = rb.GetDirectDequeueSize();
+        const std::size_t usedSz = rb.GetUseSize();
+        const std::size_t readSize = std::min(readWindowSize, usedSz); // readWindow는 <= used가 보통이지만 방어적으로
 
-        cout << "[Test8] directDeq=" << direct << " used=" << usedSz << " readSize=" << readSize << "\n";
+        cout << "[Test8] readWindow=" << readWindowSize << " used=" << usedSz << " readSize=" << readSize << "\n";
         assert(readSize > 0);
 
-        const char* frontPtr = rb.GetFront();
+        const char* readWindowPtr = rb.GetFront();
         cout << "[Test8] Direct front read: ";
-        for (int i = 0; i < readSize; ++i) cout << frontPtr[i];
+        for (std::size_t i = 0; i < readSize; ++i) cout << readWindowPtr[i];
         cout << "\n";
 
         bool moved = rb.MoveFront(readSize);
@@ -257,8 +257,8 @@ void Test()
 
     // 9) 남은 데이터 전부 Dequeue 해서 내용 검증(최종 정리)
     {
-        int left = rb.GetUseSize();
-        assert(left >= 0 && left <= rb.GetBufferSize());
+        const std::size_t left = rb.GetUseSize();
+        assert(left <= rb.GetBufferSize());
 
         char buf[32] = {};
         bool ok = true;
@@ -514,80 +514,80 @@ void TestSPSC()
 #include <cstdint>
 #include <thread>
 
-static bool TryEnqueueZeroCopy(RingBuffer& rb, const void* src, int bytes)
+static bool TryEnqueueZeroCopy(RingBuffer& rb, const void* src, std::size_t bytes)
 {
-    if (bytes <= 0) return false;
+    if (bytes == 0) return false;
 
     // 전체 free가 부족하면 실패
     if (rb.GetFreeSize() < bytes)
         return false;
 
-    const int direct = rb.GetDirectEnqueueSize();
-    char* rear = rb.GetRear();
+    const std::size_t writeWindowSize = rb.GetDirectEnqueueSize();
+    char* writeWindow = rb.GetRear();
 
-    if (direct >= bytes)
+    if (writeWindowSize >= bytes)
     {
         // 한 덩어리로 쓸 수 있음
-        std::memcpy(rear, src, bytes);
+        std::memcpy(writeWindow, src, bytes);
         return rb.MoveRear(bytes);
     }
     else
     {
         // wrap 필요: [rear..end] + [start..)
-        const int first = direct;
-        const int second = bytes - first;
+        const std::size_t first = writeWindowSize;
+        const std::size_t second = bytes - first;
 
         if (first <= 0)
             return false; // 이 경우는 보통 free<bytes인 상황이 많음(안전장치)
 
-        std::memcpy(rear, src, first);
+        std::memcpy(writeWindow, src, first);
 
         // 1차 커밋(여기서 rear가 wrap되어 start로 갈 수 있음)
         if (!rb.MoveRear(first))
             return false;
 
-        char* rear2 = rb.GetRear(); // 보통 start 쪽을 가리킴
-        std::memcpy(rear2, (const char*)src + first, second);
+        char* nextWriteWindow = rb.GetRear(); // 보통 start 쪽을 가리킴
+        std::memcpy(nextWriteWindow, (const char*)src + first, second);
 
         // 2차 커밋
         return rb.MoveRear(second);
     }
 }
 
-static bool TryDequeueZeroCopy(RingBuffer& rb, void* dst, int bytes)
+static bool TryDequeueZeroCopy(RingBuffer& rb, void* dst, std::size_t bytes)
 {
-    if (bytes <= 0) return false;
+    if (bytes == 0) return false;
 
     // 전체 used가 부족하면 실패
     if (rb.GetUseSize() < bytes)
         return false;
 
-    const int direct = rb.GetDirectDequeueSize();
-    char* front = rb.GetFront();
+    const std::size_t readWindowSize = rb.GetDirectDequeueSize();
+    char* readWindow = rb.GetFront();
 
-    if (direct >= bytes)
+    if (readWindowSize >= bytes)
     {
         // 한 덩어리로 읽을 수 있음
-        std::memcpy(dst, front, bytes);
+        std::memcpy(dst, readWindow, bytes);
         return rb.MoveFront(bytes);
     }
     else
     {
         // wrap 필요: [front..end] + [start..)
-        const int first = direct;
-        const int second = bytes - first;
+        const std::size_t first = readWindowSize;
+        const std::size_t second = bytes - first;
 
         if (first <= 0)
             return false; // 안전장치
 
-        std::memcpy(dst, front, first);
+        std::memcpy(dst, readWindow, first);
 
         // 1차 소비 커밋(여기서 front가 wrap되어 start로 갈 수 있음)
         if (!rb.MoveFront(first))
             return false;
 
-        char* front2 = rb.GetFront(); // 보통 start 쪽을 가리킴
-        std::memcpy((char*)dst + first, front2, second);
+        char* nextReadWindow = rb.GetFront(); // 보통 start 쪽을 가리킴
+        std::memcpy((char*)dst + first, nextReadWindow, second);
 
         // 2차 소비 커밋
         return rb.MoveFront(second);
@@ -599,8 +599,8 @@ void TestSPSC_ZeroCopy()
     // ============================================================
     // SPSC Zero-Copy 스트레스 테스트
     //
-    // - Producer: GetRear() 버퍼에 직접 memcpy 후 MoveRear()로 커밋
-    // - Consumer: GetFront() 버퍼를 직접 memcpy로 읽고 MoveFront()로 소비
+    // - Producer: write window 버퍼에 직접 memcpy 후 MoveRear()로 커밋
+    // - Consumer: read window 버퍼를 직접 memcpy로 읽고 MoveFront()로 소비
     //
     // 검증:
     //  1) seq 순서 보장(1..N)
@@ -650,7 +650,7 @@ void TestSPSC_ZeroCopy()
     std::thread producer([&]()
         {
             uint32_t spin = 0;
-            const int msgSize = static_cast<int>(sizeof(SpscMsg));
+            const std::size_t msgSize = sizeof(SpscMsg);
 
             for (uint32_t seq = 1; seq <= kTotalMsgs; ++seq)
             {
@@ -659,7 +659,7 @@ void TestSPSC_ZeroCopy()
                 msg.checksum = CalcChecksum(seq);
                 msg.payload = MakePayload(seq);
 
-                // 0-copy 경로: rear에 직접 쓰고 MoveRear로 커밋
+                // 0-copy 경로: write window에 직접 쓰고 MoveRear로 커밋
                 while (!TryEnqueueZeroCopy(rb, &msg, msgSize))
                 {
                     Backoff(spin);
@@ -675,18 +675,18 @@ void TestSPSC_ZeroCopy()
         {
             uint32_t expected = 1;
             uint32_t spin = 0;
-            const int msgSize = static_cast<int>(sizeof(SpscMsg));
+            const std::size_t msgSize = sizeof(SpscMsg);
 
             while (expected <= kTotalMsgs)
             {
                 SpscMsg msg{};
 
-                // 0-copy 경로: front에서 직접 읽고 MoveFront로 소비
+                // 0-copy 경로: read window에서 직접 읽고 MoveFront로 소비
                 if (!TryDequeueZeroCopy(rb, &msg, msgSize))
                 {
                     if (producerDone.load(std::memory_order_acquire))
                     {
-                        const int used = rb.GetUseSize();
+                        const std::size_t used = rb.GetUseSize();
                         if (used == 0)
                         {
                             // 끝났고 버퍼도 비었는데 expected 못 채움 => 누락/꼬임
