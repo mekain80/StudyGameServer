@@ -181,6 +181,7 @@ void NetProc_Accept() noexcept
 	Session* pSession = new Session;
 	pSession->socket = clientSocket;
 	pSession->addr = clientAddr;
+	pSession->lastRecvTime = GetTickCount64();
 
 	InetNtopW(AF_INET, &clientAddr.sin_addr, pSession->ipStr, _countof(pSession->ipStr));
 	pSession->port = ntohs(clientAddr.sin_port);
@@ -274,6 +275,8 @@ bool NetProc_Recv(Session* pSession) noexcept
 		Disconnect(pSession);
 		return false;
 	}
+
+	pSession->lastRecvTime = GetTickCount64();
 
 	while (true)
 	{

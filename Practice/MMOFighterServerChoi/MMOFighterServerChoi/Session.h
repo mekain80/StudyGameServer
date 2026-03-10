@@ -17,7 +17,7 @@ struct Session
     DWORD sessionID = 0;
     RingBuffer recvQ;
     RingBuffer sendQ;
-    DWORD lastRecvTime; // 메시지 수신 체크를 위한 시간 (타임아웃용)
+    ULONGLONG lastRecvTime = 0; // 메시지 수신 체크를 위한 시간 (타임아웃용)
 };
 
 extern SOCKET gListenSocket;

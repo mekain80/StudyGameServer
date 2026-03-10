@@ -36,6 +36,14 @@ void Update() noexcept
             continue;
         }
 
+        const ULONGLONG currentTick = GetTickCount64();
+        const ULONGLONG timeoutTick = static_cast<ULONGLONG>(NETWORK_PACKET_RECV_TIMEOUT) * 1000;
+        if (currentTick - pCharacter->session->lastRecvTime >= timeoutTick)
+        {
+            Disconnect(pCharacter->session);
+            continue;
+        }
+
         if (!MoveCheck(pCharacter->action, pCharacter->x, pCharacter->y))
         {
             continue;
