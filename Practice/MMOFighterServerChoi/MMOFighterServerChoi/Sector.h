@@ -7,8 +7,8 @@
 
 struct Character;
 
-constexpr int dfSECTOR_SIZE_X = 100;
-constexpr int dfSECTOR_SIZE_Y = 100;
+constexpr int dfSECTOR_SIZE_X = 150;
+constexpr int dfSECTOR_SIZE_Y = 150;
 
 constexpr int dfSECTOR_MAX_X = ((dfRANGE_MOVE_RIGHT - dfRANGE_MOVE_LEFT) / dfSECTOR_SIZE_X) + 1;
 constexpr int dfSECTOR_MAX_Y = ((dfRANGE_MOVE_BOTTOM - dfRANGE_MOVE_TOP) / dfSECTOR_SIZE_Y) + 1;
