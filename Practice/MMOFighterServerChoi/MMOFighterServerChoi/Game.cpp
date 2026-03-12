@@ -34,15 +34,22 @@ void Update() noexcept
 
         if (pCharacter->HP <= 0)
         {
-            Disconnect(pCharacter->session);
+            Session* session = FindSession(pCharacter->sessionID);
+            Disconnect(session);
             continue;
         }
 
         const ULONGLONG currentTick = GetTickCount64();
         const ULONGLONG timeoutTick = static_cast<ULONGLONG>(NETWORK_PACKET_RECV_TIMEOUT) * 1000;
-        if (currentTick - pCharacter->session->lastRecvTime >= timeoutTick)
+        Session* currentSession = FindSession(pCharacter->sessionID);
+        if (currentSession == nullptr)
         {
-            Disconnect(pCharacter->session);
+            continue;
+        }
+
+        if (currentTick - currentSession->lastRecvTime >= timeoutTick)
+        {
+            Disconnect(currentSession);
             continue;
         }
 
@@ -125,7 +132,7 @@ void Update() noexcept
                 PacketHeader otherDelHeader;
                 PacketSCDeleteCharacter otherDelMsg;
                 MakePacket_DeleteCharacter(&otherDelHeader, &otherDelMsg, character->sessionID);
-                SendUnicast(pCharacter->session, &otherDelHeader, reinterpret_cast<char*>(&otherDelMsg));
+                SendUnicast(currentSession, &otherDelHeader, reinterpret_cast<char*>(&otherDelMsg));
             }
         }
 
@@ -158,7 +165,7 @@ void Update() noexcept
                     character->x,
                     character->y,
                     character->HP);
-                SendUnicast(pCharacter->session, &otherCreateHeader, reinterpret_cast<char*>(&otherCreateMsg));
+                SendUnicast(currentSession, &otherCreateHeader, reinterpret_cast<char*>(&otherCreateMsg));
             }
         }
 

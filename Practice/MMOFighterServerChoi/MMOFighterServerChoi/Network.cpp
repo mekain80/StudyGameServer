@@ -193,9 +193,9 @@ void NetProc_Accept() noexcept
 
 	pSession->sessionID = gAllocID++;
 	gSessionMap[clientSocket] = pSession;
+	gSessionIdMap[pSession->sessionID] = pSession;
 
 	Character* pCharacter = new Character;
-	pCharacter->session = pSession;
 	pCharacter->sessionID = pSession->sessionID;
 	pCharacter->y = static_cast<short>(dfRANGE_MOVE_TOP + rand() % (dfRANGE_MOVE_BOTTOM - dfRANGE_MOVE_TOP + 1));
 	pCharacter->x = static_cast<short>(dfRANGE_MOVE_LEFT + rand() % (dfRANGE_MOVE_RIGHT - dfRANGE_MOVE_LEFT + 1));

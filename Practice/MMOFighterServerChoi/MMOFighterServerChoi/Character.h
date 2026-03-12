@@ -5,7 +5,6 @@
 
 struct Character
 {
-    Session* session = nullptr;
     DWORD sessionID = 0;
 
     BYTE action = 0;

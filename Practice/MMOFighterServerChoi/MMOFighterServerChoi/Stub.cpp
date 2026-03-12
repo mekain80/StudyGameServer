@@ -214,8 +214,9 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 				character->HP = 0;
 			}
 
+			Session* targetSession = FindSession(character->sessionID);
 			MakePacket_Damage(&dmgHeader, &dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
-			SendPacket_Around(pSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg));
+			SendPacket_Around(targetSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg));
 		}
 	}
 
@@ -288,8 +289,9 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 				character->HP = 0;
 			}
 
+			Session* targetSession = FindSession(character->sessionID);
 			MakePacket_Damage(&dmgHeader, &dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
-			SendPacket_Around(pSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg));
+			SendPacket_Around(targetSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg));
 		}
 	}
 
@@ -362,8 +364,9 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 				character->HP = 0;
 			}
 
+			Session* targetSession = FindSession(character->sessionID);
 			MakePacket_Damage(&dmgHeader, &dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
-			SendPacket_Around(pSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg));
+			SendPacket_Around(targetSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg));
 		}
 	}
 

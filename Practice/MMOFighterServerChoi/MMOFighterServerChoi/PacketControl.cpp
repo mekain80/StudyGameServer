@@ -85,17 +85,23 @@ void SendPacket_SectorOne(int sectorX, int sectorY, PacketHeader* pHeader, char*
     std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
     for (Character* character : sectorList)
     {
-        if (character == nullptr || character->session == nullptr)
+        if (character == nullptr)
         {
             continue;
         }
 
-        if (character->session == pExceptSession)
+        Session* session = FindSession(character->sessionID);
+        if (session == nullptr)
         {
             continue;
         }
 
-        EnqueuePacket(character->session, pHeader, pPacket);
+        if (session == pExceptSession)
+        {
+            continue;
+        }
+
+        EnqueuePacket(session, pHeader, pPacket);
     }
 }
 
@@ -139,12 +145,17 @@ void Disconnect(Session* pSession) noexcept
     MakePacket_DeleteCharacter(&header, &packet, pSession->sessionID);
     SendPacket_Around(pSession, &header, reinterpret_cast<char*>(&packet));
 
+    gSessionIdMap.erase(pSession->sessionID);
     gSessionMap.erase(pSession->socket);
     closesocket(pSession->socket);
 
     Character* pCharacter = FindCharacter(pSession->sessionID);
-    RemoveSector(pCharacter);
-    gCharacterMap.erase(pCharacter->sessionID);
-    delete pCharacter;
+    if (pCharacter != nullptr)
+    {
+        RemoveSector(pCharacter);
+        gCharacterMap.erase(pCharacter->sessionID);
+        delete pCharacter;
+    }
+
     delete pSession;
 }

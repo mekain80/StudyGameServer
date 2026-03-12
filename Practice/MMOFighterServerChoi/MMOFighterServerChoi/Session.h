@@ -22,3 +22,6 @@ struct Session
 
 extern SOCKET gListenSocket;
 extern std::unordered_map<SOCKET, Session*> gSessionMap;
+extern std::unordered_map<DWORD, Session*> gSessionIdMap;
+
+Session* FindSession(DWORD sessionID) noexcept;
