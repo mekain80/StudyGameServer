@@ -9,8 +9,8 @@ struct Character
 
     BYTE action = 0;
     BYTE direction = 0;
-    short x = 0;
-    short y = 0;
+    int x = 0;
+    int y = 0;
     int HP = 0;
 
     SectorPos sector;

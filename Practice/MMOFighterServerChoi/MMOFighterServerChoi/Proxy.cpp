@@ -18,8 +18,8 @@ void MakePacket_CreateMyCharacter(PacketHeader* pHeader, PacketSCCreateMyCharact
     InitHeader(pHeader, dfPACKET_SC_CREATE_MY_CHARACTER, sizeof(PacketSCCreateMyCharacter));
     pPacket->ID = ID;
     pPacket->direction = direction;
-    pPacket->x = x;
-    pPacket->y = y;
+    pPacket->x = static_cast<WORD>(x);
+    pPacket->y = static_cast<WORD>(y);
     pPacket->HP = HP;
 }
 
@@ -28,8 +28,8 @@ void MakePacket_CreateOtherCharacter(PacketHeader* pHeader, PacketSCCreateOtherC
     InitHeader(pHeader, dfPACKET_SC_CREATE_OTHER_CHARACTER, sizeof(PacketSCCreateOtherCharacter));
     pPacket->ID = ID;
     pPacket->direction = direction;
-    pPacket->x = x;
-    pPacket->y = y;
+    pPacket->x = static_cast<WORD>(x);
+    pPacket->y = static_cast<WORD>(y);
     pPacket->HP = HP;
 }
 
@@ -44,8 +44,8 @@ void MakePacket_MoveStart(PacketHeader* pHeader, PacketSCMoveStart* pPacket, DWO
     InitHeader(pHeader, dfPACKET_SC_MOVE_START, sizeof(PacketSCMoveStart));
     pPacket->ID = ID;
     pPacket->direction = direction;
-    pPacket->x = x;
-    pPacket->y = y;
+    pPacket->x = static_cast<WORD>(x);
+    pPacket->y = static_cast<WORD>(y);
 }
 
 void MakePacket_MoveStop(PacketHeader* pHeader, PacketSCMoveStop* pPacket, DWORD ID, BYTE direction, int x, int y)
@@ -53,8 +53,8 @@ void MakePacket_MoveStop(PacketHeader* pHeader, PacketSCMoveStop* pPacket, DWORD
     InitHeader(pHeader, dfPACKET_SC_MOVE_STOP, sizeof(PacketSCMoveStop));
     pPacket->ID = ID;
     pPacket->direction = direction;
-    pPacket->x = x;
-    pPacket->y = y;
+    pPacket->x = static_cast<WORD>(x);
+    pPacket->y = static_cast<WORD>(y);
 }
 
 void MakePacket_Damage(PacketHeader* pHeader, PacketSCDamage* pPacket, DWORD attackID, DWORD damageID, BYTE damageHP)
@@ -70,8 +70,8 @@ void MakePacket_Attack1(PacketHeader* pHeader, PacketSCAttack1* pPacket, BYTE di
     InitHeader(pHeader, dfPACKET_SC_ATTACK1, sizeof(PacketSCAttack1));
     pPacket->ID = ID;
     pPacket->direction = direction;
-    pPacket->x = x;
-    pPacket->y = y;
+    pPacket->x = static_cast<WORD>(x);
+    pPacket->y = static_cast<WORD>(y);
 }
 
 void MakePacket_Attack2(PacketHeader* pHeader, PacketSCAttack2* pPacket, BYTE direction, DWORD ID, int x, int y)
@@ -79,8 +79,8 @@ void MakePacket_Attack2(PacketHeader* pHeader, PacketSCAttack2* pPacket, BYTE di
     InitHeader(pHeader, dfPACKET_SC_ATTACK2, sizeof(PacketSCAttack2));
     pPacket->ID = ID;
     pPacket->direction = direction;
-    pPacket->x = x;
-    pPacket->y = y;
+    pPacket->x = static_cast<WORD>(x);
+    pPacket->y = static_cast<WORD>(y);
 }
 
 void MakePacket_Attack3(PacketHeader* pHeader, PacketSCAttack3* pPacket, BYTE direction, DWORD ID, int x, int y)
@@ -88,8 +88,8 @@ void MakePacket_Attack3(PacketHeader* pHeader, PacketSCAttack3* pPacket, BYTE di
     InitHeader(pHeader, dfPACKET_SC_ATTACK3, sizeof(PacketSCAttack3));
     pPacket->ID = ID;
     pPacket->direction = direction;
-    pPacket->x = x;
-    pPacket->y = y;
+    pPacket->x = static_cast<WORD>(x);
+    pPacket->y = static_cast<WORD>(y);
 }
 
 void MakePacket_Sync(PacketHeader* pHeader, PacketSCSync* pPacket, DWORD ID, WORD x, WORD y)

@@ -61,8 +61,8 @@ void Update() noexcept
         int dx = 0;
         int dy = 0;
         GetMoveDelta(pCharacter->action, dx, dy);
-        pCharacter->x += static_cast<short>(dx);
-        pCharacter->y += static_cast<short>(dy);
+        pCharacter->x += dx;
+        pCharacter->y += dy;
 
         // 이동 로그
         {

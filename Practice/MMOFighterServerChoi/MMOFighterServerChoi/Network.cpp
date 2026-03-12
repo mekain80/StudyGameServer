@@ -197,8 +197,8 @@ void NetProc_Accept() noexcept
 
 	Character* pCharacter = new Character;
 	pCharacter->sessionID = pSession->sessionID;
-	pCharacter->y = static_cast<short>(dfRANGE_MOVE_TOP + rand() % (dfRANGE_MOVE_BOTTOM - dfRANGE_MOVE_TOP + 1));
-	pCharacter->x = static_cast<short>(dfRANGE_MOVE_LEFT + rand() % (dfRANGE_MOVE_RIGHT - dfRANGE_MOVE_LEFT + 1));
+	pCharacter->y = dfRANGE_MOVE_TOP + rand() % (dfRANGE_MOVE_BOTTOM - dfRANGE_MOVE_TOP + 1);
+	pCharacter->x = dfRANGE_MOVE_LEFT + rand() % (dfRANGE_MOVE_RIGHT - dfRANGE_MOVE_LEFT + 1);
 	pCharacter->direction = dfPACKET_MOVE_DIR_LL;
 	pCharacter->action = dfACTION_STOP;
 	pCharacter->HP = MAX_HP;

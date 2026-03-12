@@ -74,9 +74,8 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 
 	pCharacter->action = direction;
 	pCharacter->direction = NormalizeViewDir(direction);
-	// TODO 왜 Character의 x, y가 short인지
-	pCharacter->x = static_cast<short>(x);
-	pCharacter->y = static_cast<short>(y);
+	pCharacter->x = x;
+	pCharacter->y = y;
 
 
 	// TODO) 패킷 뿌리는 것 섹터 기준으로 수정하기
@@ -137,8 +136,8 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 
 	pCharacter->action = dfACTION_STOP;
 	pCharacter->direction = NormalizeViewDir(moveStop.direction);
-	pCharacter->x = static_cast<short>(moveStop.x);
-	pCharacter->y = static_cast<short>(moveStop.y);
+	pCharacter->x = moveStop.x;
+	pCharacter->y = moveStop.y;
 
 	PacketHeader packetHeader;
 	PacketSCMoveStop sendMsg;
