@@ -152,29 +152,29 @@ void Update() noexcept
         pCharacter->y += dy;
 
         // 이동 로그
-        {
-            const wchar_t* dirStr = L"STOP";
-            switch (pCharacter->action)
-            {
-            case dfPACKET_MOVE_DIR_UU: dirStr = L"UU"; break;
-            case dfPACKET_MOVE_DIR_DD: dirStr = L"DD"; break;
-            case dfPACKET_MOVE_DIR_RR: dirStr = L"RR"; break;
-            case dfPACKET_MOVE_DIR_LL: dirStr = L"LL"; break;
-            case dfPACKET_MOVE_DIR_RU: dirStr = L"RU"; break;
-            case dfPACKET_MOVE_DIR_RD: dirStr = L"RD"; break;
-            case dfPACKET_MOVE_DIR_LU: dirStr = L"LU"; break;
-            case dfPACKET_MOVE_DIR_LD: dirStr = L"LD"; break;
-            default:                   dirStr = L"STOP"; break;
-            }
+        //{
+        //    const wchar_t* dirStr = L"STOP";
+        //    switch (pCharacter->action)
+        //    {
+        //    case dfPACKET_MOVE_DIR_UU: dirStr = L"UU"; break;
+        //    case dfPACKET_MOVE_DIR_DD: dirStr = L"DD"; break;
+        //    case dfPACKET_MOVE_DIR_RR: dirStr = L"RR"; break;
+        //    case dfPACKET_MOVE_DIR_LL: dirStr = L"LL"; break;
+        //    case dfPACKET_MOVE_DIR_RU: dirStr = L"RU"; break;
+        //    case dfPACKET_MOVE_DIR_RD: dirStr = L"RD"; break;
+        //    case dfPACKET_MOVE_DIR_LU: dirStr = L"LU"; break;
+        //    case dfPACKET_MOVE_DIR_LD: dirStr = L"LD"; break;
+        //    default:                   dirStr = L"STOP"; break;
+        //    }
 
-            _LOG(
-                LOG_LEVEL_DEBUG,
-                L"# gameRun : %s # SessionID : %u / X : %d / Y : %d",
-                dirStr,
-                pCharacter->sessionID,
-                pCharacter->x,
-                pCharacter->y);
-        }
+        //    _LOG(
+        //        LOG_LEVEL_DEBUG,
+        //        L"# gameRun : %s # SessionID : %u / X : %d / Y : %d",
+        //        dirStr,
+        //        pCharacter->sessionID,
+        //        pCharacter->x,
+        //        pCharacter->y);
+        //}
 
 
 
