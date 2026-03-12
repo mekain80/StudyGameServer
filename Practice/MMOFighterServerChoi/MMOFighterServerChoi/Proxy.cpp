@@ -100,6 +100,12 @@ void MakePacket_Sync(PacketHeader* pHeader, PacketSCSync* pPacket, DWORD ID, WOR
     pPacket->y = y;
 }
 
+void MakePacket_Echo(PacketHeader* pHeader, PacketSCEcho* pPacket, DWORD time) noexcept
+{
+    InitHeader(pHeader, dfPACKET_SC_ECHO, sizeof(PacketSCEcho));
+    pPacket->time = time;
+}
+
 bool NeedSync(int clientX, int clientY, const Character* ch) noexcept
 {
     return std::abs(clientX - ch->x) > dfERROR_RANGE ||

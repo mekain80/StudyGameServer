@@ -195,6 +195,22 @@
 //	2	-	X
 //	2	-	Y
 
+#define	dfPACKET_CS_ECHO						252
+//---------------------------------------------------------------
+// Echo 용 패킷					Client -> Server
+//
+//	4	-	Time
+//
+//---------------------------------------------------------------
+
+#define	dfPACKET_SC_ECHO						253
+//---------------------------------------------------------------
+// Echo 응답 패킷				Server -> Client
+//
+//	4	-	Time
+//
+//---------------------------------------------------------------
+
 #pragma pack(push, 1)
 
 // 네트워크 패킷 헤더
@@ -344,6 +360,18 @@ struct PacketSCSync
     UINT ID;
     WORD x;
     WORD y;
+};
+
+// Echo 요청 패킷 (Client -> Server)
+struct PacketCSEcho
+{
+    DWORD time;
+};
+
+// Echo 응답 패킷 (Server -> Client)
+struct PacketSCEcho
+{
+    DWORD time;
 };
 
 #pragma pack(pop)

@@ -35,6 +35,8 @@ bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packet
 		return NetPacketProc_Attack2(pSession, packet);
 	case dfPACKET_CS_ATTACK3:
 		return NetPacketProc_Attack3(pSession, packet);
+	case dfPACKET_CS_ECHO:
+		return NetPacketProc_Echo(pSession, packet);
 	default:
 		return true;
 	}
@@ -358,6 +360,19 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 			SendPacket_Around(targetSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg), true);
 		}
 	}
+
+	return true;
+}
+
+bool NetPacketProc_Echo(Session* pSession, SerializedBuffer& packet)
+{
+	PacketCSEcho echo{};
+	packet >> echo.time;
+
+	PacketHeader packetHeader{};
+	PacketSCEcho response{};
+	MakePacket_Echo(&packetHeader, &response, echo.time);
+	SendUnicast(pSession, &packetHeader, reinterpret_cast<char*>(&response));
 
 	return true;
 }
