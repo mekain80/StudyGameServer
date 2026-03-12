@@ -10,6 +10,7 @@
 #include "Protocol.h"
 #include "Proxy.h"
 #include "Character.h"
+#include "Sector.h"
 
 bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packetSize)
 {
@@ -196,35 +197,41 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 	PacketHeader packetHeader;
 	PacketSCAttack1 sendMsg;
 	MakePacket_Attack1(&packetHeader, &sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
-	SendBroadcast(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg));
+	SendPacket_Around(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg), true);
 
 	const int centerX = pCharacter->x;
 	const int centerY = pCharacter->y;
 
-	for (auto& pair : gCharacterMap)
+	SectorAround secAround{};
+	GetSectorAroundBySector(&pCharacter->sector, &secAround);
+	for (int secIdx = 0; secIdx < secAround.count; secIdx++)
 	{
-		Character* targetCharacter = pair.second;
-		if (targetCharacter == pCharacter)
+		SectorPos sectorPos = secAround.around[secIdx];
+		std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+		for (Character* character : sectorList)
 		{
-			continue;
+			if (character == pCharacter)
+			{
+				continue;
+			}
+
+			if (!IsHitAttack1(pCharacter, character, centerX, centerY))
+			{
+				continue;
+			}
+
+			PacketHeader dmgHeader;
+			PacketSCDamage dmgMsg;
+
+			character->HP -= dfATTACK1_DAMAGE;
+			if (character->HP < 0)
+			{
+				character->HP = 0;
+			}
+
+			MakePacket_Damage(&dmgHeader, &dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
+			SendPacket_Around(pSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg));
 		}
-
-		if (!IsHitAttack1(pCharacter, targetCharacter, centerX, centerY))
-		{
-			continue;
-		}
-
-		PacketHeader dmgHeader;
-		PacketSCDamage dmgMsg;
-
-		targetCharacter->HP -= dfATTACK1_DAMAGE;
-		if (targetCharacter->HP < 0)
-		{
-			targetCharacter->HP = 0;
-		}
-
-		MakePacket_Damage(&dmgHeader, &dmgMsg, pCharacter->sessionID, targetCharacter->sessionID, static_cast<BYTE>(targetCharacter->HP));
-		SendBroadcast(nullptr, &dmgHeader, reinterpret_cast<char*>(&dmgMsg));
 	}
 
 	return true;
@@ -265,35 +272,41 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 	PacketHeader packetHeader;
 	PacketSCAttack2 sendMsg;
 	MakePacket_Attack2(&packetHeader, &sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
-	SendBroadcast(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg));
+	SendPacket_Around(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg), true);
 
 	const int centerX = pCharacter->x;
 	const int centerY = pCharacter->y;
 
-	for (auto& pair : gCharacterMap)
+	SectorAround secAround{};
+	GetSectorAroundBySector(&pCharacter->sector, &secAround);
+	for (int secIdx = 0; secIdx < secAround.count; secIdx++)
 	{
-		Character* targetCharacter = pair.second;
-		if (targetCharacter == pCharacter)
+		SectorPos sectorPos = secAround.around[secIdx];
+		std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+		for (Character* character : sectorList)
 		{
-			continue;
+			if (character == pCharacter)
+			{
+				continue;
+			}
+
+			if (!IsHitDirectionalAttack(pCharacter, character, centerX, centerY, dfATTACK2_RANGE_X, dfATTACK2_RANGE_Y))
+			{
+				continue;
+			}
+
+			PacketHeader dmgHeader;
+			PacketSCDamage dmgMsg;
+
+			character->HP -= dfATTACK2_DAMAGE;
+			if (character->HP < 0)
+			{
+				character->HP = 0;
+			}
+
+			MakePacket_Damage(&dmgHeader, &dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
+			SendPacket_Around(pSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg));
 		}
-
-		if (!IsHitDirectionalAttack(pCharacter, targetCharacter, centerX, centerY, dfATTACK2_RANGE_X, dfATTACK2_RANGE_Y))
-		{
-			continue;
-		}
-
-		PacketHeader dmgHeader;
-		PacketSCDamage dmgMsg;
-
-		targetCharacter->HP -= dfATTACK2_DAMAGE;
-		if (targetCharacter->HP < 0)
-		{
-			targetCharacter->HP = 0;
-		}
-
-		MakePacket_Damage(&dmgHeader, &dmgMsg, pCharacter->sessionID, targetCharacter->sessionID, static_cast<BYTE>(targetCharacter->HP));
-		SendBroadcast(nullptr, &dmgHeader, reinterpret_cast<char*>(&dmgMsg));
 	}
 
 	return true;
@@ -334,35 +347,41 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 	PacketHeader packetHeader;
 	PacketSCAttack3 sendMsg;
 	MakePacket_Attack3(&packetHeader, &sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
-	SendBroadcast(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg));
+	SendPacket_Around(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg), true);
 
 	const int centerX = pCharacter->x;
 	const int centerY = pCharacter->y;
 
-	for (auto& pair : gCharacterMap)
+	SectorAround secAround{};
+	GetSectorAroundBySector(&pCharacter->sector, &secAround);
+	for (int secIdx = 0; secIdx < secAround.count; secIdx++)
 	{
-		Character* targetCharacter = pair.second;
-		if (targetCharacter == pCharacter)
+		SectorPos sectorPos = secAround.around[secIdx];
+		std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+		for (Character* character : sectorList)
 		{
-			continue;
+			if (character == pCharacter)
+			{
+				continue;
+			}
+
+			if (!IsHitDirectionalAttack(pCharacter, character, centerX, centerY, dfATTACK3_RANGE_X, dfATTACK3_RANGE_Y))
+			{
+				continue;
+			}
+
+			PacketHeader dmgHeader;
+			PacketSCDamage dmgMsg;
+
+			character->HP -= dfATTACK3_DAMAGE;
+			if (character->HP < 0)
+			{
+				character->HP = 0;
+			}
+
+			MakePacket_Damage(&dmgHeader, &dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
+			SendPacket_Around(pSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg));
 		}
-
-		if (!IsHitDirectionalAttack(pCharacter, targetCharacter, centerX, centerY, dfATTACK3_RANGE_X, dfATTACK3_RANGE_Y))
-		{
-			continue;
-		}
-
-		PacketHeader dmgHeader;
-		PacketSCDamage dmgMsg;
-
-		targetCharacter->HP -= dfATTACK3_DAMAGE;
-		if (targetCharacter->HP < 0)
-		{
-			targetCharacter->HP = 0;
-		}
-
-		MakePacket_Damage(&dmgHeader, &dmgMsg, pCharacter->sessionID, targetCharacter->sessionID, static_cast<BYTE>(targetCharacter->HP));
-		SendBroadcast(nullptr, &dmgHeader, reinterpret_cast<char*>(&dmgMsg));
 	}
 
 	return true;

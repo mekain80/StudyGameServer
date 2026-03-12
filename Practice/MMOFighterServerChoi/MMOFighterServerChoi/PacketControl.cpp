@@ -6,6 +6,18 @@
 #include "Network.h"
 #include "Proxy.h"
 #include "Character.h"
+#include "Sector.h"
+
+namespace
+{
+    bool IsValidSectorIndex(const SectorPos& sectorPos) noexcept
+    {
+        return sectorPos.x >= 0
+            && sectorPos.x < dfSECTOR_MAX_X
+            && sectorPos.y >= 0
+            && sectorPos.y < dfSECTOR_MAX_Y;
+    }
+}
 
 bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexcept
 {
@@ -56,6 +68,60 @@ void SendBroadcast(Session* pSession, PacketHeader* pHeader, char* pPacket) noex
     }
 }
 
+void SendPacket_SectorOne(int sectorX, int sectorY, PacketHeader* pHeader, char* pPacket, Session* pExceptSession) noexcept
+{
+    SectorPos sectorPos
+    {
+        static_cast<short>(sectorX),
+        static_cast<short>(sectorY)
+    };
+
+    if (!IsValidSectorIndex(sectorPos))
+    {
+        return;
+    }
+
+    std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+    for (Character* character : sectorList)
+    {
+        if (character == nullptr || character->session == nullptr)
+        {
+            continue;
+        }
+
+        if (character->session == pExceptSession)
+        {
+            continue;
+        }
+
+        EnqueuePacket(character->session, pHeader, pPacket);
+    }
+}
+
+void SendPacket_Around(Session* pSession, PacketHeader* pHeader, char* pPacket, bool sendMe) noexcept
+{
+    if (pSession == nullptr)
+    {
+        return;
+    }
+
+    Character* character = FindCharacter(pSession->sessionID);
+    if (character == nullptr)
+    {
+        return;
+    }
+
+    SectorAround sectorAround{};
+    GetSectorAroundBySector(&character->sector, &sectorAround);
+
+    for (int index = 0; index < sectorAround.count; ++index)
+    {
+        const SectorPos sectorPos = sectorAround.around[index];
+        Session* exceptSession = sendMe ? nullptr : pSession;
+        SendPacket_SectorOne(sectorPos.x, sectorPos.y, pHeader, pPacket, exceptSession);
+    }
+}
+
 void Disconnect(Session* pSession) noexcept
 {
     if (pSession == nullptr)
@@ -72,6 +138,7 @@ void Disconnect(Session* pSession) noexcept
     closesocket(pSession->socket);
     gSessionMap.erase(pSession->socket);
     Character* pCharacter = FindCharacter(pSession->sessionID);
+    RemoveSector(pCharacter);
     gCharacterMap.erase(pCharacter->sessionID);
     delete pCharacter;
     delete pSession;

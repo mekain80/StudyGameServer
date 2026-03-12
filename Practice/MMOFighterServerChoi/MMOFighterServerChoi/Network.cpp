@@ -11,6 +11,7 @@
 #include "Proxy.h"
 #include "Stub.h"
 #include "Character.h"
+#include "Sector.h"
 
 bool gShutdown = false;
 DWORD gAllocID = 1;
@@ -202,6 +203,7 @@ void NetProc_Accept() noexcept
 	pCharacter->action = dfACTION_STOP;
 	pCharacter->HP = MAX_HP;
 	gCharacterMap[pSession->sessionID] = pCharacter;
+	InsertSector(pCharacter);
 
 	PacketHeader packetHeader;
 	PacketSCCreateMyCharacter createMyCharacter;
@@ -218,25 +220,10 @@ void NetProc_Accept() noexcept
 
 	SendUnicast(pSession, &packetHeader, reinterpret_cast<char*>(&createMyCharacter));
 
-	for (auto& other : gSessionMap)
-	{
-		Session* otherSession = other.second;
-		if (otherSession == pSession)
-		{
-			continue;
-		}
-		
-		PacketHeader otherHeader;
-		PacketSCCreateOtherCharacter otherPacket;
-		Character* pCharacter = FindCharacter(otherSession->sessionID); // nullptr이 없다고 가정
-		MakePacket_CreateOtherCharacter(&otherHeader, &otherPacket, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y, pCharacter->HP);
-		SendUnicast(pSession, &otherHeader, reinterpret_cast<char*>(&otherPacket));
-	}
-
 	PacketHeader broadHeader;
 	PacketSCCreateOtherCharacter broadPacket;
 	MakePacket_CreateOtherCharacter(&broadHeader, &broadPacket, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y, pCharacter->HP);
-	SendBroadcast(pSession, &broadHeader, reinterpret_cast<char*>(&broadPacket));
+	SendPacket_Around(pSession, &broadHeader, reinterpret_cast<char*>(&broadPacket));
 
 	_LOG(LOG_LEVEL_SYSTEM, L"Connect # IP:%s / SessionID:%d", pSession->ipStr, pSession->sessionID);
 	_LOG(LOG_LEVEL_DEBUG, L"# PACKET_CONNECT # SessionID:%d", pSession->sessionID);

@@ -72,6 +72,20 @@ void GetSectorAround(int sectorX, int sectorY, SectorAround* outSectorAround) no
 	}
 }
 
+void GetSectorAroundBySector(SectorPos* secPos, SectorAround* outSectorAround) noexcept
+{
+	assert(secPos != nullptr);
+	assert(outSectorAround != nullptr);
+
+	if (!IsValidSectorPos(*secPos))
+	{
+		outSectorAround->count = 0;
+		return;
+	}
+
+	GetSectorAround(secPos->x, secPos->y, outSectorAround);
+}
+
 void GetUpdateSectorAround(Character* character, SectorAround* outRemoveSector, SectorAround* outAddSector) noexcept
 {
 	assert(character != nullptr);
