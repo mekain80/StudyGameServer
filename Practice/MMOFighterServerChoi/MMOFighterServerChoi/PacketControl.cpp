@@ -55,9 +55,10 @@ void SendUnicast(Session* pSession, PacketHeader* pHeader, char* pPacket) noexce
 
 void SendBroadcast(Session* pSession, PacketHeader* pHeader, char* pPacket) noexcept
 {
-    for (auto it = gSessionMap.begin(); it != gSessionMap.end(); ++it)
+    for (auto it = gSessionMap.begin(); it != gSessionMap.end();)
     {
         Session* session = it->second;
+        ++it;
 
         if (session == pSession)
         {
@@ -98,6 +99,15 @@ void SendPacket_SectorOne(int sectorX, int sectorY, PacketHeader* pHeader, char*
     }
 }
 
+void SendPacket_BySectorAround(SectorAround sectorAround, PacketHeader* pHeader, char* pPacket, Session* pExceptSession) noexcept
+{
+    for (int index = 0; index < sectorAround.count; ++index)
+    {
+        const SectorPos sectorPos = sectorAround.around[index];
+        SendPacket_SectorOne(sectorPos.x, sectorPos.y, pHeader, pPacket, pExceptSession);
+    }
+}
+
 void SendPacket_Around(Session* pSession, PacketHeader* pHeader, char* pPacket, bool sendMe) noexcept
 {
     if (pSession == nullptr)
@@ -113,13 +123,8 @@ void SendPacket_Around(Session* pSession, PacketHeader* pHeader, char* pPacket, 
 
     SectorAround sectorAround{};
     GetSectorAroundBySector(&character->sector, &sectorAround);
-
-    for (int index = 0; index < sectorAround.count; ++index)
-    {
-        const SectorPos sectorPos = sectorAround.around[index];
-        Session* exceptSession = sendMe ? nullptr : pSession;
-        SendPacket_SectorOne(sectorPos.x, sectorPos.y, pHeader, pPacket, exceptSession);
-    }
+    Session* exceptSession = sendMe ? nullptr : pSession;
+    SendPacket_BySectorAround(sectorAround, pHeader, pPacket, exceptSession);
 }
 
 void Disconnect(Session* pSession) noexcept

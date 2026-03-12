@@ -15,6 +15,8 @@ constexpr int dfSECTOR_MAX_Y = ((dfRANGE_MOVE_BOTTOM - dfRANGE_MOVE_TOP) / dfSEC
 
 extern std::list<Character*> gSector[dfSECTOR_MAX_Y][dfSECTOR_MAX_X];
 
+bool IsSameSector(const SectorPos& lhs, const SectorPos& rhs) noexcept;
+
 // 특정 섹터 좌표 기준 주변 영향권 섹터를 구한다.
 // @param sectorX 기준 섹터의 X 좌표
 // @param sectorY 기준 섹터의 Y 좌표

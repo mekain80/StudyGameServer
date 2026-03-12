@@ -8,6 +8,12 @@
 
 std::list<Character*> gSector[dfSECTOR_MAX_Y][dfSECTOR_MAX_X];
 
+
+bool IsSameSector(const SectorPos& lhs, const SectorPos& rhs) noexcept
+{
+	return lhs.x == rhs.x && lhs.y == rhs.y;
+}
+
 namespace
 {
 	bool IsValidSectorPos(const SectorPos& sectorPos) noexcept
@@ -16,11 +22,6 @@ namespace
 			&& sectorPos.x < dfSECTOR_MAX_X
 			&& sectorPos.y >= 0
 			&& sectorPos.y < dfSECTOR_MAX_Y;
-	}
-
-	bool IsSameSector(const SectorPos& lhs, const SectorPos& rhs) noexcept
-	{
-		return lhs.x == rhs.x && lhs.y == rhs.y;
 	}
 
 	bool ContainsCharacter(const std::list<Character*>& characters, const Character* target) noexcept
