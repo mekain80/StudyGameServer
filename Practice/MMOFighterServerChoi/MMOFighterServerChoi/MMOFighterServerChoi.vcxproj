@@ -28,6 +28,7 @@
     <ClCompile Include="Profiler.cpp" />
     <ClCompile Include="Proxy.cpp" />
     <ClCompile Include="RingBuffer.cpp" />
+    <ClCompile Include="Sector.cpp" />
     <ClCompile Include="SerializedBuffer.cpp" />
     <ClCompile Include="ServerControl.cpp" />
     <ClCompile Include="Session.cpp" />
@@ -50,6 +51,8 @@
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="Proxy.h" />
     <ClInclude Include="RingBuffer.h" />
+    <ClInclude Include="Sector.h" />
+    <ClInclude Include="SectorPos.h" />
     <ClInclude Include="ServerControl.h" />
     <ClInclude Include="Session.h" />
     <ClInclude Include="SerializedBuffer.h" />

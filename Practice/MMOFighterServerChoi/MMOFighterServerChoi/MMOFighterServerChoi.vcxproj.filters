@@ -63,6 +63,9 @@
     <ClCompile Include="Session.cpp">
       <Filter>Network</Filter>
     </ClCompile>
+    <ClCompile Include="Sector.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -109,6 +112,12 @@
     </ClInclude>
     <ClInclude Include="ServerControl.h">
       <Filter>Server</Filter>
+    </ClInclude>
+    <ClInclude Include="Sector.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="SectorPos.h">
+      <Filter>Game</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
