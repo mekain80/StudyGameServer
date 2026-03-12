@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "Session.h"
+#include "SectorPos.h"
 
 struct Character
 {
@@ -13,7 +14,7 @@ struct Character
     short y = 0;
     int HP = 0;
 
-    // TODO Sector
+    SectorPos sector;
 };
 
 extern std::unordered_map<DWORD, Character*> gCharacterMap;
