@@ -141,7 +141,7 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 	PacketHeader packetHeader;
 	PacketSCMoveStop sendMsg;
 	MakePacket_MoveStop(&packetHeader, &sendMsg, pCharacter->sessionID, pCharacter->direction, pCharacter->x, pCharacter->y);
-	SendBroadcast(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg));
+	SendPacket_Around(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg));
 
 	return true;
 }
