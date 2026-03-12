@@ -170,12 +170,11 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
-	if (abs(atk.x - pCharacter->x) > dfERROR_RANGE ||
-		abs(atk.y - pCharacter->y) > dfERROR_RANGE)
+	if (NeedSync(atk.x, atk.y, pCharacter))
 	{
-		_LOG(LOG_LEVEL_ERROR, L"Attack dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
-		Disconnect(pSession);
-		return false;
+		SendSync(pSession, pCharacter);
+		_LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack1 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
+		return true;
 	}
 
 	pCharacter->direction = NormalizeViewDir(atk.direction);
@@ -245,12 +244,11 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
-	if (abs(atk.x - pCharacter->x) > dfERROR_RANGE ||
-		abs(atk.y - pCharacter->y) > dfERROR_RANGE)
+	if (NeedSync(atk.x, atk.y, pCharacter))
 	{
-		_LOG(LOG_LEVEL_ERROR, L"Attack dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
-		Disconnect(pSession);
-		return false;
+		SendSync(pSession, pCharacter);
+		_LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack2 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
+		return true;
 	}
 
 	pCharacter->direction = NormalizeViewDir(atk.direction);
@@ -320,12 +318,11 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
-	if (abs(atk.x - pCharacter->x) > dfERROR_RANGE ||
-		abs(atk.y - pCharacter->y) > dfERROR_RANGE)
+	if (NeedSync(atk.x, atk.y, pCharacter))
 	{
-		_LOG(LOG_LEVEL_ERROR, L"Attack dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
-		Disconnect(pSession);
-		return false;
+		SendSync(pSession, pCharacter);
+		_LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack3 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
+		return true;
 	}
 
 	pCharacter->direction = NormalizeViewDir(atk.direction);

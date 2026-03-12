@@ -23,7 +23,7 @@ bool IsSameSector(const SectorPos& lhs, const SectorPos& rhs) noexcept;
 // @param outSectorAround 기준 섹터를 포함한 주변 섹터 목록 출력 버퍼
 void GetSectorAround(int sectorX, int sectorY, SectorAround* outSectorAround) noexcept;
 
-void GetSectorAroundBySector(SectorPos* secPos, SectorAround* outSectorAround) noexcept;
+void GetSectorAroundBySector(const SectorPos* secPos, SectorAround* outSectorAround) noexcept;
 
 // 캐릭터 이동 시 이전 영향권에서 빠진 섹터와 새로 포함된 섹터를 구한다.
 // @param character 현재 위치가 반영된 캐릭터

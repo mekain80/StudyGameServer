@@ -73,7 +73,7 @@ void GetSectorAround(int sectorX, int sectorY, SectorAround* outSectorAround) no
 	}
 }
 
-void GetSectorAroundBySector(SectorPos* secPos, SectorAround* outSectorAround) noexcept
+void GetSectorAroundBySector(const SectorPos* secPos, SectorAround* outSectorAround) noexcept
 {
 	assert(secPos != nullptr);
 	assert(outSectorAround != nullptr);
