@@ -47,8 +47,6 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 
 	packet >> direction >> x >> y;
 
-	_LOG(LOG_LEVEL_DEBUG, L"# PACKET_MOVESTART # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, direction, x, y);
-
 	if (!IsValidMoveDirection(direction))
 	{
 		Disconnect(pSession);
@@ -59,8 +57,6 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 	Character* pCharacter = FindCharacter(pSession->sessionID);
 	if (pCharacter == NULL)
 	{
-		_LOG(LOG_LEVEL_DEBUG, L"# MOVESTART > SessionID:%d Character Not Found!",
-			pSession->sessionID);
 		return false;
 	}
 
@@ -111,8 +107,6 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 		>> moveStop.x
 		>> moveStop.y;
 
-	_LOG(LOG_LEVEL_DEBUG, L"# PACKET_MOVESTOP # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, moveStop.direction, moveStop.x, moveStop.y);
-
 	if (!IsValidViewDirection(moveStop.direction))
 	{
 		Disconnect(pSession);
@@ -122,7 +116,6 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 	Character* pCharacter = FindCharacter(pSession->sessionID);
 	if (pCharacter == nullptr)
 	{
-		_LOG(LOG_LEVEL_DEBUG, L"# MOVESTOP > SessionID:%d Character Not Found!", pSession->sessionID);
 		return false;
 	}
 
@@ -155,8 +148,6 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 		>> atk.x
 		>> atk.y;
 
-	_LOG(LOG_LEVEL_DEBUG, L"# PACKET_ATTACK1 # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, atk.direction, atk.x, atk.y);
-
 	if (!IsValidViewDirection(atk.direction))
 	{
 		Disconnect(pSession);
@@ -166,7 +157,6 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 	Character* pCharacter = FindCharacter(pSession->sessionID);
 	if (pCharacter == nullptr)
 	{
-		_LOG(LOG_LEVEL_DEBUG, L"# ATTACK1 > SessionID:%d Character Not Found!", pSession->sessionID);
 		return false;
 	}
 
@@ -230,8 +220,6 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 		>> atk.x
 		>> atk.y;
 
-	_LOG(LOG_LEVEL_DEBUG, L"# PACKET_ATTACK2 # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, atk.direction, atk.x, atk.y);
-
 	if (!IsValidViewDirection(atk.direction))
 	{
 		Disconnect(pSession);
@@ -241,7 +229,6 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 	Character* pCharacter = FindCharacter(pSession->sessionID);
 	if (pCharacter == nullptr)
 	{
-		_LOG(LOG_LEVEL_DEBUG, L"# ATTACK2 > SessionID:%d Character Not Found!", pSession->sessionID);
 		return false;
 	}
 
@@ -305,8 +292,6 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 		>> atk.x
 		>> atk.y;
 
-	_LOG(LOG_LEVEL_DEBUG, L"# PACKET_ATTACK3 # SessionID:%u / Direction:%u / X:%d / Y:%d", pSession->sessionID, atk.direction, atk.x, atk.y);
-
 	if (!IsValidViewDirection(atk.direction))
 	{
 		Disconnect(pSession);
@@ -316,7 +301,6 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 	Character* pCharacter = FindCharacter(pSession->sessionID);
 	if (pCharacter == nullptr)
 	{
-		_LOG(LOG_LEVEL_DEBUG, L"# ATTACK3 > SessionID:%d Character Not Found!", pSession->sessionID);
 		return false;
 	}
 

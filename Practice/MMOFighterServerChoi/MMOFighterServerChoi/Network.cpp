@@ -209,15 +209,6 @@ void NetProc_Accept() noexcept
 	PacketSCCreateMyCharacter createMyCharacter;
 	MakePacket_CreateMyCharacter(&packetHeader, &createMyCharacter, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y, pCharacter->HP);
 
-	wprintf(L"[Server] CreateMyCharacter header : code=%u size=%u type=%u\n", packetHeader.code, packetHeader.size, packetHeader.type);
-	wprintf(
-		L"[Server] CreateMyCharacter body   : ID=%u Dir=%u X=%d Y=%d HP=%d\n",
-		createMyCharacter.ID,
-		createMyCharacter.direction,
-		createMyCharacter.x,
-		createMyCharacter.y,
-		createMyCharacter.HP);
-
 	// 자신 생성
 	SendUnicast(pSession, &packetHeader, reinterpret_cast<char*>(&createMyCharacter));
 
@@ -257,8 +248,6 @@ void NetProc_Accept() noexcept
 	SendPacket_Around(pSession, &broadHeader, reinterpret_cast<char*>(&broadPacket));
 
 	_LOG(LOG_LEVEL_SYSTEM, L"Connect # IP:%s / SessionID:%d", pSession->ipStr, pSession->sessionID);
-	_LOG(LOG_LEVEL_DEBUG, L"# PACKET_CONNECT # SessionID:%d", pSession->sessionID);
-	_LOG(LOG_LEVEL_DEBUG, L"Create Character # SessionID:%d    X:%d    Y:%d", pCharacter->sessionID, pCharacter->x, pCharacter->y);
 }
 
 bool NetProc_Recv(Session* pSession) noexcept

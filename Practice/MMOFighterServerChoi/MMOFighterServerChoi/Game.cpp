@@ -100,34 +100,6 @@ void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexc
         }
     }
 
-    // 섹터 변경 전/후 정보를 기록한다.
-    {
-        const wchar_t* dirStr = L"STOP";
-        switch (pCharacter->action)
-        {
-        case dfPACKET_MOVE_DIR_UU: dirStr = L"UU"; break;
-        case dfPACKET_MOVE_DIR_DD: dirStr = L"DD"; break;
-        case dfPACKET_MOVE_DIR_RR: dirStr = L"RR"; break;
-        case dfPACKET_MOVE_DIR_LL: dirStr = L"LL"; break;
-        case dfPACKET_MOVE_DIR_RU: dirStr = L"RU"; break;
-        case dfPACKET_MOVE_DIR_RD: dirStr = L"RD"; break;
-        case dfPACKET_MOVE_DIR_LU: dirStr = L"LU"; break;
-        case dfPACKET_MOVE_DIR_LD: dirStr = L"LD"; break;
-        default:                   dirStr = L"STOP"; break;
-        }
-
-        _LOG(
-            LOG_LEVEL_DEBUG,
-            L"# sectorMove : %s # SessionID : %u / X : %d / Y : %d / OldSector : (%d, %d) / NewSector : (%d, %d)",
-            dirStr,
-            pCharacter->sessionID,
-            pCharacter->x,
-            pCharacter->y,
-            curSector.x,
-            curSector.y,
-            pCharacter->sector.x,
-            pCharacter->sector.y);
-    }
 }
 
 void Update() noexcept
