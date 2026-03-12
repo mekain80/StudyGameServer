@@ -218,8 +218,39 @@ void NetProc_Accept() noexcept
 		createMyCharacter.y,
 		createMyCharacter.HP);
 
+	// 자신 생성
 	SendUnicast(pSession, &packetHeader, reinterpret_cast<char*>(&createMyCharacter));
 
+	// 접속 유저에게 다른 유저 정보 전달
+	SectorPos currentSector = pCharacter->sector;
+	SectorAround aroundSectors{};
+	GetSectorAroundBySector(&currentSector, &aroundSectors);
+	for (int sectorIndex = 0; sectorIndex < aroundSectors.count; ++sectorIndex)
+	{
+		const SectorPos sectorPos = aroundSectors.around[sectorIndex];
+		std::list<Character*>& sectorCharacters = gSector[sectorPos.y][sectorPos.x];
+		for (Character* otherCharacter : sectorCharacters)
+		{
+			if (otherCharacter == nullptr || otherCharacter == pCharacter)
+			{
+				continue;
+			}
+
+			PacketHeader otherCharacterHeader;
+			PacketSCCreateOtherCharacter otherCharacterPacket;
+			MakePacket_CreateOtherCharacter(
+				&otherCharacterHeader,
+				&otherCharacterPacket,
+				otherCharacter->direction,
+				otherCharacter->sessionID,
+				otherCharacter->x,
+				otherCharacter->y,
+				otherCharacter->HP);
+			SendUnicast(pSession, &otherCharacterHeader, reinterpret_cast<char*>(&otherCharacterPacket));
+		}
+	}
+
+	// 접속 유저 정보를 다른 유저에게 전달
 	PacketHeader broadHeader;
 	PacketSCCreateOtherCharacter broadPacket;
 	MakePacket_CreateOtherCharacter(&broadHeader, &broadPacket, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y, pCharacter->HP);
