@@ -41,8 +41,8 @@
 // [공격 데미지]
 // ------------------------------------------------------------------
 #define dfATTACK1_DAMAGE 3
-#define dfATTACK2_DAMAGE 5
-#define dfATTACK3_DAMAGE 10
+#define dfATTACK2_DAMAGE 4
+#define dfATTACK3_DAMAGE 5
 
 // ------------------------------------------------------------------
 // [캐릭터 기본 설정]
