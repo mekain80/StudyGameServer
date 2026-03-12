@@ -10,6 +10,7 @@ extern LARGE_INTEGER gFrameStartTick;
 extern LARGE_INTEGER gFrameEndTick;
 
 void Update() noexcept;
+void UpdateCharacterSector(Character* character, Session* currentSession) noexcept;
 bool MoveCheck(BYTE direction, int x, int y) noexcept;
 
 BYTE NormalizeViewDir(BYTE direction) noexcept;

@@ -15,6 +15,121 @@ LARGE_INTEGER gFreq{};
 LARGE_INTEGER gFrameStartTick{};
 LARGE_INTEGER gFrameEndTick{};
 
+void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexcept
+{
+    if (pCharacter == nullptr || currentSession == nullptr)
+    {
+        return;
+    }
+
+    // 이동이 반영된 현재 좌표로 섹터를 다시 계산한다.
+    SectorPos curSector = CalcSector(pCharacter->x, pCharacter->y);
+    // 이전 섹터와 같으면 시야 갱신이 필요 없다.
+    if (IsSameSector(curSector, pCharacter->sector))
+    {
+        return;
+    }
+
+    // 섹터 이동 전후를 비교해서
+    // 더 이상 보이지 않는 섹터와 새로 보이기 시작한 섹터를 구한다.
+    SectorAround removeAround;
+    SectorAround addAround;
+    GetUpdateSectorAround(pCharacter, &removeAround, &addAround);
+    // 계산이 끝났으면 캐릭터가 실제로 속한 섹터 정보를 갱신한다.
+    if (!UpdateSector(pCharacter, &curSector))
+    {
+        return;
+    }
+
+    // 1) 시야에서 빠진 섹터에 있는 다른 유저들에게
+    // 이동한 캐릭터를 삭제하라고 알린다.
+    PacketHeader delHeader;
+    PacketSCDeleteCharacter delMsg;
+    MakePacket_DeleteCharacter(&delHeader, &delMsg, pCharacter->sessionID);
+    SendPacket_BySectorAround(removeAround, &delHeader, reinterpret_cast<char*>(&delMsg));
+
+    // 2) 이동한 본인에게도 시야에서 빠진 다른 캐릭터들을 삭제시킨다.
+    for (int index = 0; index < removeAround.count; ++index)
+    {
+        const SectorPos sectorPos = removeAround.around[index];
+        std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+        for (Character* character : sectorList)
+        {
+            if (character == nullptr || character == pCharacter)
+            {
+                continue;
+            }
+
+            PacketHeader otherDelHeader;
+            PacketSCDeleteCharacter otherDelMsg;
+            MakePacket_DeleteCharacter(&otherDelHeader, &otherDelMsg, character->sessionID);
+            SendUnicast(currentSession, &otherDelHeader, reinterpret_cast<char*>(&otherDelMsg));
+        }
+    }
+
+    // 3) 새 시야에 들어온 섹터의 다른 유저들에게
+    // 이동한 캐릭터를 새로 생성하라고 알린다.
+    PacketHeader createHeader;
+    PacketSCCreateOtherCharacter createMsg;
+    MakePacket_CreateOtherCharacter(&createHeader, &createMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y, pCharacter->HP);
+    SendPacket_BySectorAround(addAround, &createHeader, reinterpret_cast<char*>(&createMsg));
+
+    // 4) 이동한 본인에게도 새 시야에 들어온 다른 캐릭터들을 생성시킨다.
+    for (int index = 0; index < addAround.count; ++index)
+    {
+        const SectorPos sectorPos = addAround.around[index];
+        std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+        for (Character* character : sectorList)
+        {
+            if (character == nullptr || character == pCharacter)
+            {
+                continue;
+            }
+
+            PacketHeader otherCreateHeader;
+            PacketSCCreateOtherCharacter otherCreateMsg;
+            MakePacket_CreateOtherCharacter(
+                &otherCreateHeader,
+                &otherCreateMsg,
+                character->direction,
+                character->sessionID,
+                character->x,
+                character->y,
+                character->HP);
+            SendUnicast(currentSession, &otherCreateHeader, reinterpret_cast<char*>(&otherCreateMsg));
+        }
+    }
+
+    // 섹터 변경 전/후 정보를 기록한다.
+    {
+        const wchar_t* dirStr = L"STOP";
+        switch (pCharacter->action)
+        {
+        case dfPACKET_MOVE_DIR_UU: dirStr = L"UU"; break;
+        case dfPACKET_MOVE_DIR_DD: dirStr = L"DD"; break;
+        case dfPACKET_MOVE_DIR_RR: dirStr = L"RR"; break;
+        case dfPACKET_MOVE_DIR_LL: dirStr = L"LL"; break;
+        case dfPACKET_MOVE_DIR_RU: dirStr = L"RU"; break;
+        case dfPACKET_MOVE_DIR_RD: dirStr = L"RD"; break;
+        case dfPACKET_MOVE_DIR_LU: dirStr = L"LU"; break;
+        case dfPACKET_MOVE_DIR_LD: dirStr = L"LD"; break;
+        default:                   dirStr = L"STOP"; break;
+        }
+
+        _LOG(
+            LOG_LEVEL_DEBUG,
+            L"# sectorMove : %s # SessionID : %u / X : %d / Y : %d / OldSector : (%d, %d) / NewSector : (%d, %d)",
+            dirStr,
+            pCharacter->sessionID,
+            pCharacter->x,
+            pCharacter->y,
+            curSector.x,
+            curSector.y,
+            pCharacter->sector.x,
+            pCharacter->sector.y);
+    }
+}
+
 void Update() noexcept
 {
     QueryPerformanceCounter(&gFrameEndTick);
@@ -91,112 +206,7 @@ void Update() noexcept
 
 
 
-        // 이동이 반영된 현재 좌표로 섹터를 다시 계산한다.
-        SectorPos curSector = CalcSector(pCharacter->x, pCharacter->y);
-        // 이전 섹터와 같으면 시야 갱신이 필요 없다.
-        if (IsSameSector(curSector, pCharacter->sector))
-        {
-            continue;
-        }
-
-        // 섹터 이동 전후를 비교해서
-        // 더 이상 보이지 않는 섹터와 새로 보이기 시작한 섹터를 구한다.
-        SectorAround removeAround;
-        SectorAround addAround;
-        GetUpdateSectorAround(pCharacter, &removeAround, &addAround);
-        // 계산이 끝났으면 캐릭터가 실제로 속한 섹터 정보를 갱신한다.
-        if (!UpdateSector(pCharacter, &curSector))
-        {
-            continue;
-        }
-
-        // 1) 시야에서 빠진 섹터에 있는 다른 유저들에게
-        // 이동한 캐릭터를 삭제하라고 알린다.
-        PacketHeader delHeader;
-        PacketSCDeleteCharacter delMsg;
-        MakePacket_DeleteCharacter(&delHeader, &delMsg, pCharacter->sessionID);
-        SendPacket_BySectorAround(removeAround, &delHeader, reinterpret_cast<char*>(&delMsg));
-
-        // 2) 이동한 본인에게도 시야에서 빠진 다른 캐릭터들을 삭제시킨다.
-        for (int index = 0; index < removeAround.count; ++index)
-        {
-            const SectorPos sectorPos = removeAround.around[index];
-            std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
-            for (Character* character : sectorList)
-            {
-                if (character == nullptr || character == pCharacter)
-                {
-                    continue;
-                }
-
-                PacketHeader otherDelHeader;
-                PacketSCDeleteCharacter otherDelMsg;
-                MakePacket_DeleteCharacter(&otherDelHeader, &otherDelMsg, character->sessionID);
-                SendUnicast(currentSession, &otherDelHeader, reinterpret_cast<char*>(&otherDelMsg));
-            }
-        }
-
-        // 3) 새 시야에 들어온 섹터의 다른 유저들에게
-        // 이동한 캐릭터를 새로 생성하라고 알린다.
-        PacketHeader phCreateCharacter;
-        PacketSCCreateOtherCharacter createMsg;
-        MakePacket_CreateOtherCharacter(&phCreateCharacter, &createMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y, pCharacter->HP);
-        SendPacket_BySectorAround(addAround, &phCreateCharacter, reinterpret_cast<char*>(&createMsg));
-
-        // 4) 이동한 본인에게도 새 시야에 들어온 다른 캐릭터들을 생성시킨다.
-        for (int index = 0; index < addAround.count; ++index)
-        {
-            const SectorPos sectorPos = addAround.around[index];
-            std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
-            for (Character* character : sectorList)
-            {
-                if (character == nullptr || character == pCharacter)
-                {
-                    continue;
-                }
-
-                PacketHeader otherCreateHeader;
-                PacketSCCreateOtherCharacter otherCreateMsg;
-                MakePacket_CreateOtherCharacter(
-                    &otherCreateHeader,
-                    &otherCreateMsg,
-                    character->direction,
-                    character->sessionID,
-                    character->x,
-                    character->y,
-                    character->HP);
-                SendUnicast(currentSession, &otherCreateHeader, reinterpret_cast<char*>(&otherCreateMsg));
-            }
-        }
-
-        // 섹터 변경 전/후 정보를 기록한다.
-        {
-            const wchar_t* dirStr = L"STOP";
-            switch (pCharacter->action)
-            {
-            case dfPACKET_MOVE_DIR_UU: dirStr = L"UU"; break;
-            case dfPACKET_MOVE_DIR_DD: dirStr = L"DD"; break;
-            case dfPACKET_MOVE_DIR_RR: dirStr = L"RR"; break;
-            case dfPACKET_MOVE_DIR_LL: dirStr = L"LL"; break;
-            case dfPACKET_MOVE_DIR_RU: dirStr = L"RU"; break;
-            case dfPACKET_MOVE_DIR_RD: dirStr = L"RD"; break;
-            case dfPACKET_MOVE_DIR_LU: dirStr = L"LU"; break;
-            case dfPACKET_MOVE_DIR_LD: dirStr = L"LD"; break;
-            default:                   dirStr = L"STOP"; break;
-            }
-
-            _LOG(
-                LOG_LEVEL_DEBUG,
-                L"# sectorMove : %s # SessionID : %u / X : %d / Y : %d / OldSector : (%d, %d) / NewSector : (%d, %d)",
-                dirStr,
-                pCharacter->sessionID,
-                pCharacter->x,
-                pCharacter->y,
-                curSector.x,
-                curSector.y,
-                pCharacter->sector.x,
-                pCharacter->sector.y);
-        }
+        UpdateCharacterSector(pCharacter, currentSession);
     }
 }
 

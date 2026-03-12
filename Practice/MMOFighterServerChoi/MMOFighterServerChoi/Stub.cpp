@@ -138,6 +138,7 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 	pCharacter->direction = NormalizeViewDir(moveStop.direction);
 	pCharacter->x = moveStop.x;
 	pCharacter->y = moveStop.y;
+	UpdateCharacterSector(pCharacter, pSession);
 
 	PacketHeader packetHeader;
 	PacketSCMoveStop sendMsg;
