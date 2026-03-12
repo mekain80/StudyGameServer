@@ -28,7 +28,7 @@ bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexc
         _LOG(LOG_LEVEL_ERROR, L"sendQ is full, disconnect");
         _LOG(LOG_LEVEL_ERROR, L"sendQ is full ID=%d IP=%s", session->sessionID, session->ipStr);
 
-        Disconnect(session);
+        Disconnect(session, L"sendQ free size 부족");
         return false;
     }
 
@@ -36,7 +36,7 @@ bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexc
     bool isBodyEnqueued = session->sendQ.Enqueue(pPacket, pHeader->size);
     if (!isHeaderEnqueued || !isBodyEnqueued)
     {
-        Disconnect(session);
+        Disconnect(session, L"sendQ enqueue 실패");
         return false;
     }
 
@@ -133,12 +133,20 @@ void SendPacket_Around(Session* pSession, PacketHeader* pHeader, char* pPacket, 
     SendPacket_BySectorAround(sectorAround, pHeader, pPacket, exceptSession);
 }
 
-void Disconnect(Session* pSession) noexcept
+void Disconnect(Session* pSession, const WCHAR* reason) noexcept
 {
     if (pSession == nullptr)
     {
         return;
     }
+
+    _LOG(
+        LOG_LEVEL_SYSTEM,
+        L"Disconnect # SessionID:%u / IP:%s / Socket:%llu / Reason:%s",
+        pSession->sessionID,
+        pSession->ipStr,
+        static_cast<unsigned long long>(pSession->socket),
+        (reason != nullptr) ? reason : L"(none)");
 
     PacketHeader header;
     PacketSCDeleteCharacter packet;

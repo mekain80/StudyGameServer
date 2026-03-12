@@ -17,6 +17,65 @@ bool gShutdown = false;
 DWORD gAllocID = 1;
 SOCKET gListenSocket = INVALID_SOCKET;
 
+namespace
+{
+	void LogRecvPacketHex(Session* session, const WCHAR* reason) noexcept
+	{
+		if (session == nullptr)
+		{
+			return;
+		}
+
+		const std::size_t usedSize = session->recvQ.GetUseSize();
+		const std::size_t dumpSize = (usedSize < 64) ? usedSize : 64;
+		if (dumpSize == 0)
+		{
+			_LOG(
+				LOG_LEVEL_ERROR,
+				L"PacketDump # SessionID:%u / Reason:%s / UsedSize:%zu / Data:(empty)",
+				session->sessionID,
+				(reason != nullptr) ? reason : L"(none)",
+				usedSize);
+			return;
+		}
+
+		char buffer[64]{};
+		if (!session->recvQ.Peek(buffer, dumpSize))
+		{
+			_LOG(
+				LOG_LEVEL_ERROR,
+				L"PacketDump # SessionID:%u / Reason:%s / UsedSize:%zu / Data:(peek fail)",
+				session->sessionID,
+				(reason != nullptr) ? reason : L"(none)",
+				usedSize);
+			return;
+		}
+
+		WCHAR hexBuffer[256]{};
+		std::size_t offset = 0;
+		for (std::size_t index = 0; index < dumpSize && offset + 4 < _countof(hexBuffer); ++index)
+		{
+			const unsigned char value = static_cast<unsigned char>(buffer[index]);
+			const int written = swprintf_s(hexBuffer + offset, _countof(hexBuffer) - offset, L"%02X ", value);
+			if (written <= 0)
+			{
+				break;
+			}
+
+			offset += static_cast<std::size_t>(written);
+		}
+
+		_LOG(
+			LOG_LEVEL_ERROR,
+			L"PacketDump # SessionID:%u / Reason:%s / UsedSize:%zu / DumpSize:%zu / Data:%s",
+			session->sessionID,
+			(reason != nullptr) ? reason : L"(none)",
+			usedSize,
+			dumpSize,
+			hexBuffer);
+	}
+}
+
 void NetStartUp() noexcept
 {
 	auto failStartUp = [](const WCHAR* const message) noexcept
@@ -257,7 +316,7 @@ bool NetProc_Recv(Session* pSession) noexcept
 	int recvRet = recv(pSession->socket, buffer, sizeof(buffer), 0);
 	if (recvRet == 0)
 	{
-		Disconnect(pSession);
+		Disconnect(pSession, L"recv 0");
 		return false;
 	}
 	else if (recvRet == SOCKET_ERROR)
@@ -272,18 +331,18 @@ bool NetProc_Recv(Session* pSession) noexcept
 			err == WSAENETRESET || err == WSAESHUTDOWN || err == WSAENOTCONN)
 		{
 			_LOG(LOG_LEVEL_ERROR, L"WSAGetLastError # SessionID:%d    WSA NUM:%d", pSession->sessionID, err);
-			Disconnect(pSession);
+			Disconnect(pSession, L"recv socket error");
 			return false;
 		}
 
-		Disconnect(pSession);
+		Disconnect(pSession, L"recv unknown socket error");
 		return false;
 	}
 
 	if (!pSession->recvQ.Enqueue(buffer, recvRet))
 	{
 		_LOG(LOG_LEVEL_ERROR, L"recvQ enqueue fail");
-		Disconnect(pSession);
+		Disconnect(pSession, L"recvQ enqueue fail");
 		return false;
 	}
 
@@ -300,20 +359,37 @@ bool NetProc_Recv(Session* pSession) noexcept
 		PacketHeader packetHeader;
 		if (!pSession->recvQ.Peek(reinterpret_cast<char*>(&packetHeader), static_cast<int>(headerSize)))
 		{
-			Disconnect(pSession);
+			Disconnect(pSession, L"packet header peek fail");
 			return false;
 		}
 
 		if (packetHeader.code != dfNETWORK_PACKET_CODE)
 		{
-			Disconnect(pSession);
+			_LOG(
+				LOG_LEVEL_ERROR,
+				L"InvalidPacketCode # SessionID:%u / Code:0x%02X / Size:%u / Type:%u",
+				pSession->sessionID,
+				packetHeader.code,
+				packetHeader.size,
+				packetHeader.type);
+			LogRecvPacketHex(pSession, L"invalid packet code");
+			Disconnect(pSession, L"invalid packet code");
 			return false;
 		}
 
 		WORD expectedSize = GetExpectedBodySize(packetHeader.type);
 		if (expectedSize == 0 || packetHeader.size != expectedSize)
 		{
-			Disconnect(pSession);
+			_LOG(
+				LOG_LEVEL_ERROR,
+				L"InvalidPacketSizeType # SessionID:%u / Code:0x%02X / Size:%u / Type:%u / ExpectedSize:%u",
+				pSession->sessionID,
+				packetHeader.code,
+				packetHeader.size,
+				packetHeader.type,
+				expectedSize);
+			LogRecvPacketHex(pSession, L"invalid packet size/type");
+			Disconnect(pSession, L"invalid packet size/type");
 			return false;
 		}
 
@@ -327,14 +403,14 @@ bool NetProc_Recv(Session* pSession) noexcept
 
 		if (packetHeader.size > BUFFER_SIZE)
 		{
-			Disconnect(pSession);
+			Disconnect(pSession, L"packet body too large");
 			return false;
 		}
 
 		char packetBuffer[BUFFER_SIZE];
 		if (!pSession->recvQ.Dequeue(packetBuffer, packetHeader.size))
 		{
-			Disconnect(pSession);
+			Disconnect(pSession, L"packet body dequeue fail");
 			return false;
 		}
 
@@ -367,14 +443,14 @@ bool NetProc_Send(Session* pSession) noexcept
 
 		if (!pSession->sendQ.Peek(buffer, sendSize))
 		{
-			Disconnect(pSession);
+			Disconnect(pSession, L"sendQ peek fail");
 			return false;
 		}
 
 		int sendRet = send(pSession->socket, buffer, sendSize, 0);
 		if (sendRet == 0)
 		{
-			Disconnect(pSession);
+			Disconnect(pSession, L"send 0");
 			return false;
 		}
 		else if (sendRet == SOCKET_ERROR)
@@ -388,11 +464,11 @@ bool NetProc_Send(Session* pSession) noexcept
 			if (err == WSAECONNRESET || err == WSAECONNABORTED ||
 				err == WSAENETRESET || err == WSAESHUTDOWN || err == WSAENOTCONN)
 			{
-				Disconnect(pSession);
+				Disconnect(pSession, L"send socket error");
 				return false;
 			}
 
-			Disconnect(pSession);
+			Disconnect(pSession, L"send unknown socket error");
 			return false;
 		}
 

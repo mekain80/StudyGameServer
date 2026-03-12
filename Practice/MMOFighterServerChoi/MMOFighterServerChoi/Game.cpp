@@ -122,7 +122,7 @@ void Update() noexcept
         if (pCharacter->HP <= 0)
         {
             Session* session = FindSession(pCharacter->sessionID);
-            Disconnect(session);
+            Disconnect(session, L"HP 0 이하");
             continue;
         }
 
@@ -136,7 +136,7 @@ void Update() noexcept
 
         if (currentTick - currentSession->lastRecvTime >= timeoutTick)
         {
-            Disconnect(currentSession);
+            Disconnect(currentSession, L"recv timeout");
             continue;
         }
 

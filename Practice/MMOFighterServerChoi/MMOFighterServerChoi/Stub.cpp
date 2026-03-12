@@ -19,7 +19,7 @@ bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packet
 	if (putRet != packetSize)
 	{
 		_LOG(LOG_LEVEL_ERROR, L"SerializedBuffer PutData fail");
-		Disconnect(pSession);
+		Disconnect(pSession, L"SerializedBuffer PutData fail");
 		return false;
 	}
 
@@ -49,7 +49,7 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 
 	if (!IsValidMoveDirection(direction))
 	{
-		Disconnect(pSession);
+		Disconnect(pSession, L"invalid move start direction");
 		return false;
 	}
 
@@ -114,7 +114,7 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 
 	if (!IsValidViewDirection(moveStop.direction))
 	{
-		Disconnect(pSession);
+		Disconnect(pSession, L"invalid move stop direction");
 		return false;
 	}
 
@@ -155,7 +155,7 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 
 	if (!IsValidViewDirection(atk.direction))
 	{
-		Disconnect(pSession);
+		Disconnect(pSession, L"invalid attack1 direction");
 		return false;
 	}
 
@@ -227,7 +227,7 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 
 	if (!IsValidViewDirection(atk.direction))
 	{
-		Disconnect(pSession);
+		Disconnect(pSession, L"invalid attack2 direction");
 		return false;
 	}
 
@@ -299,7 +299,7 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 
 	if (!IsValidViewDirection(atk.direction))
 	{
-		Disconnect(pSession);
+		Disconnect(pSession, L"invalid attack3 direction");
 		return false;
 	}
 

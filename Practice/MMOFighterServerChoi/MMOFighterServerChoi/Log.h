@@ -18,7 +18,7 @@ extern WCHAR gLogBuff[5000];	// 로그 저장 시 필요한 임시 버퍼
 do{													\
 	if (gLogLevel <= LogLevel)						\
 	{												\
-		wsprintf(gLogBuff, fmt, ##__VA_ARGS__);		\
+		swprintf_s(gLogBuff, _countof(gLogBuff), fmt, ##__VA_ARGS__);	\
 		Log(gLogBuff, LogLevel);					\
 	}												\
 }while(0)
