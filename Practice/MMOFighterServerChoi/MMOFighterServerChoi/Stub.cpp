@@ -93,7 +93,12 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 
 	PacketHeader packetHeader;
 	PacketSCMoveStart sendMsg;
-	MakePacket_MoveStart(&packetHeader, &sendMsg, pCharacter->sessionID, pCharacter->direction, pCharacter->x, pCharacter->y);
+	MakePacket_MoveStart(&packetHeader, 
+		&sendMsg, 
+		pCharacter->sessionID,
+		pCharacter->action, 
+		pCharacter->x, 
+		pCharacter->y);
 	SendPacket_Around(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg));
 
 	return true;
