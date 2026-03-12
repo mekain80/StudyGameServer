@@ -137,11 +137,11 @@ void Disconnect(Session* pSession) noexcept
     PacketHeader header;
     PacketSCDeleteCharacter packet;
     MakePacket_DeleteCharacter(&header, &packet, pSession->sessionID);
+    SendPacket_Around(pSession, &header, reinterpret_cast<char*>(&packet));
 
-    SendBroadcast(pSession, &header, reinterpret_cast<char*>(&packet));
-
-    closesocket(pSession->socket);
     gSessionMap.erase(pSession->socket);
+    closesocket(pSession->socket);
+
     Character* pCharacter = FindCharacter(pSession->sessionID);
     RemoveSector(pCharacter);
     gCharacterMap.erase(pCharacter->sessionID);
