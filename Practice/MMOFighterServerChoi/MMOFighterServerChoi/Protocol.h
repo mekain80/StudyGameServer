@@ -338,6 +338,14 @@ struct PacketSCDamage
     BYTE damageHP;
 };
 
+// 캐릭터 위치 싱크 패킷 (Server -> Client)
+struct PacketSCSync
+{
+    UINT ID;
+    WORD x;
+    WORD y;
+};
+
 #pragma pack(pop)
 
 #endif

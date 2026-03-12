@@ -1,6 +1,9 @@
 ﻿#pragma once
 
 #include "Protocol.h"
+#include "Session.h"
+
+struct Character;
 
 void InitHeader(PacketHeader* pHeader, BYTE type, BYTE bodySize) noexcept;
 
@@ -15,3 +18,9 @@ void MakePacket_Damage(PacketHeader* pHeader, PacketSCDamage* pPacket, DWORD att
 void MakePacket_Attack1(PacketHeader* pHeader, PacketSCAttack1* pPacket, BYTE direction, DWORD ID, int x, int y);
 void MakePacket_Attack2(PacketHeader* pHeader, PacketSCAttack2* pPacket, BYTE direction, DWORD ID, int x, int y);
 void MakePacket_Attack3(PacketHeader* pHeader, PacketSCAttack3* pPacket, BYTE direction, DWORD ID, int x, int y);
+
+
+void MakePacket_Sync(PacketHeader* pHeader, PacketSCSync* pPacket, DWORD ID, WORD x, WORD y);
+
+bool NeedSync(int clientX, int clientY, const Character* ch) noexcept;
+void SendSync(Session* s, const Character* ch) noexcept;

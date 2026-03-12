@@ -3,6 +3,8 @@
 #include "Proxy.h"
 
 #include "GameInfo.h"
+#include "Character.h"
+#include "PacketControl.h"
 
 void InitHeader(PacketHeader* pHeader, BYTE type, BYTE bodySize) noexcept
 {
@@ -88,4 +90,28 @@ void MakePacket_Attack3(PacketHeader* pHeader, PacketSCAttack3* pPacket, BYTE di
     pPacket->direction = direction;
     pPacket->x = x;
     pPacket->y = y;
+}
+
+void MakePacket_Sync(PacketHeader* pHeader, PacketSCSync* pPacket, DWORD ID, WORD x, WORD y)
+{
+    InitHeader(pHeader, dfPACKET_SC_SYNC, sizeof(PacketSCSync));
+    pPacket->ID = ID;
+    pPacket->x = x;
+    pPacket->y = y;
+}
+
+bool NeedSync(int clientX, int clientY, const Character* ch) noexcept
+{
+    return std::abs(clientX - ch->x) > dfERROR_RANGE ||
+        std::abs(clientY - ch->y) > dfERROR_RANGE;
+}
+
+void SendSync(Session* s, const Character* ch) noexcept
+{
+    PacketHeader h{};
+    PacketSCSync p{};
+    MakePacket_Sync(&h, &p, ch->sessionID,
+        static_cast<WORD>(ch->x),
+        static_cast<WORD>(ch->y));
+    SendUnicast(s, &h, reinterpret_cast<char*>(&p));
 }

@@ -64,27 +64,12 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
-	// TODO) Disconnect 비활성화 하고 동기화 패킷 클라에 쏴주는 것 추가하기
-	//-----------------------------------------------------
 	// 서버의 위치와 받은 패킷의 위치값이 너무 큰 차이가 난다면 싱크 패킷을 보내어 좌표 보정.
-	//
-	// 본 게임의 좌표 동기화 구조가 단순한 키보드 조작 (클라이언트의 선처리, 서버의 후 반영) 방식으로
-	// 클라이언트의 좌표를 그대로 믿는 방식을 택하고 있음.
-	// 실제 온라인 게임이라면 클라이언트에서 목적지를 공유하는 방식을 택해야 함.
-	// 지금은 좌표에 대해서는 간단한 구현을 목적으로 하고 있으므로
-	// 서버는 클라이언트의 좌표를 그대로 믿지만, 서버와 너무 큰 차이가 있다면 강제좌표 동기화 하도록 함
-	//-----------------------------------------------------
-	if (abs(x - pCharacter->x) > dfERROR_RANGE ||
-		abs(y - pCharacter->y) > dfERROR_RANGE)
+	if (NeedSync(x, y, pCharacter))
 	{
-		//mpSync(pPacket, pSession->sessionID, pCharacter->x, pCharacter->y);
-		//SendPacket_Around(pSession, pPacket, true);
-		//x = pCharacter->x;
-		//y = pCharacter->y;
-
-		_LOG(LOG_LEVEL_ERROR, L"dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
-		Disconnect(pSession);
-		return false;
+		SendSync(pSession, pCharacter);
+		_LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE MoveStart ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
+		return true; // 세션 유지, 이번 입력만 무시
 	}
 
 	pCharacter->action = direction;
@@ -110,10 +95,11 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 	//// 현재 접속중인 사용자에게 모든 패킷을 뿌린다. (섹터 단위 패킷 전송 함수 )
 	////-----------------------------------------------------
 	//SendPacket_Around(pSession, pPacket);
+
 	PacketHeader packetHeader;
 	PacketSCMoveStart sendMsg;
 	MakePacket_MoveStart(&packetHeader, &sendMsg, pCharacter->sessionID, pCharacter->direction, pCharacter->x, pCharacter->y);
-	SendBroadcast(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg));
+	SendPacket_Around(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg));
 
 	return true;
 }
@@ -141,12 +127,12 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
-	if (abs(moveStop.x - pCharacter->x) > dfERROR_RANGE ||
-		abs(moveStop.y - pCharacter->y) > dfERROR_RANGE)
+	// 서버의 위치와 받은 패킷의 위치값이 너무 큰 차이가 난다면 싱크 패킷을 보내어 좌표 보정.
+	if (NeedSync(moveStop.x, moveStop.y, pCharacter))
 	{
-		_LOG(LOG_LEVEL_ERROR, L"dfERROR_RANGE Fail ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
-		Disconnect(pSession);
-		return false;
+		SendSync(pSession, pCharacter);
+		_LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE MoveStop ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
+		return true; // 세션 유지, 이번 입력만 무시
 	}
 
 	pCharacter->action = dfACTION_STOP;
