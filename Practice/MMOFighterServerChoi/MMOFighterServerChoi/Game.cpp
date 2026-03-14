@@ -73,6 +73,13 @@ void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexc
     PacketSCCreateOtherCharacter createMsg;
     MakePacket_CreateOtherCharacter(&createHeader, &createMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y, pCharacter->HP);
     SendPacket_BySectorAround(addAround, &createHeader, reinterpret_cast<char*>(&createMsg));
+    if (pCharacter->action != dfACTION_STOP)
+    {
+        PacketHeader moveHeader{};
+        PacketSCMoveStart moveMsg{};
+        MakePacket_MoveStart(&moveHeader, &moveMsg, pCharacter->sessionID, pCharacter->action, pCharacter->x, pCharacter->y);
+        SendPacket_BySectorAround(addAround, &moveHeader, reinterpret_cast<char*>(&moveMsg));
+    }
 
     // 4) 이동한 본인에게도 새 시야에 들어온 다른 캐릭터들을 생성시킨다.
     for (int index = 0; index < addAround.count; ++index)
@@ -97,6 +104,19 @@ void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexc
                 character->y,
                 character->HP);
             SendUnicast(currentSession, &otherCreateHeader, reinterpret_cast<char*>(&otherCreateMsg));
+            if (character->action != dfACTION_STOP)
+            {
+                PacketHeader otherMoveHeader{};
+                PacketSCMoveStart otherMoveMsg{};
+                MakePacket_MoveStart(
+                    &otherMoveHeader,
+                    &otherMoveMsg,
+                    character->sessionID,
+                    character->action,
+                    character->x,
+                    character->y);
+                SendUnicast(currentSession, &otherMoveHeader, reinterpret_cast<char*>(&otherMoveMsg));
+            }
         }
     }
 

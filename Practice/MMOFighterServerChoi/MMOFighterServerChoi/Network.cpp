@@ -297,6 +297,19 @@ void NetProc_Accept() noexcept
 				otherCharacter->y,
 				otherCharacter->HP);
 			SendUnicast(pSession, &otherCharacterHeader, reinterpret_cast<char*>(&otherCharacterPacket));
+			if (otherCharacter->action != dfACTION_STOP)
+			{
+				PacketHeader moveHeader{};
+				PacketSCMoveStart movePacket{};
+				MakePacket_MoveStart(
+					&moveHeader,
+					&movePacket,
+					otherCharacter->sessionID,
+					otherCharacter->action,
+					otherCharacter->x,
+					otherCharacter->y);
+				SendUnicast(pSession, &moveHeader, reinterpret_cast<char*>(&movePacket));
+			}
 		}
 	}
 
@@ -305,6 +318,13 @@ void NetProc_Accept() noexcept
 	PacketSCCreateOtherCharacter broadPacket;
 	MakePacket_CreateOtherCharacter(&broadHeader, &broadPacket, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y, pCharacter->HP);
 	SendPacket_Around(pSession, &broadHeader, reinterpret_cast<char*>(&broadPacket));
+	if (pCharacter->action != dfACTION_STOP)
+	{
+		PacketHeader moveHeader{};
+		PacketSCMoveStart movePacket{};
+		MakePacket_MoveStart(&moveHeader, &movePacket, pCharacter->sessionID, pCharacter->action, pCharacter->x, pCharacter->y);
+		SendPacket_Around(pSession, &moveHeader, reinterpret_cast<char*>(&movePacket));
+	}
 
 	_LOG(LOG_LEVEL_SYSTEM, L"Connect # IP:%s / SessionID:%d", pSession->ipStr, pSession->sessionID);
 }
