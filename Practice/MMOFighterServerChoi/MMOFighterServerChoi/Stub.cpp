@@ -18,7 +18,6 @@ bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packet
 	int putRet = packet.PutData(pPacket, packetSize);
 	if (putRet != packetSize)
 	{
-		// _LOG(LOG_LEVEL_ERROR, L"SerializedBuffer PutData fail");
 		Disconnect(pSession, L"SerializedBuffer PutData fail");
 		return false;
 	}
@@ -66,7 +65,6 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
-		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE MoveStart ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true; // 세션 유지, 이번 입력만 무시
 	}
 
@@ -76,24 +74,6 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 	pCharacter->action = direction;
 	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
-
-
-	// TODO) 패킷 뿌리는 것 섹터 기준으로 수정하기
-	//// 정지를 하면서 좌표가 약간 조절된 경우섹터 업데이트를 함. (섹터는 차후 설명)
-	////-----------------------------------------------------------------------
-	//if (Sector_UpdateCharacter(pCharacter))
-	//{
-	//	//-----------------------------------------------------------------------
-	//	// 섹터가 변경된 경우는 클라에게 관련 정보를 쏜다. (섹터는 차후 설명)
-	//	//-----------------------------------------------------------------------
-	//	CharacterSectorUpdatePacket(pCharacter);
-	//}
-	////-----------------------------------------------------------------------
-	//mpMoveStart(pPacket, pSession->dwSessionID, byDirection, pCharacter->shX, pCharacter->shY);
-	////-----------------------------------------------------
-	//// 현재 접속중인 사용자에게 모든 패킷을 뿌린다. (섹터 단위 패킷 전송 함수 )
-	////-----------------------------------------------------
-	//SendPacket_Around(pSession, pPacket);
 
 	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
 	MakePacket_MoveStart(
@@ -133,7 +113,6 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
-		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE MoveStop ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true; // 세션 유지, 이번 입력만 무시
 	}
 
@@ -174,7 +153,6 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
-		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack1 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true;
 	}
 
@@ -249,7 +227,6 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
-		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack2 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true;
 	}
 
@@ -324,7 +301,6 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
-		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack3 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true;
 	}
 

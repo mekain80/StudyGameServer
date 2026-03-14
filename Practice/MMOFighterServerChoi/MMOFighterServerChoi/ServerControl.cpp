@@ -29,15 +29,9 @@ void ServerControl() noexcept
             wprintf(L"Control Lock..! Press U - Control Unlock\n");
             bControlMode = false;
         }
-        // 키보드 제어 풀림 상태에서 특정 기능
         if ((L'q' == ControlKey || L'Q' == ControlKey) && bControlMode)
         {
             gShutdown = true;
         }
-        // 기타 컨트롤 기능…
-        //if (… ControlKey || … ControlKey) && bControlMode )
-        //{
-        //    // 기타 처리 하고자 하는 함수
-        //}
     }
 }
