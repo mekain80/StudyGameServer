@@ -242,7 +242,6 @@ void NetStartUp() noexcept
 		failStartUp(L"WSAStartup fail");
 		return;
 	}
-	_LOG(LOG_LEVEL_SYSTEM, L"WSAStartup #");
 
 	gListenSocket = socket(AF_INET, SOCK_STREAM, 0);
 	if (gListenSocket == INVALID_SOCKET)
@@ -276,8 +275,6 @@ void NetStartUp() noexcept
 		failStartUp(L"listen() fail");
 		return;
 	}
-
-	_LOG(LOG_LEVEL_SYSTEM, L"Listen OK #");
 }
 
 void NetEnd() noexcept
