@@ -376,4 +376,6 @@ struct PacketSCEcho
 
 #pragma pack(pop)
 
+WORD GetExpectedBodySize(BYTE packetType) noexcept;
+
 #endif

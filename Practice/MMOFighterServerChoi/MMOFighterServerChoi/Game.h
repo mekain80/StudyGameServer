@@ -17,7 +17,6 @@ BYTE NormalizeViewDir(BYTE direction, BYTE currentDirection) noexcept;
 void GetMoveDelta(BYTE direction, int& dx, int& dy) noexcept;
 bool IsValidMoveDirection(BYTE direction) noexcept;
 bool IsValidViewDirection(BYTE direction) noexcept;
-WORD GetExpectedBodySize(BYTE packetType) noexcept;
 
 bool IsHitAttack1(const Character* attacker, const Character* target, int centerX, int centerY) noexcept;
 bool IsHitDirectionalAttack(const Character* attacker, const Character* target, int centerX, int centerY, int rangeX, int rangeY) noexcept;
