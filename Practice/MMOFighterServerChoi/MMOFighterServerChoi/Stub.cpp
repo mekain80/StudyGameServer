@@ -72,8 +72,6 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 
 	pCharacter->action = direction;
 	pCharacter->direction = NormalizeViewDir(direction);
-	pCharacter->x = x;
-	pCharacter->y = y;
 
 
 	// TODO) 패킷 뿌리는 것 섹터 기준으로 수정하기
