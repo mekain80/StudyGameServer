@@ -21,14 +21,14 @@ namespace
     }
 }
 
-bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexcept
+bool EnqueuePacket(Session* session, const SerializedBuffer* pPacket) noexcept
 {
-    if (session == nullptr || session->disconnectFlag)
+    if (session == nullptr || session->disconnectFlag || pPacket == nullptr)
         return false;
 
-    const int totalSize = static_cast<int>(sizeof(PacketHeader)) + pHeader->size;
+    const int packetSize = pPacket->GetDataSize();
 
-    if (session->sendQ.GetFreeSize() < totalSize)
+    if (session->sendQ.GetFreeSize() < packetSize)
     {
         _LOG(LOG_LEVEL_ERROR, L"sendQ is full, disconnect");
         _LOG(LOG_LEVEL_ERROR, L"sendQ is full ID=%d IP=%s", session->sessionID, session->ipStr);
@@ -37,9 +37,8 @@ bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexc
         return false;
     }
 
-    bool isHeaderEnqueued = session->sendQ.Enqueue(reinterpret_cast<char*>(pHeader), sizeof(PacketHeader));
-    bool isBodyEnqueued = session->sendQ.Enqueue(pPacket, pHeader->size);
-    if (!isHeaderEnqueued || !isBodyEnqueued)
+    bool isPacketEnqueued = session->sendQ.Enqueue(pPacket->GetBufferRead(), packetSize);
+    if (!isPacketEnqueued)
     {
         Disconnect(session, L"sendQ enqueue 실패");
         return false;
@@ -48,17 +47,17 @@ bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexc
     return true;
 }
 
-void SendUnicast(Session* pSession, PacketHeader* pHeader, char* pPacket) noexcept
+void SendUnicast(Session* pSession, const SerializedBuffer* pPacket) noexcept
 {
     if (pSession == nullptr || pSession->disconnectFlag)
     {
         return;
     }
 
-    EnqueuePacket(pSession, pHeader, pPacket);
+    EnqueuePacket(pSession, pPacket);
 }
 
-void SendBroadcast(Session* pSession, PacketHeader* pHeader, char* pPacket) noexcept
+void SendBroadcast(Session* pSession, const SerializedBuffer* pPacket) noexcept
 {
     for (auto it = gSessionMap.begin(); it != gSessionMap.end();)
     {
@@ -70,11 +69,11 @@ void SendBroadcast(Session* pSession, PacketHeader* pHeader, char* pPacket) noex
             continue;
         }
 
-        EnqueuePacket(session, pHeader, pPacket);
+        EnqueuePacket(session, pPacket);
     }
 }
 
-void SendPacket_SectorOne(int sectorX, int sectorY, PacketHeader* pHeader, char* pPacket, Session* pExceptSession) noexcept
+void SendPacket_SectorOne(int sectorX, int sectorY, const SerializedBuffer* pPacket, Session* pExceptSession) noexcept
 {
     SectorPos sectorPos
     {
@@ -106,20 +105,20 @@ void SendPacket_SectorOne(int sectorX, int sectorY, PacketHeader* pHeader, char*
             continue;
         }
 
-        EnqueuePacket(session, pHeader, pPacket);
+        EnqueuePacket(session, pPacket);
     }
 }
 
-void SendPacket_BySectorAround(SectorAround sectorAround, PacketHeader* pHeader, char* pPacket, Session* pExceptSession) noexcept
+void SendPacket_BySectorAround(SectorAround sectorAround, const SerializedBuffer* pPacket, Session* pExceptSession) noexcept
 {
     for (int index = 0; index < sectorAround.count; ++index)
     {
         const SectorPos sectorPos = sectorAround.around[index];
-        SendPacket_SectorOne(sectorPos.x, sectorPos.y, pHeader, pPacket, pExceptSession);
+        SendPacket_SectorOne(sectorPos.x, sectorPos.y, pPacket, pExceptSession);
     }
 }
 
-void SendPacket_Around(Session* pSession, PacketHeader* pHeader, char* pPacket, bool sendMe) noexcept
+void SendPacket_Around(Session* pSession, const SerializedBuffer* pPacket, bool sendMe) noexcept
 {
     if (pSession == nullptr)
     {
@@ -135,7 +134,7 @@ void SendPacket_Around(Session* pSession, PacketHeader* pHeader, char* pPacket, 
     SectorAround sectorAround{};
     GetSectorAroundBySector(&character->sector, &sectorAround);
     Session* exceptSession = sendMe ? nullptr : pSession;
-    SendPacket_BySectorAround(sectorAround, pHeader, pPacket, exceptSession);
+    SendPacket_BySectorAround(sectorAround, pPacket, exceptSession);
 }
 
 void Disconnect(Session* pSession, const WCHAR* reason) noexcept
@@ -152,7 +151,7 @@ void Disconnect(Session* pSession, const WCHAR* reason) noexcept
     pSession->disconnectFlag = true;
 
     _LOG(
-        LOG_LEVEL_SYSTEM,
+        LOG_LEVEL_DEBUG,
         L"Disconnect 예약 # SessionID:%u / IP:%s / Socket:%llu / Reason:%s",
         pSession->sessionID,
         pSession->ipStr,
@@ -195,12 +194,11 @@ void FlushDisconnectedSessions() noexcept
 
         if (pCharacter != nullptr)
         {
-            PacketHeader header{};
-            PacketSCDeleteCharacter packet{};
-            MakePacket_DeleteCharacter(&header, &packet, pSession->sessionID);
+            SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_DELETE_CHARACTER_SIZE);
+            MakePacket_DeleteCharacter(&packet, pSession->sessionID);
 
             // 아직 Character와 sector 정보가 살아 있으니 주변에 삭제 통지 가능
-            SendPacket_Around(pSession, &header, reinterpret_cast<char*>(&packet));
+            SendPacket_Around(pSession, &packet);
 
             RemoveSector(pCharacter);
             gCharacterMap.erase(pCharacter->sessionID);

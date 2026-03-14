@@ -121,48 +121,42 @@ namespace
 
 	void SendVisibleCharacterState(Session* session, const Character* character) noexcept
 	{
-		PacketHeader createHeader{};
-		PacketSCCreateOtherCharacter createPacket{};
+		SerializedBuffer createPacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE);
 		MakePacket_CreateOtherCharacter(
-			&createHeader,
 			&createPacket,
 			character->direction,
 			character->sessionID,
 			character->x,
 			character->y,
 			character->HP);
-		SendUnicast(session, &createHeader, reinterpret_cast<char*>(&createPacket));
+		SendUnicast(session, &createPacket);
 
 		if (character->action == dfACTION_STOP)
 		{
 			return;
 		}
 
-		PacketHeader moveHeader{};
-		PacketSCMoveStart movePacket{};
+		SerializedBuffer movePacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
 		MakePacket_MoveStart(
-			&moveHeader,
 			&movePacket,
 			character->sessionID,
 			character->action,
 			character->x,
 			character->y);
-		SendUnicast(session, &moveHeader, reinterpret_cast<char*>(&movePacket));
+		SendUnicast(session, &movePacket);
 	}
 
 	void SendMyCharacterState(Session* session, const Character* character) noexcept
 	{
-		PacketHeader packetHeader{};
-		PacketSCCreateMyCharacter createPacket{};
+		SerializedBuffer createPacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_MY_CHARACTER_SIZE);
 		MakePacket_CreateMyCharacter(
-			&packetHeader,
 			&createPacket,
 			character->direction,
 			character->sessionID,
 			character->x,
 			character->y,
 			character->HP);
-		SendUnicast(session, &packetHeader, reinterpret_cast<char*>(&createPacket));
+		SendUnicast(session, &createPacket);
 	}
 
 	void SendNearbyCharactersToNewSession(Session* session, const Character* character) noexcept
@@ -187,33 +181,29 @@ namespace
 
 	void BroadcastNewCharacter(Session* session, const Character* character) noexcept
 	{
-		PacketHeader createHeader{};
-		PacketSCCreateOtherCharacter createPacket{};
+		SerializedBuffer createPacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE);
 		MakePacket_CreateOtherCharacter(
-			&createHeader,
 			&createPacket,
 			character->direction,
 			character->sessionID,
 			character->x,
 			character->y,
 			character->HP);
-		SendPacket_Around(session, &createHeader, reinterpret_cast<char*>(&createPacket));
+		SendPacket_Around(session, &createPacket);
 
 		if (character->action == dfACTION_STOP)
 		{
 			return;
 		}
 
-		PacketHeader moveHeader{};
-		PacketSCMoveStart movePacket{};
+		SerializedBuffer movePacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
 		MakePacket_MoveStart(
-			&moveHeader,
 			&movePacket,
 			character->sessionID,
 			character->action,
 			character->x,
 			character->y);
-		SendPacket_Around(session, &moveHeader, reinterpret_cast<char*>(&movePacket));
+		SendPacket_Around(session, &movePacket);
 	}
 }
 

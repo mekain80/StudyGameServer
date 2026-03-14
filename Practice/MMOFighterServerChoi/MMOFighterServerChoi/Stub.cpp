@@ -95,28 +95,29 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 	////-----------------------------------------------------
 	//SendPacket_Around(pSession, pPacket);
 
-	PacketHeader packetHeader;
-	PacketSCMoveStart sendMsg;
-	MakePacket_MoveStart(&packetHeader, 
-		&sendMsg, 
+	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
+	MakePacket_MoveStart(
+		&sendMsg,
 		pCharacter->sessionID,
 		pCharacter->action, 
 		pCharacter->x, 
 		pCharacter->y);
-	SendPacket_Around(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg));
+	SendPacket_Around(pSession, &sendMsg);
 
 	return true;
 }
 
 bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 {
-	PacketCSMoveStop moveStop{};
+	BYTE direction = 0;
+	WORD x = 0;
+	WORD y = 0;
 
-	packet >> moveStop.direction
-		>> moveStop.x
-		>> moveStop.y;
+	packet >> direction
+		>> x
+		>> y;
 
-	if (!IsValidViewDirection(moveStop.direction))
+	if (!IsValidViewDirection(direction))
 	{
 		Disconnect(pSession, L"invalid move stop direction");
 		return false;
@@ -129,7 +130,7 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 	}
 
 	// 서버의 위치와 받은 패킷의 위치값이 너무 큰 차이가 난다면 싱크 패킷을 보내어 좌표 보정.
-	if (NeedSync(moveStop.x, moveStop.y, pCharacter))
+	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
 		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE MoveStop ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
@@ -137,27 +138,28 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 	}
 
 	pCharacter->action = dfACTION_STOP;
-	pCharacter->direction = NormalizeViewDir(moveStop.direction, pCharacter->direction);
-	pCharacter->x = moveStop.x;
-	pCharacter->y = moveStop.y;
+	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
+	pCharacter->x = x;
+	pCharacter->y = y;
 	UpdateCharacterSector(pCharacter, pSession);
 
-	PacketHeader packetHeader;
-	PacketSCMoveStop sendMsg;
-	MakePacket_MoveStop(&packetHeader, &sendMsg, pCharacter->sessionID, pCharacter->direction, pCharacter->x, pCharacter->y);
-	SendPacket_Around(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg));
+	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_STOP_SIZE);
+	MakePacket_MoveStop(&sendMsg, pCharacter->sessionID, pCharacter->direction, pCharacter->x, pCharacter->y);
+	SendPacket_Around(pSession, &sendMsg);
 
 	return true;
 }
 
 bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 {
-	PacketCSAttack1 atk{};
-	packet >> atk.direction
-		>> atk.x
-		>> atk.y;
+	BYTE direction = 0;
+	WORD x = 0;
+	WORD y = 0;
+	packet >> direction
+		>> x
+		>> y;
 
-	if (!IsValidViewDirection(atk.direction))
+	if (!IsValidViewDirection(direction))
 	{
 		Disconnect(pSession, L"invalid attack1 direction");
 		return false;
@@ -169,22 +171,21 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
-	if (NeedSync(atk.x, atk.y, pCharacter))
+	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
 		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack1 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true;
 	}
 
-	pCharacter->x = atk.x;
-	pCharacter->y = atk.y;
-	pCharacter->direction = NormalizeViewDir(atk.direction, pCharacter->direction);
+	pCharacter->x = x;
+	pCharacter->y = y;
+	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
-	PacketHeader packetHeader;
-	PacketSCAttack1 sendMsg;
-	MakePacket_Attack1(&packetHeader, &sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
-	SendPacket_Around(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg), true);
+	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_ATTACK1_SIZE);
+	MakePacket_Attack1(&sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
+	SendPacket_Around(pSession, &sendMsg, true);
 
 	const int centerX = pCharacter->x;
 	const int centerY = pCharacter->y;
@@ -207,8 +208,7 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 				continue;
 			}
 
-			PacketHeader dmgHeader;
-			PacketSCDamage dmgMsg;
+			SerializedBuffer dmgMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_DAMAGE_SIZE);
 
 			character->HP -= dfATTACK1_DAMAGE;
 			if (character->HP < 0)
@@ -217,8 +217,8 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 			}
 
 			Session* targetSession = FindSession(character->sessionID);
-			MakePacket_Damage(&dmgHeader, &dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
-			SendPacket_Around(targetSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg), true);
+			MakePacket_Damage(&dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
+			SendPacket_Around(targetSession, &dmgMsg, true);
 		}
 	}
 
@@ -227,12 +227,14 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 
 bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 {
-	PacketCSAttack2 atk{};
-	packet >> atk.direction
-		>> atk.x
-		>> atk.y;
+	BYTE direction = 0;
+	WORD x = 0;
+	WORD y = 0;
+	packet >> direction
+		>> x
+		>> y;
 
-	if (!IsValidViewDirection(atk.direction))
+	if (!IsValidViewDirection(direction))
 	{
 		Disconnect(pSession, L"invalid attack2 direction");
 		return false;
@@ -244,22 +246,21 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
-	if (NeedSync(atk.x, atk.y, pCharacter))
+	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
 		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack2 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true;
 	}
 
-	pCharacter->x = atk.x;
-	pCharacter->y = atk.y;
-	pCharacter->direction = NormalizeViewDir(atk.direction, pCharacter->direction);
+	pCharacter->x = x;
+	pCharacter->y = y;
+	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
-	PacketHeader packetHeader;
-	PacketSCAttack2 sendMsg;
-	MakePacket_Attack2(&packetHeader, &sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
-	SendPacket_Around(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg), true);
+	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_ATTACK2_SIZE);
+	MakePacket_Attack2(&sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
+	SendPacket_Around(pSession, &sendMsg, true);
 
 	const int centerX = pCharacter->x;
 	const int centerY = pCharacter->y;
@@ -282,8 +283,7 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 				continue;
 			}
 
-			PacketHeader dmgHeader;
-			PacketSCDamage dmgMsg;
+			SerializedBuffer dmgMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_DAMAGE_SIZE);
 
 			character->HP -= dfATTACK2_DAMAGE;
 			if (character->HP < 0)
@@ -292,8 +292,8 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 			}
 
 			Session* targetSession = FindSession(character->sessionID);
-			MakePacket_Damage(&dmgHeader, &dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
-			SendPacket_Around(targetSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg), true);
+			MakePacket_Damage(&dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
+			SendPacket_Around(targetSession, &dmgMsg, true);
 		}
 	}
 
@@ -302,12 +302,14 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 
 bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 {
-	PacketCSAttack3 atk{};
-	packet >> atk.direction
-		>> atk.x
-		>> atk.y;
+	BYTE direction = 0;
+	WORD x = 0;
+	WORD y = 0;
+	packet >> direction
+		>> x
+		>> y;
 
-	if (!IsValidViewDirection(atk.direction))
+	if (!IsValidViewDirection(direction))
 	{
 		Disconnect(pSession, L"invalid attack3 direction");
 		return false;
@@ -319,22 +321,21 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
-	if (NeedSync(atk.x, atk.y, pCharacter))
+	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
 		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack3 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true;
 	}
 
-	pCharacter->x = atk.x;
-	pCharacter->y = atk.y;
-	pCharacter->direction = NormalizeViewDir(atk.direction, pCharacter->direction);
+	pCharacter->x = x;
+	pCharacter->y = y;
+	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
-	PacketHeader packetHeader;
-	PacketSCAttack3 sendMsg;
-	MakePacket_Attack3(&packetHeader, &sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
-	SendPacket_Around(pSession, &packetHeader, reinterpret_cast<char*>(&sendMsg), true);
+	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_ATTACK3_SIZE);
+	MakePacket_Attack3(&sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
+	SendPacket_Around(pSession, &sendMsg, true);
 
 	const int centerX = pCharacter->x;
 	const int centerY = pCharacter->y;
@@ -357,8 +358,7 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 				continue;
 			}
 
-			PacketHeader dmgHeader;
-			PacketSCDamage dmgMsg;
+			SerializedBuffer dmgMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_DAMAGE_SIZE);
 
 			character->HP -= dfATTACK3_DAMAGE;
 			if (character->HP < 0)
@@ -367,8 +367,8 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 			}
 
 			Session* targetSession = FindSession(character->sessionID);
-			MakePacket_Damage(&dmgHeader, &dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
-			SendPacket_Around(targetSession, &dmgHeader, reinterpret_cast<char*>(&dmgMsg), true);
+			MakePacket_Damage(&dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
+			SendPacket_Around(targetSession, &dmgMsg, true);
 		}
 	}
 
@@ -377,13 +377,12 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 
 bool NetPacketProc_Echo(Session* pSession, SerializedBuffer& packet)
 {
-	PacketCSEcho echo{};
-	packet >> echo.time;
+	DWORD time = 0;
+	packet >> time;
 
-	PacketHeader packetHeader{};
-	PacketSCEcho response{};
-	MakePacket_Echo(&packetHeader, &response, echo.time);
-	SendUnicast(pSession, &packetHeader, reinterpret_cast<char*>(&response));
+	SerializedBuffer response(dfPACKET_HEADER_SIZE + dfPACKET_SC_ECHO_SIZE);
+	MakePacket_Echo(&response, time);
+	SendUnicast(pSession, &response);
 
 	return true;
 }

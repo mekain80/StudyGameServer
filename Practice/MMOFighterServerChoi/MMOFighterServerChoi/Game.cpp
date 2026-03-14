@@ -19,25 +19,22 @@ namespace
 {
 	void SendDeleteCharacterPacket(Session* session, DWORD sessionID) noexcept
 	{
-		PacketHeader packetHeader{};
-		PacketSCDeleteCharacter packet{};
-		MakePacket_DeleteCharacter(&packetHeader, &packet, sessionID);
-		SendUnicast(session, &packetHeader, reinterpret_cast<char*>(&packet));
+		SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_DELETE_CHARACTER_SIZE);
+		MakePacket_DeleteCharacter(&packet, sessionID);
+		SendUnicast(session, &packet);
 	}
 
 	void SendCreateCharacterPacket(Session* session, const Character* character) noexcept
 	{
-		PacketHeader packetHeader{};
-		PacketSCCreateOtherCharacter packet{};
+		SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE);
 		MakePacket_CreateOtherCharacter(
-			&packetHeader,
 			&packet,
 			character->direction,
 			character->sessionID,
 			character->x,
 			character->y,
 			character->HP);
-		SendUnicast(session, &packetHeader, reinterpret_cast<char*>(&packet));
+		SendUnicast(session, &packet);
 	}
 
 	void SendMoveStartPacket(Session* session, const Character* character) noexcept
@@ -47,24 +44,21 @@ namespace
 			return;
 		}
 
-		PacketHeader packetHeader{};
-		PacketSCMoveStart packet{};
+		SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
 		MakePacket_MoveStart(
-			&packetHeader,
 			&packet,
 			character->sessionID,
 			character->action,
 			character->x,
 			character->y);
-		SendUnicast(session, &packetHeader, reinterpret_cast<char*>(&packet));
+		SendUnicast(session, &packet);
 	}
 
 	void BroadcastCharacterLeave(const SectorAround& removeAround, DWORD sessionID) noexcept
 	{
-		PacketHeader packetHeader{};
-		PacketSCDeleteCharacter packet{};
-		MakePacket_DeleteCharacter(&packetHeader, &packet, sessionID);
-		SendPacket_BySectorAround(removeAround, &packetHeader, reinterpret_cast<char*>(&packet));
+		SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_DELETE_CHARACTER_SIZE);
+		MakePacket_DeleteCharacter(&packet, sessionID);
+		SendPacket_BySectorAround(removeAround, &packet);
 	}
 
 	void SyncRemovedCharactersToCurrentSession(const SectorAround& removeAround, const Character* movingCharacter, Session* currentSession) noexcept
@@ -87,33 +81,29 @@ namespace
 
 	void BroadcastCharacterEnter(const SectorAround& addAround, const Character* movingCharacter) noexcept
 	{
-		PacketHeader createHeader{};
-		PacketSCCreateOtherCharacter createPacket{};
+		SerializedBuffer createPacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE);
 		MakePacket_CreateOtherCharacter(
-			&createHeader,
 			&createPacket,
 			movingCharacter->direction,
 			movingCharacter->sessionID,
 			movingCharacter->x,
 			movingCharacter->y,
 			movingCharacter->HP);
-		SendPacket_BySectorAround(addAround, &createHeader, reinterpret_cast<char*>(&createPacket));
+		SendPacket_BySectorAround(addAround, &createPacket);
 
 		if (movingCharacter->action == dfACTION_STOP)
 		{
 			return;
 		}
 
-		PacketHeader moveHeader{};
-		PacketSCMoveStart movePacket{};
+		SerializedBuffer movePacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
 		MakePacket_MoveStart(
-			&moveHeader,
 			&movePacket,
 			movingCharacter->sessionID,
 			movingCharacter->action,
 			movingCharacter->x,
 			movingCharacter->y);
-		SendPacket_BySectorAround(addAround, &moveHeader, reinterpret_cast<char*>(&movePacket));
+		SendPacket_BySectorAround(addAround, &movePacket);
 	}
 
 	void SyncAddedCharactersToCurrentSession(const SectorAround& addAround, const Character* movingCharacter, Session* currentSession) noexcept

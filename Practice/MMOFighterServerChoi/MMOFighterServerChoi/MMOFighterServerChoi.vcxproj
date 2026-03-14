@@ -25,6 +25,7 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Network.cpp" />
     <ClCompile Include="PacketControl.cpp" />
+    <ClCompile Include="Protocol.cpp" />
     <ClCompile Include="Profiler.cpp" />
     <ClCompile Include="Proxy.cpp" />
     <ClCompile Include="RingBuffer.cpp" />

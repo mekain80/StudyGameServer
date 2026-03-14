@@ -220,161 +220,28 @@ struct PacketHeader
     BYTE size;          // 이 패킷(페이로드) 전체 길이
     BYTE type;          // 패킷 타입
 };
-
-
-// 클라이언트 자신의 캐릭터 생성 패킷 (Server -> Client)
-struct PacketSCCreateMyCharacter
-{
-    UINT ID;
-    BYTE direction;
-    WORD x;
-    WORD y;
-    BYTE HP;
-};
-
-
-// 다른 클라이언트의 캐릭터 생성 패킷 (Server -> Client)
-struct PacketSCCreateOtherCharacter
-{
-    UINT ID;
-    BYTE direction;
-    WORD x;
-    WORD y;
-    BYTE HP;
-};
-
-
-// 캐릭터 삭제 패킷 (Server -> Client)
-struct PacketSCDeleteCharacter
-{
-    UINT ID;
-};
-
-
-// 캐릭터 이동 시작 패킷 (Client -> Server)
-struct PacketCSMoveStart
-{
-    BYTE direction;
-    WORD x;
-    WORD y;
-};
-
-
-// 캐릭터 이동 시작 패킷 (Server -> Client)
-struct PacketSCMoveStart
-{
-    UINT ID;
-    BYTE direction; // pSession->action(이동 방향)
-    WORD x;
-    WORD y;
-};
-
-
-// 캐릭터 이동 중지 패킷 (Client -> Server)
-struct PacketCSMoveStop
-{
-    BYTE direction;
-    WORD x;
-    WORD y;
-};
-
-
-// 캐릭터 이동 중지 패킷 (Server -> Client)
-struct PacketSCMoveStop
-{
-    UINT ID;
-    BYTE direction;
-    WORD x;
-    WORD y;
-};
-
-
-// 캐릭터 공격 1 패킷 (Client -> Server)
-struct PacketCSAttack1
-{
-    BYTE direction;
-    WORD x;
-    WORD y;
-};
-
-
-// 캐릭터 공격 1 패킷 (Server -> Client)
-struct PacketSCAttack1
-{
-    UINT ID;
-    BYTE direction;
-    WORD x;
-    WORD y;
-};
-
-
-// 캐릭터 공격 2 패킷 (Client -> Server)
-struct PacketCSAttack2
-{
-    BYTE direction;
-    WORD x;
-    WORD y;
-};
-
-
-// 캐릭터 공격 2 패킷 (Server -> Client)
-struct PacketSCAttack2
-{
-    UINT ID;
-    BYTE direction;
-    WORD x;
-    WORD y;
-};
-
-
-// 캐릭터 공격 3 패킷 (Client -> Server)
-struct PacketCSAttack3
-{
-    BYTE direction;
-    WORD x;
-    WORD y;
-};
-
-
-// 캐릭터 공격 3 패킷 (Server -> Client)
-struct PacketSCAttack3
-{
-    UINT ID;
-    BYTE direction;
-    WORD x;
-    WORD y;
-};
-
-
-// 캐릭터 데미지 패킷 (Server -> Client)
-struct PacketSCDamage
-{
-    UINT attackID;
-    UINT damageID;
-    BYTE damageHP;
-};
-
-// 캐릭터 위치 싱크 패킷 (Server -> Client)
-struct PacketSCSync
-{
-    UINT ID;
-    WORD x;
-    WORD y;
-};
-
-// Echo 요청 패킷 (Client -> Server)
-struct PacketCSEcho
-{
-    DWORD time;
-};
-
-// Echo 응답 패킷 (Server -> Client)
-struct PacketSCEcho
-{
-    DWORD time;
-};
-
 #pragma pack(pop)
+
+constexpr WORD dfPACKET_HEADER_SIZE = sizeof(PacketHeader);
+constexpr WORD dfPACKET_CS_MOVE_START_SIZE = sizeof(BYTE) + sizeof(WORD) + sizeof(WORD);
+constexpr WORD dfPACKET_CS_MOVE_STOP_SIZE = sizeof(BYTE) + sizeof(WORD) + sizeof(WORD);
+constexpr WORD dfPACKET_CS_ATTACK1_SIZE = sizeof(BYTE) + sizeof(WORD) + sizeof(WORD);
+constexpr WORD dfPACKET_CS_ATTACK2_SIZE = sizeof(BYTE) + sizeof(WORD) + sizeof(WORD);
+constexpr WORD dfPACKET_CS_ATTACK3_SIZE = sizeof(BYTE) + sizeof(WORD) + sizeof(WORD);
+constexpr WORD dfPACKET_CS_SYNC_SIZE = sizeof(WORD) + sizeof(WORD);
+constexpr WORD dfPACKET_CS_ECHO_SIZE = sizeof(DWORD);
+
+constexpr WORD dfPACKET_SC_CREATE_MY_CHARACTER_SIZE = sizeof(DWORD) + sizeof(BYTE) + sizeof(WORD) + sizeof(WORD) + sizeof(BYTE);
+constexpr WORD dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE = sizeof(DWORD) + sizeof(BYTE) + sizeof(WORD) + sizeof(WORD) + sizeof(BYTE);
+constexpr WORD dfPACKET_SC_DELETE_CHARACTER_SIZE = sizeof(DWORD);
+constexpr WORD dfPACKET_SC_MOVE_START_SIZE = sizeof(DWORD) + sizeof(BYTE) + sizeof(WORD) + sizeof(WORD);
+constexpr WORD dfPACKET_SC_MOVE_STOP_SIZE = sizeof(DWORD) + sizeof(BYTE) + sizeof(WORD) + sizeof(WORD);
+constexpr WORD dfPACKET_SC_ATTACK1_SIZE = sizeof(DWORD) + sizeof(BYTE) + sizeof(WORD) + sizeof(WORD);
+constexpr WORD dfPACKET_SC_ATTACK2_SIZE = sizeof(DWORD) + sizeof(BYTE) + sizeof(WORD) + sizeof(WORD);
+constexpr WORD dfPACKET_SC_ATTACK3_SIZE = sizeof(DWORD) + sizeof(BYTE) + sizeof(WORD) + sizeof(WORD);
+constexpr WORD dfPACKET_SC_DAMAGE_SIZE = sizeof(DWORD) + sizeof(DWORD) + sizeof(BYTE);
+constexpr WORD dfPACKET_SC_SYNC_SIZE = sizeof(DWORD) + sizeof(WORD) + sizeof(WORD);
+constexpr WORD dfPACKET_SC_ECHO_SIZE = sizeof(DWORD);
 
 WORD GetExpectedBodySize(BYTE packetType) noexcept;
 

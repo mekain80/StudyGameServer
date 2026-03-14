@@ -42,6 +42,9 @@
     <ClCompile Include="PacketControl.cpp">
       <Filter>Network</Filter>
     </ClCompile>
+    <ClCompile Include="Protocol.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
     <ClCompile Include="Proxy.cpp">
       <Filter>Network</Filter>
     </ClCompile>
