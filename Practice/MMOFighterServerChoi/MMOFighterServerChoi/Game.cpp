@@ -242,7 +242,7 @@ bool MoveCheck(BYTE direction, int x, int y) noexcept
     return true;
 }
 
-BYTE NormalizeViewDir(BYTE direction) noexcept
+BYTE NormalizeViewDir(BYTE direction, BYTE currentDirection) noexcept
 {
     switch (direction)
     {
@@ -254,7 +254,20 @@ BYTE NormalizeViewDir(BYTE direction) noexcept
     case dfPACKET_MOVE_DIR_LL:
     case dfPACKET_MOVE_DIR_LD:
         return dfPACKET_MOVE_DIR_LL;
+    case dfPACKET_MOVE_DIR_UU:
+    case dfPACKET_MOVE_DIR_DD:
+        if (currentDirection == dfPACKET_MOVE_DIR_LL)
+        {
+            return dfPACKET_MOVE_DIR_LL;
+        }
+
+        return dfPACKET_MOVE_DIR_RR;
     default:
+        if (currentDirection == dfPACKET_MOVE_DIR_LL)
+        {
+            return dfPACKET_MOVE_DIR_LL;
+        }
+
         return dfPACKET_MOVE_DIR_RR;
     }
 }

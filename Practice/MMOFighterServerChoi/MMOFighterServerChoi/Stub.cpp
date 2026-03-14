@@ -74,7 +74,7 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 	pCharacter->x = x;
 	pCharacter->y = y;
 	pCharacter->action = direction;
-	pCharacter->direction = NormalizeViewDir(direction);
+	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
 
@@ -137,7 +137,7 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 	}
 
 	pCharacter->action = dfACTION_STOP;
-	pCharacter->direction = NormalizeViewDir(moveStop.direction);
+	pCharacter->direction = NormalizeViewDir(moveStop.direction, pCharacter->direction);
 	pCharacter->x = moveStop.x;
 	pCharacter->y = moveStop.y;
 	UpdateCharacterSector(pCharacter, pSession);
@@ -178,7 +178,7 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 
 	pCharacter->x = atk.x;
 	pCharacter->y = atk.y;
-	pCharacter->direction = NormalizeViewDir(atk.direction);
+	pCharacter->direction = NormalizeViewDir(atk.direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
 	PacketHeader packetHeader;
@@ -253,7 +253,7 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 
 	pCharacter->x = atk.x;
 	pCharacter->y = atk.y;
-	pCharacter->direction = NormalizeViewDir(atk.direction);
+	pCharacter->direction = NormalizeViewDir(atk.direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
 	PacketHeader packetHeader;
@@ -328,7 +328,7 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 
 	pCharacter->x = atk.x;
 	pCharacter->y = atk.y;
-	pCharacter->direction = NormalizeViewDir(atk.direction);
+	pCharacter->direction = NormalizeViewDir(atk.direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
 	PacketHeader packetHeader;

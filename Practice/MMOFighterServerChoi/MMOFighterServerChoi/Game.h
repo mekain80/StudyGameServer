@@ -13,7 +13,7 @@ void Update() noexcept;
 void UpdateCharacterSector(Character* character, Session* currentSession) noexcept;
 bool MoveCheck(BYTE direction, int x, int y) noexcept;
 
-BYTE NormalizeViewDir(BYTE direction) noexcept;
+BYTE NormalizeViewDir(BYTE direction, BYTE currentDirection) noexcept;
 void GetMoveDelta(BYTE direction, int& dx, int& dy) noexcept;
 bool IsValidMoveDirection(BYTE direction) noexcept;
 bool IsValidViewDirection(BYTE direction) noexcept;
