@@ -18,7 +18,7 @@ bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packet
 	int putRet = packet.PutData(pPacket, packetSize);
 	if (putRet != packetSize)
 	{
-		_LOG(LOG_LEVEL_ERROR, L"SerializedBuffer PutData fail");
+		// _LOG(LOG_LEVEL_ERROR, L"SerializedBuffer PutData fail");
 		Disconnect(pSession, L"SerializedBuffer PutData fail");
 		return false;
 	}
@@ -66,7 +66,7 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
-		_LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE MoveStart ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
+		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE MoveStart ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true; // 세션 유지, 이번 입력만 무시
 	}
 
@@ -132,7 +132,7 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 	if (NeedSync(moveStop.x, moveStop.y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
-		_LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE MoveStop ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
+		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE MoveStop ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true; // 세션 유지, 이번 입력만 무시
 	}
 
@@ -172,7 +172,7 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 	if (NeedSync(atk.x, atk.y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
-		_LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack1 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
+		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack1 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true;
 	}
 
@@ -247,7 +247,7 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 	if (NeedSync(atk.x, atk.y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
-		_LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack2 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
+		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack2 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true;
 	}
 
@@ -322,7 +322,7 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 	if (NeedSync(atk.x, atk.y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
-		_LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack3 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
+		// _LOG(LOG_LEVEL_ERROR, L"SYNC_RANGE Attack3 ID=%d IP=%s", pSession->sessionID, pSession->ipStr);
 		return true;
 	}
 
