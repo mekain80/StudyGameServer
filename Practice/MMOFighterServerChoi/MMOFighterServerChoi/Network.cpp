@@ -197,7 +197,12 @@ void NetIOProcess() noexcept
 
 		for (Session* session : sessionBatch)
 		{
-			if (session == nullptr)
+			if (session == nullptr || session->disconnectFlag)
+			{
+				continue;
+			}
+
+			if (session->socket == INVALID_SOCKET)
 			{
 				continue;
 			}
@@ -281,7 +286,7 @@ void NetProc_Accept() noexcept
 		std::list<Character*>& sectorCharacters = gSector[sectorPos.y][sectorPos.x];
 		for (Character* otherCharacter : sectorCharacters)
 		{
-			if (otherCharacter == nullptr || otherCharacter == pCharacter)
+			if (otherCharacter == pCharacter || !IsCharacterActive(otherCharacter))
 			{
 				continue;
 			}

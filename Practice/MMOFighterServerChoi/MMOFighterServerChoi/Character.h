@@ -19,3 +19,4 @@ struct Character
 extern std::unordered_map<DWORD, Character*> gCharacterMap;
 
 Character* FindCharacter(DWORD sessionID) noexcept;
+bool IsCharacterActive(const Character* character) noexcept;

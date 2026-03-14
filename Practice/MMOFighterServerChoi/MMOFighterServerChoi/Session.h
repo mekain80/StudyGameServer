@@ -18,6 +18,7 @@ struct Session
     RingBuffer recvQ;
     RingBuffer sendQ;
     ULONGLONG lastRecvTime = 0; // 메시지 수신 체크를 위한 시간 (타임아웃용)
+    bool disconnectFlag = false;
 };
 
 extern SOCKET gListenSocket;

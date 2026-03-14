@@ -17,7 +17,7 @@ LARGE_INTEGER gFrameEndTick{};
 
 void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexcept
 {
-    if (pCharacter == nullptr || currentSession == nullptr)
+    if (pCharacter == nullptr || currentSession == nullptr || currentSession->disconnectFlag)
     {
         return;
     }
@@ -55,7 +55,7 @@ void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexc
         std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
         for (Character* character : sectorList)
         {
-            if (character == nullptr || character == pCharacter)
+            if (character == pCharacter || !IsCharacterActive(character))
             {
                 continue;
             }
@@ -88,7 +88,7 @@ void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexc
         std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
         for (Character* character : sectorList)
         {
-            if (character == nullptr || character == pCharacter)
+            if (character == pCharacter || !IsCharacterActive(character))
             {
                 continue;
             }
@@ -139,21 +139,25 @@ void Update() noexcept
         Character* pCharacter = it->second;
         ++it;
 
-        if (pCharacter->HP <= 0)
+        if (!IsCharacterActive(pCharacter))
         {
-            Session* session = FindSession(pCharacter->sessionID);
-            Disconnect(session, L"HP 0 이하");
             continue;
         }
 
-        const ULONGLONG currentTick = GetTickCount64();
-        const ULONGLONG timeoutTick = static_cast<ULONGLONG>(NETWORK_PACKET_RECV_TIMEOUT) * 1000;
         Session* currentSession = FindSession(pCharacter->sessionID);
         if (currentSession == nullptr)
         {
             continue;
         }
 
+        if (pCharacter->HP <= 0)
+        {
+            Disconnect(currentSession, L"HP 0 이하");
+            continue;
+        }
+
+        const ULONGLONG currentTick = GetTickCount64();
+        const ULONGLONG timeoutTick = static_cast<ULONGLONG>(NETWORK_PACKET_RECV_TIMEOUT) * 1000;
         if (currentTick - currentSession->lastRecvTime >= timeoutTick)
         {
             Disconnect(currentSession, L"recv timeout");

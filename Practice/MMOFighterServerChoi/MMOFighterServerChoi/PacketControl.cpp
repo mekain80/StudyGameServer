@@ -10,6 +10,8 @@
 
 namespace
 {
+    std::vector<Session*> gPendingDisconnects;
+
     bool IsValidSectorIndex(const SectorPos& sectorPos) noexcept
     {
         return sectorPos.x >= 0
@@ -21,6 +23,9 @@ namespace
 
 bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexcept
 {
+    if (session == nullptr || session->disconnectFlag)
+        return false;
+
     const int totalSize = static_cast<int>(sizeof(PacketHeader)) + pHeader->size;
 
     if (session->sendQ.GetFreeSize() < totalSize)
@@ -45,7 +50,7 @@ bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexc
 
 void SendUnicast(Session* pSession, PacketHeader* pHeader, char* pPacket) noexcept
 {
-    if (pSession == nullptr)
+    if (pSession == nullptr || pSession->disconnectFlag)
     {
         return;
     }
@@ -85,7 +90,7 @@ void SendPacket_SectorOne(int sectorX, int sectorY, PacketHeader* pHeader, char*
     std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
     for (Character* character : sectorList)
     {
-        if (character == nullptr)
+        if (!IsCharacterActive(character))
         {
             continue;
         }
@@ -140,30 +145,68 @@ void Disconnect(Session* pSession, const WCHAR* reason) noexcept
         return;
     }
 
+    if (pSession->disconnectFlag)
+    {
+        return; // 중복 예약 방지
+    }
+    pSession->disconnectFlag = true;
+
     _LOG(
         LOG_LEVEL_SYSTEM,
-        L"Disconnect # SessionID:%u / IP:%s / Socket:%llu / Reason:%s",
+        L"Disconnect 예약 # SessionID:%u / IP:%s / Socket:%llu / Reason:%s",
         pSession->sessionID,
         pSession->ipStr,
         static_cast<unsigned long long>(pSession->socket),
         (reason != nullptr) ? reason : L"(none)");
 
-    PacketHeader header;
-    PacketSCDeleteCharacter packet;
-    MakePacket_DeleteCharacter(&header, &packet, pSession->sessionID);
-    SendPacket_Around(pSession, &header, reinterpret_cast<char*>(&packet));
-
+    // 앞으로 새로운 루프/조회에서 안 잡히게 먼저 분리
     gSessionIdMap.erase(pSession->sessionID);
     gSessionMap.erase(pSession->socket);
-    closesocket(pSession->socket);
 
-    Character* pCharacter = FindCharacter(pSession->sessionID);
-    if (pCharacter != nullptr)
+    // 소켓은 바로 닫아도 됨
+    if (pSession->socket != INVALID_SOCKET)
     {
-        RemoveSector(pCharacter);
-        gCharacterMap.erase(pCharacter->sessionID);
-        delete pCharacter;
+        shutdown(pSession->socket, SD_BOTH);
+        closesocket(pSession->socket);
+        pSession->socket = INVALID_SOCKET;
     }
 
-    delete pSession;
+    gPendingDisconnects.push_back(pSession);
+}
+
+void FlushDisconnectedSessions() noexcept
+{
+    if (gPendingDisconnects.empty())
+    {
+        return;
+    }
+
+    std::vector<Session*> pending(gPendingDisconnects.size());
+    pending.swap(gPendingDisconnects); // flush 중 새로 들어온 건 다음 flush에서 처리
+
+    for (Session* pSession : pending)
+    {
+        if (pSession == nullptr)
+        {
+            continue;
+        }
+
+        Character* pCharacter = FindCharacter(pSession->sessionID);
+
+        if (pCharacter != nullptr)
+        {
+            PacketHeader header{};
+            PacketSCDeleteCharacter packet{};
+            MakePacket_DeleteCharacter(&header, &packet, pSession->sessionID);
+
+            // 아직 Character와 sector 정보가 살아 있으니 주변에 삭제 통지 가능
+            SendPacket_Around(pSession, &header, reinterpret_cast<char*>(&packet));
+
+            RemoveSector(pCharacter);
+            gCharacterMap.erase(pCharacter->sessionID);
+            delete pCharacter;
+        }
+
+        delete pSession;
+    }
 }

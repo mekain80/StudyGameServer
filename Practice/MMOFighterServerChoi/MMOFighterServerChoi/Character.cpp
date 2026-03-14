@@ -16,3 +16,19 @@ Character* FindCharacter(DWORD sessionID) noexcept
 		return iter->second;
 	}
 }
+
+bool IsCharacterActive(const Character* character) noexcept
+{
+	if (character == nullptr)
+	{
+		return false;
+	}
+
+	Session* session = FindSession(character->sessionID);
+	if (session == nullptr)
+	{
+		return false;
+	}
+
+	return session->disconnectFlag == false;
+}

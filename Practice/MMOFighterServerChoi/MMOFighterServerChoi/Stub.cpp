@@ -190,7 +190,7 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 		std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
 		for (Character* character : sectorList)
 		{
-			if (character == pCharacter)
+			if (character == pCharacter || !IsCharacterActive(character))
 			{
 				continue;
 			}
@@ -262,7 +262,7 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 		std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
 		for (Character* character : sectorList)
 		{
-			if (character == pCharacter)
+			if (character == pCharacter || !IsCharacterActive(character))
 			{
 				continue;
 			}
@@ -334,7 +334,7 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 		std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
 		for (Character* character : sectorList)
 		{
-			if (character == pCharacter)
+			if (character == pCharacter || !IsCharacterActive(character))
 			{
 				continue;
 			}

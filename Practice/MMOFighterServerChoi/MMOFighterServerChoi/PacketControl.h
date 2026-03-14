@@ -8,6 +8,7 @@ bool EnqueuePacket(Session* session, PacketHeader* pHeader, char* pPacket) noexc
 void SendUnicast(Session* pSession, PacketHeader* pHeader, char* pPacket) noexcept;
 void SendBroadcast(Session* pSession, PacketHeader* pHeader, char* pPacket) noexcept;
 void Disconnect(Session* pSession, const WCHAR* reason = nullptr) noexcept;
+void FlushDisconnectedSessions() noexcept;
 
 // 특정 섹터 1개에 있는 클라이언트들 에게 메시지 보내기
 void SendPacket_SectorOne(int sectorX, int sectorY, PacketHeader* pHeader, char* pPacket, Session* pExceptSession = nullptr) noexcept;

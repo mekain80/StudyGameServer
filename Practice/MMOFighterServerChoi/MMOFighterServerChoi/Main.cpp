@@ -9,6 +9,7 @@
 #include "Log.h"
 #include "Network.h"
 #include "ServerControl.h"
+#include "PacketControl.h"
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -27,7 +28,9 @@ int _tmain(int argc, _TCHAR* argv[])
     while (!gShutdown)
     {
         NetIOProcess();     // 네트워크 송수신 처리
+        FlushDisconnectedSessions();
         Update();           // 게임 로직 업데이트
+        FlushDisconnectedSessions();
         ServerControl();    // 키보드 입력을 통해서 서버를 제어할 경우 사용
         //Monitor();          // 모니터링 정보를 표시,저장, 전송하는 경우 사용
     }
