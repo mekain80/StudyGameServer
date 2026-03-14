@@ -15,6 +15,127 @@ LARGE_INTEGER gFreq{};
 LARGE_INTEGER gFrameStartTick{};
 LARGE_INTEGER gFrameEndTick{};
 
+namespace
+{
+	void SendDeleteCharacterPacket(Session* session, DWORD sessionID) noexcept
+	{
+		PacketHeader packetHeader{};
+		PacketSCDeleteCharacter packet{};
+		MakePacket_DeleteCharacter(&packetHeader, &packet, sessionID);
+		SendUnicast(session, &packetHeader, reinterpret_cast<char*>(&packet));
+	}
+
+	void SendCreateCharacterPacket(Session* session, const Character* character) noexcept
+	{
+		PacketHeader packetHeader{};
+		PacketSCCreateOtherCharacter packet{};
+		MakePacket_CreateOtherCharacter(
+			&packetHeader,
+			&packet,
+			character->direction,
+			character->sessionID,
+			character->x,
+			character->y,
+			character->HP);
+		SendUnicast(session, &packetHeader, reinterpret_cast<char*>(&packet));
+	}
+
+	void SendMoveStartPacket(Session* session, const Character* character) noexcept
+	{
+		if (character->action == dfACTION_STOP)
+		{
+			return;
+		}
+
+		PacketHeader packetHeader{};
+		PacketSCMoveStart packet{};
+		MakePacket_MoveStart(
+			&packetHeader,
+			&packet,
+			character->sessionID,
+			character->action,
+			character->x,
+			character->y);
+		SendUnicast(session, &packetHeader, reinterpret_cast<char*>(&packet));
+	}
+
+	void BroadcastCharacterLeave(const SectorAround& removeAround, DWORD sessionID) noexcept
+	{
+		PacketHeader packetHeader{};
+		PacketSCDeleteCharacter packet{};
+		MakePacket_DeleteCharacter(&packetHeader, &packet, sessionID);
+		SendPacket_BySectorAround(removeAround, &packetHeader, reinterpret_cast<char*>(&packet));
+	}
+
+	void SyncRemovedCharactersToCurrentSession(const SectorAround& removeAround, const Character* movingCharacter, Session* currentSession) noexcept
+	{
+		for (int index = 0; index < removeAround.count; ++index)
+		{
+			const SectorPos sectorPos = removeAround.around[index];
+			std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+			for (Character* character : sectorList)
+			{
+				if (character == movingCharacter || !IsCharacterActive(character))
+				{
+					continue;
+				}
+
+				SendDeleteCharacterPacket(currentSession, character->sessionID);
+			}
+		}
+	}
+
+	void BroadcastCharacterEnter(const SectorAround& addAround, const Character* movingCharacter) noexcept
+	{
+		PacketHeader createHeader{};
+		PacketSCCreateOtherCharacter createPacket{};
+		MakePacket_CreateOtherCharacter(
+			&createHeader,
+			&createPacket,
+			movingCharacter->direction,
+			movingCharacter->sessionID,
+			movingCharacter->x,
+			movingCharacter->y,
+			movingCharacter->HP);
+		SendPacket_BySectorAround(addAround, &createHeader, reinterpret_cast<char*>(&createPacket));
+
+		if (movingCharacter->action == dfACTION_STOP)
+		{
+			return;
+		}
+
+		PacketHeader moveHeader{};
+		PacketSCMoveStart movePacket{};
+		MakePacket_MoveStart(
+			&moveHeader,
+			&movePacket,
+			movingCharacter->sessionID,
+			movingCharacter->action,
+			movingCharacter->x,
+			movingCharacter->y);
+		SendPacket_BySectorAround(addAround, &moveHeader, reinterpret_cast<char*>(&movePacket));
+	}
+
+	void SyncAddedCharactersToCurrentSession(const SectorAround& addAround, const Character* movingCharacter, Session* currentSession) noexcept
+	{
+		for (int index = 0; index < addAround.count; ++index)
+		{
+			const SectorPos sectorPos = addAround.around[index];
+			std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+			for (Character* character : sectorList)
+			{
+				if (character == movingCharacter || !IsCharacterActive(character))
+				{
+					continue;
+				}
+
+				SendCreateCharacterPacket(currentSession, character);
+				SendMoveStartPacket(currentSession, character);
+			}
+		}
+	}
+}
+
 void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexcept
 {
     if (pCharacter == nullptr || currentSession == nullptr || currentSession->disconnectFlag)
@@ -41,84 +162,10 @@ void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexc
         return;
     }
 
-    // 1) 시야에서 빠진 섹터에 있는 다른 유저들에게
-    // 이동한 캐릭터를 삭제하라고 알린다.
-    PacketHeader delHeader;
-    PacketSCDeleteCharacter delMsg;
-    MakePacket_DeleteCharacter(&delHeader, &delMsg, pCharacter->sessionID);
-    SendPacket_BySectorAround(removeAround, &delHeader, reinterpret_cast<char*>(&delMsg));
-
-    // 2) 이동한 본인에게도 시야에서 빠진 다른 캐릭터들을 삭제시킨다.
-    for (int index = 0; index < removeAround.count; ++index)
-    {
-        const SectorPos sectorPos = removeAround.around[index];
-        std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
-        for (Character* character : sectorList)
-        {
-            if (character == pCharacter || !IsCharacterActive(character))
-            {
-                continue;
-            }
-
-            PacketHeader otherDelHeader;
-            PacketSCDeleteCharacter otherDelMsg;
-            MakePacket_DeleteCharacter(&otherDelHeader, &otherDelMsg, character->sessionID);
-            SendUnicast(currentSession, &otherDelHeader, reinterpret_cast<char*>(&otherDelMsg));
-        }
-    }
-
-    // 3) 새 시야에 들어온 섹터의 다른 유저들에게
-    // 이동한 캐릭터를 새로 생성하라고 알린다.
-    PacketHeader createHeader;
-    PacketSCCreateOtherCharacter createMsg;
-    MakePacket_CreateOtherCharacter(&createHeader, &createMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y, pCharacter->HP);
-    SendPacket_BySectorAround(addAround, &createHeader, reinterpret_cast<char*>(&createMsg));
-    if (pCharacter->action != dfACTION_STOP)
-    {
-        PacketHeader moveHeader{};
-        PacketSCMoveStart moveMsg{};
-        MakePacket_MoveStart(&moveHeader, &moveMsg, pCharacter->sessionID, pCharacter->action, pCharacter->x, pCharacter->y);
-        SendPacket_BySectorAround(addAround, &moveHeader, reinterpret_cast<char*>(&moveMsg));
-    }
-
-    // 4) 이동한 본인에게도 새 시야에 들어온 다른 캐릭터들을 생성시킨다.
-    for (int index = 0; index < addAround.count; ++index)
-    {
-        const SectorPos sectorPos = addAround.around[index];
-        std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
-        for (Character* character : sectorList)
-        {
-            if (character == pCharacter || !IsCharacterActive(character))
-            {
-                continue;
-            }
-
-            PacketHeader otherCreateHeader;
-            PacketSCCreateOtherCharacter otherCreateMsg;
-            MakePacket_CreateOtherCharacter(
-                &otherCreateHeader,
-                &otherCreateMsg,
-                character->direction,
-                character->sessionID,
-                character->x,
-                character->y,
-                character->HP);
-            SendUnicast(currentSession, &otherCreateHeader, reinterpret_cast<char*>(&otherCreateMsg));
-            if (character->action != dfACTION_STOP)
-            {
-                PacketHeader otherMoveHeader{};
-                PacketSCMoveStart otherMoveMsg{};
-                MakePacket_MoveStart(
-                    &otherMoveHeader,
-                    &otherMoveMsg,
-                    character->sessionID,
-                    character->action,
-                    character->x,
-                    character->y);
-                SendUnicast(currentSession, &otherMoveHeader, reinterpret_cast<char*>(&otherMoveMsg));
-            }
-        }
-    }
+    BroadcastCharacterLeave(removeAround, pCharacter->sessionID);
+    SyncRemovedCharactersToCurrentSession(removeAround, pCharacter, currentSession);
+    BroadcastCharacterEnter(addAround, pCharacter);
+    SyncAddedCharactersToCurrentSession(addAround, pCharacter, currentSession);
 
 }
 
