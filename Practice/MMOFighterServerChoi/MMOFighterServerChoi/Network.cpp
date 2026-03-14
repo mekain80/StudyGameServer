@@ -147,8 +147,26 @@ void NetEnd() noexcept
 
 void NetIOProcess() noexcept
 {
-	auto sessionIter = gSessionMap.begin();
+	std::vector<Session*> sessions;
+	sessions.reserve(gSessionMap.size());
+	for (const auto& sessionPair : gSessionMap)
+	{
+		Session* session = sessionPair.second;
+		if (session == nullptr || session->disconnectFlag)
+		{
+			continue;
+		}
 
+		if (session->socket == INVALID_SOCKET)
+		{
+			continue;
+		}
+
+		sessions.push_back(session);
+	}
+
+	size_t maxBatchSize = static_cast<size_t>(FD_SETSIZE - 1);
+	size_t offset = 0;
 	do
 	{
 		FD_SET readSet;
@@ -161,16 +179,10 @@ void NetIOProcess() noexcept
 		std::vector<Session*> sessionBatch;
 		sessionBatch.reserve(FD_SETSIZE - 1);
 
-		int batchCount = 0;
-		while (sessionIter != gSessionMap.end() && batchCount < FD_SETSIZE - 1)
+		const size_t batchEnd = min(offset + maxBatchSize, sessions.size());
+		for (; offset < batchEnd; ++offset)
 		{
-			Session* session = sessionIter->second;
-			++sessionIter;
-
-			if (session == nullptr)
-			{
-				continue;
-			}
+			Session* session = sessions[offset];
 
 			sessionBatch.push_back(session);
 			FD_SET(session->socket, &readSet);
@@ -178,8 +190,6 @@ void NetIOProcess() noexcept
 			{
 				FD_SET(session->socket, &writeSet);
 			}
-
-			++batchCount;
 		}
 
 		timeval time{};
@@ -224,7 +234,7 @@ void NetIOProcess() noexcept
 				}
 			}
 		}
-	} while (sessionIter != gSessionMap.end());
+	} while (offset < sessions.size());
 }
 
 void NetProc_Accept() noexcept
