@@ -11,10 +11,10 @@
 // ------------------------------------------------------------------
 // [화면 이동 영역]
 // ------------------------------------------------------------------
-#define dfRANGE_MOVE_TOP    50
-#define dfRANGE_MOVE_LEFT   10
-#define dfRANGE_MOVE_RIGHT  630
-#define dfRANGE_MOVE_BOTTOM 470
+#define dfRANGE_MOVE_TOP    0
+#define dfRANGE_MOVE_LEFT   0
+#define dfRANGE_MOVE_RIGHT  6400
+#define dfRANGE_MOVE_BOTTOM 6400
 
 // ------------------------------------------------------------------
 // [프레임당 이동량]
