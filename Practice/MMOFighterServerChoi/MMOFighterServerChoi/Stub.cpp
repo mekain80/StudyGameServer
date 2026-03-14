@@ -70,8 +70,12 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 		return true; // 세션 유지, 이번 입력만 무시
 	}
 
+	// 입력이 유효하면 클라이언트 기준 최신 좌표를 서버 상태에도 반영한다.
+	pCharacter->x = x;
+	pCharacter->y = y;
 	pCharacter->action = direction;
 	pCharacter->direction = NormalizeViewDir(direction);
+	UpdateCharacterSector(pCharacter, pSession);
 
 
 	// TODO) 패킷 뿌리는 것 섹터 기준으로 수정하기
@@ -172,7 +176,10 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 		return true;
 	}
 
+	pCharacter->x = atk.x;
+	pCharacter->y = atk.y;
 	pCharacter->direction = NormalizeViewDir(atk.direction);
+	UpdateCharacterSector(pCharacter, pSession);
 
 	PacketHeader packetHeader;
 	PacketSCAttack1 sendMsg;
@@ -244,7 +251,10 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 		return true;
 	}
 
+	pCharacter->x = atk.x;
+	pCharacter->y = atk.y;
 	pCharacter->direction = NormalizeViewDir(atk.direction);
+	UpdateCharacterSector(pCharacter, pSession);
 
 	PacketHeader packetHeader;
 	PacketSCAttack2 sendMsg;
@@ -316,7 +326,10 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 		return true;
 	}
 
+	pCharacter->x = atk.x;
+	pCharacter->y = atk.y;
 	pCharacter->direction = NormalizeViewDir(atk.direction);
+	UpdateCharacterSector(pCharacter, pSession);
 
 	PacketHeader packetHeader;
 	PacketSCAttack3 sendMsg;
