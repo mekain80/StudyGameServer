@@ -74,6 +74,147 @@ namespace
 			dumpSize,
 			hexBuffer);
 	}
+
+	bool ConfigureAcceptedSocket(SOCKET clientSocket) noexcept
+	{
+		u_long on = 1;
+		if (ioctlsocket(clientSocket, FIONBIO, &on) == SOCKET_ERROR)
+		{
+			closesocket(clientSocket);
+			_LOG(LOG_LEVEL_ERROR, L"clientSocket ioctlsocket fail");
+			return false;
+		}
+
+		return true;
+	}
+
+	Session* CreateSession(SOCKET clientSocket, const SOCKADDR_IN& clientAddr)
+	{
+		Session* session = new Session;
+		session->socket = clientSocket;
+		session->addr = clientAddr;
+		session->lastRecvTime = GetTickCount64();
+
+		InetNtopW(AF_INET, const_cast<IN_ADDR*>(&clientAddr.sin_addr), session->ipStr, _countof(session->ipStr));
+		session->port = ntohs(clientAddr.sin_port);
+		session->sessionID = gAllocID++;
+
+		gSessionMap[clientSocket] = session;
+		gSessionIdMap[session->sessionID] = session;
+		return session;
+	}
+
+	Character* SpawnCharacter(Session* session)
+	{
+		Character* character = new Character;
+		character->sessionID = session->sessionID;
+		character->y = dfRANGE_MOVE_TOP + rand() % (dfRANGE_MOVE_BOTTOM - dfRANGE_MOVE_TOP + 1);
+		character->x = dfRANGE_MOVE_LEFT + rand() % (dfRANGE_MOVE_RIGHT - dfRANGE_MOVE_LEFT + 1);
+		character->direction = dfPACKET_MOVE_DIR_LL;
+		character->action = dfACTION_STOP;
+		character->HP = MAX_HP;
+
+		gCharacterMap[session->sessionID] = character;
+		InsertSector(character);
+		return character;
+	}
+
+	void SendVisibleCharacterState(Session* session, const Character* character) noexcept
+	{
+		PacketHeader createHeader{};
+		PacketSCCreateOtherCharacter createPacket{};
+		MakePacket_CreateOtherCharacter(
+			&createHeader,
+			&createPacket,
+			character->direction,
+			character->sessionID,
+			character->x,
+			character->y,
+			character->HP);
+		SendUnicast(session, &createHeader, reinterpret_cast<char*>(&createPacket));
+
+		if (character->action == dfACTION_STOP)
+		{
+			return;
+		}
+
+		PacketHeader moveHeader{};
+		PacketSCMoveStart movePacket{};
+		MakePacket_MoveStart(
+			&moveHeader,
+			&movePacket,
+			character->sessionID,
+			character->action,
+			character->x,
+			character->y);
+		SendUnicast(session, &moveHeader, reinterpret_cast<char*>(&movePacket));
+	}
+
+	void SendMyCharacterState(Session* session, const Character* character) noexcept
+	{
+		PacketHeader packetHeader{};
+		PacketSCCreateMyCharacter createPacket{};
+		MakePacket_CreateMyCharacter(
+			&packetHeader,
+			&createPacket,
+			character->direction,
+			character->sessionID,
+			character->x,
+			character->y,
+			character->HP);
+		SendUnicast(session, &packetHeader, reinterpret_cast<char*>(&createPacket));
+	}
+
+	void SendNearbyCharactersToNewSession(Session* session, const Character* character) noexcept
+	{
+		SectorAround nearbySectors{};
+		GetSectorAroundBySector(&character->sector, &nearbySectors);
+		for (int sectorIndex = 0; sectorIndex < nearbySectors.count; ++sectorIndex)
+		{
+			const SectorPos sectorPos = nearbySectors.around[sectorIndex];
+			std::list<Character*>& sectorCharacters = gSector[sectorPos.y][sectorPos.x];
+			for (Character* otherCharacter : sectorCharacters)
+			{
+				if (otherCharacter == character || !IsCharacterActive(otherCharacter))
+				{
+					continue;
+				}
+
+				SendVisibleCharacterState(session, otherCharacter);
+			}
+		}
+	}
+
+	void BroadcastNewCharacter(Session* session, const Character* character) noexcept
+	{
+		PacketHeader createHeader{};
+		PacketSCCreateOtherCharacter createPacket{};
+		MakePacket_CreateOtherCharacter(
+			&createHeader,
+			&createPacket,
+			character->direction,
+			character->sessionID,
+			character->x,
+			character->y,
+			character->HP);
+		SendPacket_Around(session, &createHeader, reinterpret_cast<char*>(&createPacket));
+
+		if (character->action == dfACTION_STOP)
+		{
+			return;
+		}
+
+		PacketHeader moveHeader{};
+		PacketSCMoveStart movePacket{};
+		MakePacket_MoveStart(
+			&moveHeader,
+			&movePacket,
+			character->sessionID,
+			character->action,
+			character->x,
+			character->y);
+		SendPacket_Around(session, &moveHeader, reinterpret_cast<char*>(&movePacket));
+	}
 }
 
 void NetStartUp() noexcept
@@ -249,99 +390,17 @@ void NetProc_Accept() noexcept
 		return;
 	}
 
-	u_long on = 1;
-	if (ioctlsocket(clientSocket, FIONBIO, &on) == SOCKET_ERROR)
+	if (!ConfigureAcceptedSocket(clientSocket))
 	{
-		closesocket(clientSocket);
-		_LOG(LOG_LEVEL_ERROR, L"clientSocket ioctlsocket fail");
 		return;
 	}
 
-	Session* pSession = new Session;
-	pSession->socket = clientSocket;
-	pSession->addr = clientAddr;
-	pSession->lastRecvTime = GetTickCount64();
+	Session* session = CreateSession(clientSocket, clientAddr);
+	Character* character = SpawnCharacter(session);
 
-	InetNtopW(AF_INET, &clientAddr.sin_addr, pSession->ipStr, _countof(pSession->ipStr));
-	pSession->port = ntohs(clientAddr.sin_port);
-
-	pSession->sessionID = gAllocID++;
-	gSessionMap[clientSocket] = pSession;
-	gSessionIdMap[pSession->sessionID] = pSession;
-
-	Character* pCharacter = new Character;
-	pCharacter->sessionID = pSession->sessionID;
-	pCharacter->y = dfRANGE_MOVE_TOP + rand() % (dfRANGE_MOVE_BOTTOM - dfRANGE_MOVE_TOP + 1);
-	pCharacter->x = dfRANGE_MOVE_LEFT + rand() % (dfRANGE_MOVE_RIGHT - dfRANGE_MOVE_LEFT + 1);
-	pCharacter->direction = dfPACKET_MOVE_DIR_LL;
-	pCharacter->action = dfACTION_STOP;
-	pCharacter->HP = MAX_HP;
-	gCharacterMap[pSession->sessionID] = pCharacter;
-	InsertSector(pCharacter);
-
-	PacketHeader packetHeader;
-	PacketSCCreateMyCharacter createMyCharacter;
-	MakePacket_CreateMyCharacter(&packetHeader, &createMyCharacter, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y, pCharacter->HP);
-
-	// 자신 생성
-	SendUnicast(pSession, &packetHeader, reinterpret_cast<char*>(&createMyCharacter));
-
-	// 접속 유저에게 다른 유저 정보 전달
-	SectorPos currentSector = pCharacter->sector;
-	SectorAround aroundSectors{};
-	GetSectorAroundBySector(&currentSector, &aroundSectors);
-	for (int sectorIndex = 0; sectorIndex < aroundSectors.count; ++sectorIndex)
-	{
-		const SectorPos sectorPos = aroundSectors.around[sectorIndex];
-		std::list<Character*>& sectorCharacters = gSector[sectorPos.y][sectorPos.x];
-		for (Character* otherCharacter : sectorCharacters)
-		{
-			if (otherCharacter == pCharacter || !IsCharacterActive(otherCharacter))
-			{
-				continue;
-			}
-
-			PacketHeader otherCharacterHeader;
-			PacketSCCreateOtherCharacter otherCharacterPacket;
-			MakePacket_CreateOtherCharacter(
-				&otherCharacterHeader,
-				&otherCharacterPacket,
-				otherCharacter->direction,
-				otherCharacter->sessionID,
-				otherCharacter->x,
-				otherCharacter->y,
-				otherCharacter->HP);
-			SendUnicast(pSession, &otherCharacterHeader, reinterpret_cast<char*>(&otherCharacterPacket));
-			if (otherCharacter->action != dfACTION_STOP)
-			{
-				PacketHeader moveHeader{};
-				PacketSCMoveStart movePacket{};
-				MakePacket_MoveStart(
-					&moveHeader,
-					&movePacket,
-					otherCharacter->sessionID,
-					otherCharacter->action,
-					otherCharacter->x,
-					otherCharacter->y);
-				SendUnicast(pSession, &moveHeader, reinterpret_cast<char*>(&movePacket));
-			}
-		}
-	}
-
-	// 접속 유저 정보를 다른 유저에게 전달
-	PacketHeader broadHeader;
-	PacketSCCreateOtherCharacter broadPacket;
-	MakePacket_CreateOtherCharacter(&broadHeader, &broadPacket, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y, pCharacter->HP);
-	SendPacket_Around(pSession, &broadHeader, reinterpret_cast<char*>(&broadPacket));
-	if (pCharacter->action != dfACTION_STOP)
-	{
-		PacketHeader moveHeader{};
-		PacketSCMoveStart movePacket{};
-		MakePacket_MoveStart(&moveHeader, &movePacket, pCharacter->sessionID, pCharacter->action, pCharacter->x, pCharacter->y);
-		SendPacket_Around(pSession, &moveHeader, reinterpret_cast<char*>(&movePacket));
-	}
-
-	_LOG(LOG_LEVEL_SYSTEM, L"Connect # IP:%s / SessionID:%d", pSession->ipStr, pSession->sessionID);
+	SendMyCharacterState(session, character);
+	SendNearbyCharactersToNewSession(session, character);
+	BroadcastNewCharacter(session, character);
 }
 
 bool NetProc_Recv(Session* pSession) noexcept
