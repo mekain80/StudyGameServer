@@ -3,7 +3,7 @@
 // ------------------------------------------------------------------
 // [서버/네트워크 설정]
 // ------------------------------------------------------------------
-#define SERVER_PORT 5000
+#define SERVER_PORT 21001
 #define BUFFER_SIZE RING_DEFAULT_SIZE
 #define dfNETWORK_PACKET_CODE 0x89
 #define NETWORK_PACKET_RECV_TIMEOUT 30
