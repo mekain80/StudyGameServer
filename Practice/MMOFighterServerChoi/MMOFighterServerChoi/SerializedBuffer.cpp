@@ -10,7 +10,8 @@ namespace
 		char data[SerializedBuffer::eBUFFER_DEFAULT];
 	};
 
-	MemoryPool<SerializedBufferPoolBlock> gSerializedBufferPool(true, 1024);
+	constexpr unsigned int kSerializedBufferPoolInitCount = 1024;
+	MemoryPool<SerializedBufferPoolBlock> gSerializedBufferPool(true, kSerializedBufferPoolInitCount);
 }
 
 SerializedBuffer::SerializedBuffer()
@@ -25,7 +26,6 @@ SerializedBuffer::SerializedBuffer(int bufferSize)
 	mWrite(nullptr),
 	mEnd(nullptr),
 	mBufferSize(0),
-	mStorageKind(StorageKind::Heap),
 	mPoolBlock(nullptr)
 {
 	AllocateBuffer(bufferSize);
@@ -38,7 +38,6 @@ SerializedBuffer::SerializedBuffer(const SerializedBuffer& src)
 	mWrite(nullptr),
 	mEnd(nullptr),
 	mBufferSize(0),
-	mStorageKind(StorageKind::Heap),
 	mPoolBlock(nullptr)
 {
 	AllocateBuffer(src.mBufferSize);
@@ -60,30 +59,18 @@ SerializedBuffer::~SerializedBuffer() noexcept
 
 void SerializedBuffer::AllocateBuffer(int bufferSize)
 {
-	if (bufferSize <= 0)
+	UNREFERENCED_PARAMETER(bufferSize);
+
+	if (mPoolBlock != nullptr)
 	{
-		bufferSize = eBUFFER_DEFAULT;
+		ReleaseBuffer();
 	}
 
-	mBufferSize = bufferSize;
-	mStorageKind = StorageKind::Heap;
-	mPoolBlock = nullptr;
-
-	if (mBufferSize <= eBUFFER_DEFAULT)
-	{
-		if (auto* block = gSerializedBufferPool.Alloc())
-		{
-			mBuffer = block->data;
-			mStorageKind = StorageKind::Pool;
-			mPoolBlock = block;
-		}
-	}
-
-	if (mBuffer == nullptr)
-	{
-		mBuffer = new char[mBufferSize];
-		mStorageKind = StorageKind::Heap;
-	}
+	mBufferSize = eBUFFER_DEFAULT;
+	mPoolBlock = gSerializedBufferPool.Alloc();
+	mBuffer = (mPoolBlock != nullptr)
+		? static_cast<SerializedBufferPoolBlock*>(mPoolBlock)->data
+		: nullptr;
 
 	InitializePointers();
 }
@@ -95,16 +82,7 @@ void SerializedBuffer::ReleaseBuffer() noexcept
 		return;
 	}
 
-	switch (mStorageKind)
-	{
-	case StorageKind::Pool:
-		gSerializedBufferPool.Free(static_cast<SerializedBufferPoolBlock*>(mPoolBlock));
-		break;
-	case StorageKind::Heap:
-	default:
-		delete[] mBuffer;
-		break;
-	}
+	gSerializedBufferPool.Free(static_cast<SerializedBufferPoolBlock*>(mPoolBlock));
 
 	mBuffer = nullptr;
 	mBegin = nullptr;
@@ -112,7 +90,6 @@ void SerializedBuffer::ReleaseBuffer() noexcept
 	mWrite = nullptr;
 	mEnd = nullptr;
 	mBufferSize = 0;
-	mStorageKind = StorageKind::Heap;
 	mPoolBlock = nullptr;
 }
 
@@ -121,7 +98,7 @@ void SerializedBuffer::InitializePointers() noexcept
 	mBegin = mBuffer;
 	mRead = mBuffer;
 	mWrite = mBuffer;
-	mEnd = mBuffer + mBufferSize;
+	mEnd = (mBuffer != nullptr) ? (mBuffer + mBufferSize) : nullptr;
 }
 
 void SerializedBuffer::ResetPointers() noexcept

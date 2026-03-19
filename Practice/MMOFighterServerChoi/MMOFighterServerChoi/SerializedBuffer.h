@@ -63,12 +63,6 @@ public:
 	int PutData(const char* src, int srcSize) noexcept;
 
 private:
-	enum class StorageKind : unsigned char
-	{
-		Heap = 0,
-		Pool
-	};
-
 	void AllocateBuffer(int bufferSize);
 	void ReleaseBuffer() noexcept;
 	void InitializePointers() noexcept;
@@ -81,6 +75,5 @@ private:
 	char* mWrite;
 	char* mEnd;
 	int   mBufferSize;
-	StorageKind mStorageKind;
 	void* mPoolBlock;
 };
