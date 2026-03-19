@@ -1,13 +1,11 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 
-#include <algorithm>
 #include <cassert>
 
 #include "Character.h"
 #include "Sector.h"
 
-std::list<Character*> gSector[dfSECTOR_MAX_Y][dfSECTOR_MAX_X];
-
+SectorCharacterList gSector[dfSECTOR_MAX_Y][dfSECTOR_MAX_X];
 
 bool IsSameSector(const SectorPos& lhs, const SectorPos& rhs) noexcept
 {
@@ -16,6 +14,8 @@ bool IsSameSector(const SectorPos& lhs, const SectorPos& rhs) noexcept
 
 namespace
 {
+	constexpr std::size_t kInvalidSectorIndex = static_cast<std::size_t>(-1);
+
 	struct SectorAroundBounds
 	{
 		short minX;
@@ -32,9 +32,47 @@ namespace
 			&& sectorPos.y < dfSECTOR_MAX_Y;
 	}
 
-	bool ContainsCharacter(const std::list<Character*>& characters, const Character* target) noexcept
+	std::size_t FindCharacterIndex(const SectorCharacterList& characters, const Character* target) noexcept
 	{
-		return std::find(characters.begin(), characters.end(), target) != characters.end();
+		for (std::size_t index = 0; index < characters.size(); ++index)
+		{
+			if (characters[index] == target)
+			{
+				return index;
+			}
+		}
+
+		return kInvalidSectorIndex;
+	}
+
+	std::size_t GetCharacterIndexInSector(const SectorCharacterList& characters, const Character* target) noexcept
+	{
+		if (target == nullptr)
+		{
+			return kInvalidSectorIndex;
+		}
+
+		if (target->sectorIndex < characters.size() && characters[target->sectorIndex] == target)
+		{
+			return target->sectorIndex;
+		}
+
+		return FindCharacterIndex(characters, target);
+	}
+
+	void RemoveCharacterAt(SectorCharacterList& characters, std::size_t removeIndex) noexcept
+	{
+		assert(removeIndex < characters.size());
+
+		const std::size_t lastIndex = characters.size() - 1;
+		Character* movedCharacter = characters[lastIndex];
+		characters[removeIndex] = movedCharacter;
+		if (movedCharacter != nullptr)
+		{
+			movedCharacter->sectorIndex = removeIndex;
+		}
+
+		characters.pop_back();
 	}
 
 	SectorAroundBounds GetSectorAroundBounds(const SectorPos& sectorPos) noexcept
@@ -189,13 +227,19 @@ void InsertSector(Character* ch) noexcept
 
 	const SectorPos secPos = CalcSector(ch->x, ch->y);
 	auto& sectorList = gSector[secPos.y][secPos.x];
-
-	if (!ContainsCharacter(sectorList, ch))
+	if (IsSameSector(ch->sector, secPos))
 	{
-		sectorList.push_back(ch);
+		const std::size_t currentIndex = GetCharacterIndexInSector(sectorList, ch);
+		if (currentIndex != kInvalidSectorIndex)
+		{
+			ch->sectorIndex = currentIndex;
+			return;
+		}
 	}
 
 	ch->sector = secPos;
+	ch->sectorIndex = sectorList.size();
+	sectorList.push_back(ch);
 }
 
 void RemoveSector(Character* ch) noexcept
@@ -205,20 +249,22 @@ void RemoveSector(Character* ch) noexcept
 	const SectorPos secPos = ch->sector;
 	if (!IsValidSectorPos(secPos))
 	{
+		ch->sectorIndex = kInvalidSectorIndex;
 		return;
 	}
 
 	auto& curList = gSector[secPos.y][secPos.x];
-
-	for (auto iter = curList.begin(); iter != curList.end(); ++iter)
+	const std::size_t removeIndex = GetCharacterIndexInSector(curList, ch);
+	if (removeIndex == kInvalidSectorIndex)
 	{
-		if (*iter == ch)
-		{
-			curList.erase(iter);
-			ch->sector = SectorPos{};
-			return;
-		}
+		ch->sector = SectorPos{};
+		ch->sectorIndex = kInvalidSectorIndex;
+		return;
 	}
+
+	RemoveCharacterAt(curList, removeIndex);
+	ch->sector = SectorPos{};
+	ch->sectorIndex = kInvalidSectorIndex;
 }
 
 bool UpdateSector(Character* ch, const SectorPos& newSec, SectorPos* oldPos) noexcept
@@ -239,19 +285,17 @@ bool UpdateSector(Character* ch, const SectorPos& newSec, SectorPos* oldPos) noe
 	if (IsValidSectorPos(oldSec))
 	{
 		auto& oldSectorList = gSector[oldSec.y][oldSec.x];
-		for (auto iter = oldSectorList.begin(); iter != oldSectorList.end(); ++iter)
+		const std::size_t removeIndex = GetCharacterIndexInSector(oldSectorList, ch);
+		if (removeIndex != kInvalidSectorIndex)
 		{
-			if (*iter == ch)
-			{
-				oldSectorList.erase(iter);
-				break;
-			}
+			RemoveCharacterAt(oldSectorList, removeIndex);
 		}
 	}
 
 	auto& newSectorList = gSector[newSec.y][newSec.x];
-	newSectorList.push_back(ch);
 	ch->sector = newSec;
+	ch->sectorIndex = newSectorList.size();
+	newSectorList.push_back(ch);
 
 	return true;
 }

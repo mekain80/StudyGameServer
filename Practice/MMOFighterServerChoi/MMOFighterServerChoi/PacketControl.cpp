@@ -22,7 +22,7 @@ namespace
     }
 
     void SendPacket_ToSectorList(
-        const std::list<Character*>& sectorList,
+        const SectorCharacterList& sectorList,
         const SerializedBuffer* pPacket,
         Session* pExceptSession) noexcept
     {
@@ -220,6 +220,7 @@ void FlushDisconnectedSessions() noexcept
             FreeCharacter(pCharacter);
         }
 
+        RemoveActiveSession(pSession);
         FreeSession(pSession);
     }
 }

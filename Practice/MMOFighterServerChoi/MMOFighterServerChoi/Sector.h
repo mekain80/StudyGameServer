@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include <list>
+#include <vector>
 
 #include "GameInfo.h"
 #include "SectorPos.h"
@@ -13,7 +13,9 @@ constexpr int dfSECTOR_SIZE_Y = 150;
 constexpr int dfSECTOR_MAX_X = ((dfRANGE_MOVE_RIGHT - dfRANGE_MOVE_LEFT) / dfSECTOR_SIZE_X) + 1;
 constexpr int dfSECTOR_MAX_Y = ((dfRANGE_MOVE_BOTTOM - dfRANGE_MOVE_TOP) / dfSECTOR_SIZE_Y) + 1;
 
-extern std::list<Character*> gSector[dfSECTOR_MAX_Y][dfSECTOR_MAX_X];
+using SectorCharacterList = std::vector<Character*>;
+
+extern SectorCharacterList gSector[dfSECTOR_MAX_Y][dfSECTOR_MAX_X];
 
 bool IsSameSector(const SectorPos& lhs, const SectorPos& rhs) noexcept;
 

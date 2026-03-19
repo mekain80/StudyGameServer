@@ -145,7 +145,7 @@ namespace
 		for (int index = 0; index < removeAround.count; ++index)
 		{
 			const SectorPos sectorPos = removeAround.around[index];
-			std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+			SectorCharacterList& sectorList = gSector[sectorPos.y][sectorPos.x];
 			for (Character* character : sectorList)
 			{
 				if (character == movingCharacter)
@@ -195,7 +195,7 @@ namespace
 		for (int index = 0; index < addAround.count; ++index)
 		{
 			const SectorPos sectorPos = addAround.around[index];
-			std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+			SectorCharacterList& sectorList = gSector[sectorPos.y][sectorPos.x];
 			for (Character* character : sectorList)
 			{
 				if (character == movingCharacter)

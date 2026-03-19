@@ -19,7 +19,6 @@ SOCKET gListenSocket = INVALID_SOCKET;
 
 namespace
 {
-	std::vector<Session*> gNetIoSessions;
 	std::vector<Session*> gNetIoSessionBatch;
 
 	void LogRecvPacketHex(Session* session, const WCHAR* reason) noexcept
@@ -109,6 +108,7 @@ namespace
 
 		gSessionMap[clientSocket] = session;
 		gSessionIdMap[session->sessionID] = session;
+		AddActiveSession(session);
 		return session;
 	}
 
@@ -183,7 +183,7 @@ namespace
 		for (int sectorIndex = 0; sectorIndex < nearbySectors.count; ++sectorIndex)
 		{
 			const SectorPos sectorPos = nearbySectors.around[sectorIndex];
-			std::list<Character*>& sectorCharacters = gSector[sectorPos.y][sectorPos.x];
+			SectorCharacterList& sectorCharacters = gSector[sectorPos.y][sectorPos.x];
 			for (Character* otherCharacter : sectorCharacters)
 			{
 				if (otherCharacter == character || FindActiveSession(otherCharacter) == nullptr)
@@ -292,29 +292,8 @@ void NetEnd() noexcept
 
 void NetIOProcess() noexcept
 {
-	gNetIoSessions.clear();
-	if (gNetIoSessions.capacity() < gSessionMap.size())
-	{
-		gNetIoSessions.reserve(gSessionMap.size());
-	}
-
-	for (const auto& sessionPair : gSessionMap)
-	{
-		Session* session = sessionPair.second;
-		if (session == nullptr || session->disconnectFlag)
-		{
-			continue;
-		}
-
-		if (session->socket == INVALID_SOCKET)
-		{
-			continue;
-		}
-
-		gNetIoSessions.push_back(session);
-	}
-
 	size_t maxBatchSize = static_cast<size_t>(FD_SETSIZE - 1);
+	const size_t activeSessionCount = gActiveSessions.size();
 	size_t offset = 0;
 	do
 	{
@@ -331,10 +310,19 @@ void NetIOProcess() noexcept
 			gNetIoSessionBatch.reserve(maxBatchSize);
 		}
 
-		const size_t batchEnd = min(offset + maxBatchSize, gNetIoSessions.size());
+		const size_t batchEnd = min(offset + maxBatchSize, activeSessionCount);
 		for (; offset < batchEnd; ++offset)
 		{
-			Session* session = gNetIoSessions[offset];
+			Session* session = gActiveSessions[offset];
+			if (session == nullptr || session->disconnectFlag)
+			{
+				continue;
+			}
+
+			if (session->socket == INVALID_SOCKET)
+			{
+				continue;
+			}
 
 			gNetIoSessionBatch.push_back(session);
 			FD_SET(session->socket, &readSet);
@@ -386,7 +374,7 @@ void NetIOProcess() noexcept
 				}
 			}
 		}
-	} while (offset < gNetIoSessions.size());
+	} while (offset < activeSessionCount);
 }
 
 void NetProc_Accept() noexcept
@@ -419,6 +407,7 @@ void NetProc_Accept() noexcept
 	{
 		gSessionIdMap.erase(session->sessionID);
 		gSessionMap.erase(session->socket);
+		RemoveActiveSession(session);
 		closesocket(session->socket);
 		session->socket = INVALID_SOCKET;
 		FreeSession(session);

@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include <cstddef>
+
 #include "Session.h"
 #include "SectorPos.h"
 
@@ -17,6 +19,7 @@ struct Character
     int HP = 0;
 
     SectorPos sector;
+    std::size_t sectorIndex = static_cast<std::size_t>(-1);
 };
 
 extern std::unordered_map<DWORD, Character*> gCharacterMap;
