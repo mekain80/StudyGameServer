@@ -12,8 +12,23 @@
 #include "Character.h"
 #include "Sector.h"
 
+#include <deque>
+#include <vector>
+
 namespace
 {
+	struct PendingDamageEvent
+	{
+		explicit PendingDamageEvent(Character* targetCharacter)
+			: target(targetCharacter)
+			, packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_DAMAGE_SIZE)
+		{
+		}
+
+		Character* target = nullptr;
+		SerializedBuffer packet;
+	};
+
 	template <typename T>
 	bool ReadPacketValue(const char*& cursor, const char* end, T& outValue) noexcept
 	{
@@ -76,6 +91,126 @@ namespace
 		{
 			UpdateCharacterSector(character, session);
 		}
+	}
+
+	bool IsCharacterVisibleBySector(const Character* observer, const Character* target) noexcept
+	{
+		if (observer == nullptr || target == nullptr)
+		{
+			return false;
+		}
+
+		return std::abs(observer->sector.x - target->sector.x) <= 1 &&
+			std::abs(observer->sector.y - target->sector.y) <= 1;
+	}
+
+	void BroadcastPendingDamageEvents(const std::deque<PendingDamageEvent>& damageEvents) noexcept
+	{
+		if (damageEvents.empty())
+		{
+			return;
+		}
+
+		bool visitedSector[dfSECTOR_MAX_Y][dfSECTOR_MAX_X]{};
+		std::vector<SectorPos> sectorsToVisit;
+		sectorsToVisit.reserve(damageEvents.size() * 9);
+
+		for (const PendingDamageEvent& damageEvent : damageEvents)
+		{
+			SectorAround targetAround{};
+			GetSectorAroundBySector(&damageEvent.target->sector, &targetAround);
+			for (int sectorIndex = 0; sectorIndex < targetAround.count; ++sectorIndex)
+			{
+				const SectorPos sectorPos = targetAround.around[sectorIndex];
+				if (visitedSector[sectorPos.y][sectorPos.x])
+				{
+					continue;
+				}
+
+				visitedSector[sectorPos.y][sectorPos.x] = true;
+				sectorsToVisit.push_back(sectorPos);
+			}
+		}
+
+		for (const SectorPos& sectorPos : sectorsToVisit)
+		{
+			std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+			for (Character* observer : sectorList)
+			{
+				Session* observerSession = FindActiveSession(observer);
+				if (observerSession == nullptr)
+				{
+					continue;
+				}
+
+				for (const PendingDamageEvent& damageEvent : damageEvents)
+				{
+					if (!IsCharacterVisibleBySector(observer, damageEvent.target))
+					{
+						continue;
+					}
+
+					SendUnicast(observerSession, &damageEvent.packet);
+				}
+			}
+		}
+	}
+
+	template <typename HitPredicate>
+	void ApplyAttackDamage(
+		Character* attacker,
+		int centerX,
+		int centerY,
+		int damage,
+		HitPredicate&& isHit) noexcept
+	{
+		SectorAround attackerAround{};
+		GetSectorAroundBySector(&attacker->sector, &attackerAround);
+
+		std::deque<PendingDamageEvent> damageEvents;
+		for (int sectorIndex = 0; sectorIndex < attackerAround.count; ++sectorIndex)
+		{
+			const SectorPos sectorPos = attackerAround.around[sectorIndex];
+			std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+			for (Character* target : sectorList)
+			{
+				if (target == attacker)
+				{
+					continue;
+				}
+
+				if (FindActiveSession(target) == nullptr)
+				{
+					continue;
+				}
+
+				if (!isHit(target, centerX, centerY))
+				{
+					continue;
+				}
+
+				target->HP -= damage;
+				if (target->HP < 0)
+				{
+					target->HP = 0;
+				}
+
+				damageEvents.emplace_back(target);
+				PendingDamageEvent& damageEvent = damageEvents.back();
+				MakePacket_Damage(
+					&damageEvent.packet,
+					attacker->sessionID,
+					target->sessionID,
+					static_cast<BYTE>(target->HP));
+
+				if (target->HP <= 0)
+				{
+					MarkCharacterDead(target);
+				}
+			}
+		}
+
+		BroadcastPendingDamageEvents(damageEvents);
 	}
 }
 
@@ -259,47 +394,15 @@ bool NetPacketProc_Attack1(Session* pSession, const char* packetData, WORD packe
 
 	const int centerX = pCharacter->x;
 	const int centerY = pCharacter->y;
-
-	SectorAround secAround{};
-	GetSectorAroundBySector(&pCharacter->sector, &secAround);
-	for (int secIdx = 0; secIdx < secAround.count; secIdx++)
-	{
-		SectorPos sectorPos = secAround.around[secIdx];
-		std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
-		for (Character* character : sectorList)
+	ApplyAttackDamage(
+		pCharacter,
+		centerX,
+		centerY,
+		dfATTACK1_DAMAGE,
+		[pCharacter](Character* target, int attackCenterX, int attackCenterY) noexcept
 		{
-			if (character == pCharacter)
-			{
-				continue;
-			}
-
-			Session* targetSession = FindActiveSession(character);
-			if (targetSession == nullptr)
-			{
-				continue;
-			}
-
-			if (!IsHitAttack1(pCharacter, character, centerX, centerY))
-			{
-				continue;
-			}
-
-			SerializedBuffer dmgMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_DAMAGE_SIZE);
-
-			character->HP -= dfATTACK1_DAMAGE;
-			if (character->HP < 0)
-			{
-				character->HP = 0;
-			}
-
-			MakePacket_Damage(&dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
-			SendPacket_AroundCharacter(character, &dmgMsg);
-			if (character->HP <= 0)
-			{
-				MarkCharacterDead(character);
-			}
-		}
-	}
+			return IsHitAttack1(pCharacter, target, attackCenterX, attackCenterY);
+		});
 
 	return true;
 }
@@ -352,47 +455,21 @@ bool NetPacketProc_Attack2(Session* pSession, const char* packetData, WORD packe
 
 	const int centerX = pCharacter->x;
 	const int centerY = pCharacter->y;
-
-	SectorAround secAround{};
-	GetSectorAroundBySector(&pCharacter->sector, &secAround);
-	for (int secIdx = 0; secIdx < secAround.count; secIdx++)
-	{
-		SectorPos sectorPos = secAround.around[secIdx];
-		std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
-		for (Character* character : sectorList)
+	ApplyAttackDamage(
+		pCharacter,
+		centerX,
+		centerY,
+		dfATTACK2_DAMAGE,
+		[pCharacter](Character* target, int attackCenterX, int attackCenterY) noexcept
 		{
-			if (character == pCharacter)
-			{
-				continue;
-			}
-
-			Session* targetSession = FindActiveSession(character);
-			if (targetSession == nullptr)
-			{
-				continue;
-			}
-
-			if (!IsHitDirectionalAttack(pCharacter, character, centerX, centerY, dfATTACK2_RANGE_X, dfATTACK2_RANGE_Y))
-			{
-				continue;
-			}
-
-			SerializedBuffer dmgMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_DAMAGE_SIZE);
-
-			character->HP -= dfATTACK2_DAMAGE;
-			if (character->HP < 0)
-			{
-				character->HP = 0;
-			}
-
-			MakePacket_Damage(&dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
-			SendPacket_AroundCharacter(character, &dmgMsg);
-			if (character->HP <= 0)
-			{
-				MarkCharacterDead(character);
-			}
-		}
-	}
+			return IsHitDirectionalAttack(
+				pCharacter,
+				target,
+				attackCenterX,
+				attackCenterY,
+				dfATTACK2_RANGE_X,
+				dfATTACK2_RANGE_Y);
+		});
 
 	return true;
 }
@@ -445,47 +522,21 @@ bool NetPacketProc_Attack3(Session* pSession, const char* packetData, WORD packe
 
 	const int centerX = pCharacter->x;
 	const int centerY = pCharacter->y;
-
-	SectorAround secAround{};
-	GetSectorAroundBySector(&pCharacter->sector, &secAround);
-	for (int secIdx = 0; secIdx < secAround.count; secIdx++)
-	{
-		SectorPos sectorPos = secAround.around[secIdx];
-		std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
-		for (Character* character : sectorList)
+	ApplyAttackDamage(
+		pCharacter,
+		centerX,
+		centerY,
+		dfATTACK3_DAMAGE,
+		[pCharacter](Character* target, int attackCenterX, int attackCenterY) noexcept
 		{
-			if (character == pCharacter)
-			{
-				continue;
-			}
-
-			Session* targetSession = FindActiveSession(character);
-			if (targetSession == nullptr)
-			{
-				continue;
-			}
-
-			if (!IsHitDirectionalAttack(pCharacter, character, centerX, centerY, dfATTACK3_RANGE_X, dfATTACK3_RANGE_Y))
-			{
-				continue;
-			}
-
-			SerializedBuffer dmgMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_DAMAGE_SIZE);
-
-			character->HP -= dfATTACK3_DAMAGE;
-			if (character->HP < 0)
-			{
-				character->HP = 0;
-			}
-
-			MakePacket_Damage(&dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
-			SendPacket_AroundCharacter(character, &dmgMsg);
-			if (character->HP <= 0)
-			{
-				MarkCharacterDead(character);
-			}
-		}
-	}
+			return IsHitDirectionalAttack(
+				pCharacter,
+				target,
+				attackCenterX,
+				attackCenterY,
+				dfATTACK3_RANGE_X,
+				dfATTACK3_RANGE_Y);
+		});
 
 	return true;
 }
