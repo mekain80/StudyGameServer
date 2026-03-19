@@ -22,17 +22,35 @@ int _tmain(int argc, _TCHAR* argv[])
 
     LogFileInit();
     timeBeginPeriod(1);
-    // LoadData(); // 설정 및 게임데이터, DB 데이터 로딩
     NetStartUp(); // 네트워크 초기화, 리슨소켓 생성 및 listen
+
+    ULONGLONG monitorTick = GetTickCount64();
+    unsigned int frameCount = 0;
+    unsigned int loopCount = 0;
 
     while (!gShutdown)
     {
-        NetIOProcess();     // 네트워크 송수신 처리
+        ++loopCount;
+        NetIOProcess();     // 첫 select 배치만 다음 업데이트 시점까지 대기
         FlushDisconnectedSessions();
-        Update();           // 게임 로직 업데이트
+        if (Update())       // 게임 로직 업데이트
+        {
+            ++frameCount;
+        }
         FlushDisconnectedSessions();
-        ServerControl();    // 키보드 입력을 통해서 서버를 제어할 경우 사용
-        //Monitor();          // 모니터링 정보를 표시,저장, 전송하는 경우 사용
+        
+
+        const ULONGLONG currentTick = GetTickCount64();
+        if (currentTick - monitorTick >= 1000)
+        {
+            _LOG(LOG_LEVEL_SYSTEM, L"Frame : %u  Loop : %u", frameCount, loopCount);
+            frameCount = 0;
+            loopCount = 0;
+            monitorTick = currentTick;
+
+            // 부하 때문에 1초에 한번만 되도록 수정
+            ServerControl();    // 키보드 입력을 통해서 서버를 제어할 경우 사용
+        }
     }
 
     NetEnd();
