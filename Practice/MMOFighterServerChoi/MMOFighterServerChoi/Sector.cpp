@@ -15,6 +15,8 @@ bool IsSameSector(const SectorPos& lhs, const SectorPos& rhs) noexcept
 namespace
 {
 	constexpr std::size_t kInvalidSectorIndex = static_cast<std::size_t>(-1);
+	constexpr int kPrecomputedMoveDeltaRange = 1;
+	constexpr int kPrecomputedMoveDeltaSize = (kPrecomputedMoveDeltaRange * 2) + 1;
 
 	struct SectorAroundBounds
 	{
@@ -23,6 +25,22 @@ namespace
 		short minY;
 		short maxY;
 	};
+
+	struct SectorPrecomputedInfo
+	{
+		SectorAround around;
+		SectorAroundBounds bounds;
+	};
+
+	struct SectorAroundDeltaInfo
+	{
+		SectorAround removeAround;
+		SectorAround addAround;
+	};
+
+	SectorPrecomputedInfo gSectorPrecomputed[dfSECTOR_MAX_Y][dfSECTOR_MAX_X];
+	SectorAroundDeltaInfo gSectorMoveDelta[dfSECTOR_MAX_Y][dfSECTOR_MAX_X][kPrecomputedMoveDeltaSize][kPrecomputedMoveDeltaSize];
+	bool gSectorCacheInitialized = false;
 
 	bool IsValidSectorPos(const SectorPos& sectorPos) noexcept
 	{
@@ -92,42 +110,141 @@ namespace
 			&& sectorPos.y >= bounds.minY
 			&& sectorPos.y <= bounds.maxY;
 	}
+
+	SectorAround BuildSectorAround(const SectorPos& sectorPos) noexcept
+	{
+		SectorAround sectorAround{};
+		for (short y = static_cast<short>(sectorPos.y - 1); y <= sectorPos.y + 1; ++y)
+		{
+			if (y < 0 || y >= dfSECTOR_MAX_Y)
+			{
+				continue;
+			}
+
+			for (short x = static_cast<short>(sectorPos.x - 1); x <= sectorPos.x + 1; ++x)
+			{
+				if (x < 0 || x >= dfSECTOR_MAX_X)
+				{
+					continue;
+				}
+
+				sectorAround.around[sectorAround.count] = { x, y };
+				++sectorAround.count;
+			}
+		}
+
+		return sectorAround;
+	}
+
+	SectorAroundDeltaInfo BuildSectorAroundDelta(const SectorPos& oldSector, const SectorPos& newSector) noexcept
+	{
+		SectorAroundDeltaInfo deltaInfo{};
+		if (IsSameSector(oldSector, newSector))
+		{
+			return deltaInfo;
+		}
+
+		const SectorPrecomputedInfo& oldInfo = gSectorPrecomputed[oldSector.y][oldSector.x];
+		const SectorPrecomputedInfo& newInfo = gSectorPrecomputed[newSector.y][newSector.x];
+		for (int index = 0; index < oldInfo.around.count; ++index)
+		{
+			const SectorPos sectorPos = oldInfo.around.around[index];
+			if (!IsSectorInsideBounds(sectorPos, newInfo.bounds))
+			{
+				deltaInfo.removeAround.around[deltaInfo.removeAround.count] = sectorPos;
+				++deltaInfo.removeAround.count;
+			}
+		}
+
+		for (int index = 0; index < newInfo.around.count; ++index)
+		{
+			const SectorPos sectorPos = newInfo.around.around[index];
+			if (!IsSectorInsideBounds(sectorPos, oldInfo.bounds))
+			{
+				deltaInfo.addAround.around[deltaInfo.addAround.count] = sectorPos;
+				++deltaInfo.addAround.count;
+			}
+		}
+
+		return deltaInfo;
+	}
+
+	void InitializeSectorPrecomputedData() noexcept
+	{
+		for (short y = 0; y < dfSECTOR_MAX_Y; ++y)
+		{
+			for (short x = 0; x < dfSECTOR_MAX_X; ++x)
+			{
+				const SectorPos sectorPos{ x, y };
+				SectorPrecomputedInfo& sectorInfo = gSectorPrecomputed[y][x];
+				sectorInfo.bounds = GetSectorAroundBounds(sectorPos);
+				sectorInfo.around = BuildSectorAround(sectorPos);
+			}
+		}
+
+		for (short y = 0; y < dfSECTOR_MAX_Y; ++y)
+		{
+			for (short x = 0; x < dfSECTOR_MAX_X; ++x)
+			{
+				const SectorPos oldSector{ x, y };
+				for (int dy = -kPrecomputedMoveDeltaRange; dy <= kPrecomputedMoveDeltaRange; ++dy)
+				{
+					for (int dx = -kPrecomputedMoveDeltaRange; dx <= kPrecomputedMoveDeltaRange; ++dx)
+					{
+						const short newX = static_cast<short>(x + dx);
+						const short newY = static_cast<short>(y + dy);
+						SectorAroundDeltaInfo& deltaInfo =
+							gSectorMoveDelta[y][x][dy + kPrecomputedMoveDeltaRange][dx + kPrecomputedMoveDeltaRange];
+						if (newX < 0 || newX >= dfSECTOR_MAX_X || newY < 0 || newY >= dfSECTOR_MAX_Y)
+						{
+							deltaInfo = {};
+							continue;
+						}
+
+						deltaInfo = BuildSectorAroundDelta(oldSector, SectorPos{ newX, newY });
+					}
+				}
+			}
+		}
+	}
+}
+
+void InitializeSectorCache() noexcept
+{
+	if (gSectorCacheInitialized)
+	{
+		return;
+	}
+
+	InitializeSectorPrecomputedData();
+	gSectorCacheInitialized = true;
 }
 
 void GetSectorAround(int sectorX, int sectorY, SectorAround* outSectorAround) noexcept
 {
 	assert(outSectorAround != nullptr);
-
-	outSectorAround->count = 0;
-
-	for (int y = sectorY - 1; y <= sectorY + 1; ++y)
+	if (!gSectorCacheInitialized)
 	{
-		if (y < 0 || y >= dfSECTOR_MAX_Y)
-		{
-			continue;
-		}
-
-		for (int x = sectorX - 1; x <= sectorX + 1; ++x)
-		{
-			if (x < 0 || x >= dfSECTOR_MAX_X)
-			{
-				continue;
-			}
-
-			outSectorAround->around[outSectorAround->count] =
-			{
-				static_cast<short>(x),
-				static_cast<short>(y)
-			};
-			++outSectorAround->count;
-		}
+		InitializeSectorCache();
 	}
+	const SectorPos sectorPos{ static_cast<short>(sectorX), static_cast<short>(sectorY) };
+	if (!IsValidSectorPos(sectorPos))
+	{
+		outSectorAround->count = 0;
+		return;
+	}
+
+	*outSectorAround = gSectorPrecomputed[sectorPos.y][sectorPos.x].around;
 }
 
 void GetSectorAroundBySector(const SectorPos* secPos, SectorAround* outSectorAround) noexcept
 {
 	assert(secPos != nullptr);
 	assert(outSectorAround != nullptr);
+	if (!gSectorCacheInitialized)
+	{
+		InitializeSectorCache();
+	}
 
 	if (!IsValidSectorPos(*secPos))
 	{
@@ -135,7 +252,7 @@ void GetSectorAroundBySector(const SectorPos* secPos, SectorAround* outSectorAro
 		return;
 	}
 
-	GetSectorAround(secPos->x, secPos->y, outSectorAround);
+	*outSectorAround = gSectorPrecomputed[secPos->y][secPos->x].around;
 }
 
 void GetUpdateSectorAround(
@@ -146,6 +263,10 @@ void GetUpdateSectorAround(
 {
 	assert(outRemoveSector != nullptr);
 	assert(outAddSector != nullptr);
+	if (!gSectorCacheInitialized)
+	{
+		InitializeSectorCache();
+	}
 
 	if (IsSameSector(oldSector, newSector))
 	{
@@ -159,31 +280,39 @@ void GetUpdateSectorAround(
 
 	if (!IsValidSectorPos(oldSector))
 	{
-		GetSectorAround(newSector.x, newSector.y, outAddSector);
+		*outAddSector = gSectorPrecomputed[newSector.y][newSector.x].around;
 		return;
 	}
 
-	SectorAround oldAround{};
-	SectorAround newAround{};
-	GetSectorAround(oldSector.x, oldSector.y, &oldAround);
-	GetSectorAround(newSector.x, newSector.y, &newAround);
-	const SectorAroundBounds oldBounds = GetSectorAroundBounds(oldSector);
-	const SectorAroundBounds newBounds = GetSectorAroundBounds(newSector);
-
-	for (int index = 0; index < oldAround.count; ++index)
+	const int dx = newSector.x - oldSector.x;
+	const int dy = newSector.y - oldSector.y;
+	if (dx >= -kPrecomputedMoveDeltaRange && dx <= kPrecomputedMoveDeltaRange &&
+		dy >= -kPrecomputedMoveDeltaRange && dy <= kPrecomputedMoveDeltaRange)
 	{
-		const SectorPos sectorPos = oldAround.around[index];
-		if (!IsSectorInsideBounds(sectorPos, newBounds))
+		const SectorAroundDeltaInfo& deltaInfo =
+			gSectorMoveDelta[oldSector.y][oldSector.x][dy + kPrecomputedMoveDeltaRange][dx + kPrecomputedMoveDeltaRange];
+		*outRemoveSector = deltaInfo.removeAround;
+		*outAddSector = deltaInfo.addAround;
+		return;
+	}
+
+	const SectorPrecomputedInfo& oldInfo = gSectorPrecomputed[oldSector.y][oldSector.x];
+	const SectorPrecomputedInfo& newInfo = gSectorPrecomputed[newSector.y][newSector.x];
+
+	for (int index = 0; index < oldInfo.around.count; ++index)
+	{
+		const SectorPos sectorPos = oldInfo.around.around[index];
+		if (!IsSectorInsideBounds(sectorPos, newInfo.bounds))
 		{
 			outRemoveSector->around[outRemoveSector->count] = sectorPos;
 			++outRemoveSector->count;
 		}
 	}
 
-	for (int index = 0; index < newAround.count; ++index)
+	for (int index = 0; index < newInfo.around.count; ++index)
 	{
-		const SectorPos sectorPos = newAround.around[index];
-		if (!IsSectorInsideBounds(sectorPos, oldBounds))
+		const SectorPos sectorPos = newInfo.around.around[index];
+		if (!IsSectorInsideBounds(sectorPos, oldInfo.bounds))
 		{
 			outAddSector->around[outAddSector->count] = sectorPos;
 			++outAddSector->count;

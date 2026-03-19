@@ -22,10 +22,22 @@ namespace
 {
 	constexpr double kServerFrameSeconds = 0.02;
 	constexpr std::size_t kInvalidCharacterTrackingIndex = static_cast<std::size_t>(-1);
+	struct DirectionInfo
+	{
+		int dx = 0;
+		int dy = 0;
+		bool validMove = false;
+		bool validView = false;
+		BYTE normalizeIfLeft = dfPACKET_MOVE_DIR_LL;
+		BYTE normalizeIfRight = dfPACKET_MOVE_DIR_RR;
+	};
+
 	using CharacterTrackingList = std::vector<Character*>;
 	CharacterTrackingList gMovingCharacters;
 	CharacterTrackingList gPendingDeadCharacters;
 	ULONGLONG gLastTimeoutCheckTick = 0;
+	DirectionInfo gDirectionInfo[256]{};
+	bool gGameCacheInitialized = false;
 
 	void RemoveTrackedCharacterAt(
 		CharacterTrackingList& trackingList,
@@ -118,6 +130,24 @@ namespace
 		return static_cast<double>(currentTick - previousTick) / static_cast<double>(gFreq.QuadPart);
 	}
 
+	void SetDirectionInfo(
+		BYTE direction,
+		int dx,
+		int dy,
+		bool validMove,
+		bool validView,
+		BYTE normalizeIfLeft,
+		BYTE normalizeIfRight) noexcept
+	{
+		DirectionInfo& info = gDirectionInfo[direction];
+		info.dx = dx;
+		info.dy = dy;
+		info.validMove = validMove;
+		info.validView = validView;
+		info.normalizeIfLeft = normalizeIfLeft;
+		info.normalizeIfRight = normalizeIfRight;
+	}
+
 	bool IsTrackedMoveAction(BYTE action) noexcept
 	{
 		switch (action)
@@ -183,9 +213,33 @@ namespace
 			if (currentTick - session->lastRecvTime >= timeoutTick)
 			{
 				Disconnect(session, L"recv timeout");
-			}
 		}
 	}
+}
+
+void InitializeGameCacheInternal() noexcept
+{
+	if (gGameCacheInitialized)
+	{
+		return;
+	}
+
+	for (DirectionInfo& info : gDirectionInfo)
+	{
+		info = {};
+	}
+
+	SetDirectionInfo(dfPACKET_MOVE_DIR_UU, 0, -dfMOVE_Y, true, false, dfPACKET_MOVE_DIR_LL, dfPACKET_MOVE_DIR_RR);
+	SetDirectionInfo(dfPACKET_MOVE_DIR_DD, 0, +dfMOVE_Y, true, false, dfPACKET_MOVE_DIR_LL, dfPACKET_MOVE_DIR_RR);
+	SetDirectionInfo(dfPACKET_MOVE_DIR_RR, +dfMOVE_X, 0, true, true, dfPACKET_MOVE_DIR_RR, dfPACKET_MOVE_DIR_RR);
+	SetDirectionInfo(dfPACKET_MOVE_DIR_LL, -dfMOVE_X, 0, true, true, dfPACKET_MOVE_DIR_LL, dfPACKET_MOVE_DIR_LL);
+	SetDirectionInfo(dfPACKET_MOVE_DIR_RU, +dfMOVE_X, -dfMOVE_Y, true, false, dfPACKET_MOVE_DIR_RR, dfPACKET_MOVE_DIR_RR);
+	SetDirectionInfo(dfPACKET_MOVE_DIR_RD, +dfMOVE_X, +dfMOVE_Y, true, false, dfPACKET_MOVE_DIR_RR, dfPACKET_MOVE_DIR_RR);
+	SetDirectionInfo(dfPACKET_MOVE_DIR_LU, -dfMOVE_X, -dfMOVE_Y, true, false, dfPACKET_MOVE_DIR_LL, dfPACKET_MOVE_DIR_LL);
+	SetDirectionInfo(dfPACKET_MOVE_DIR_LD, -dfMOVE_X, +dfMOVE_Y, true, false, dfPACKET_MOVE_DIR_LL, dfPACKET_MOVE_DIR_LL);
+
+	gGameCacheInitialized = true;
+}
 
 	void SendDeleteCharacterPacket(Session* session, DWORD sessionID) noexcept
 	{
@@ -339,6 +393,11 @@ namespace
 
 		FlushPacketBatch(currentSession, &currentSessionBatch);
 	}
+}
+
+void InitializeGameCache() noexcept
+{
+	InitializeGameCacheInternal();
 }
 
 LONGLONG GetCurrentMoveTick() noexcept
@@ -574,75 +633,45 @@ bool MoveCheck(BYTE direction, int x, int y) noexcept
 
 BYTE NormalizeViewDir(BYTE direction, BYTE currentDirection) noexcept
 {
-    switch (direction)
-    {
-    case dfPACKET_MOVE_DIR_RR:
-    case dfPACKET_MOVE_DIR_RU:
-    case dfPACKET_MOVE_DIR_RD:
-        return dfPACKET_MOVE_DIR_RR;
-    case dfPACKET_MOVE_DIR_LU:
-    case dfPACKET_MOVE_DIR_LL:
-    case dfPACKET_MOVE_DIR_LD:
-        return dfPACKET_MOVE_DIR_LL;
-    case dfPACKET_MOVE_DIR_UU:
-    case dfPACKET_MOVE_DIR_DD:
-        if (currentDirection == dfPACKET_MOVE_DIR_LL)
-        {
-            return dfPACKET_MOVE_DIR_LL;
-        }
+	if (!gGameCacheInitialized)
+	{
+		InitializeGameCacheInternal();
+	}
 
-        return dfPACKET_MOVE_DIR_RR;
-    default:
-        if (currentDirection == dfPACKET_MOVE_DIR_LL)
-        {
-            return dfPACKET_MOVE_DIR_LL;
-        }
-
-        return dfPACKET_MOVE_DIR_RR;
-    }
+	const DirectionInfo& info = gDirectionInfo[direction];
+	return (currentDirection == dfPACKET_MOVE_DIR_LL) ? info.normalizeIfLeft : info.normalizeIfRight;
 }
 
 void GetMoveDelta(BYTE direction, int& dx, int& dy) noexcept
 {
-    dx = 0;
-    dy = 0;
+	if (!gGameCacheInitialized)
+	{
+		InitializeGameCacheInternal();
+	}
 
-    switch (direction)
-    {
-    case dfPACKET_MOVE_DIR_UU: dy = -dfMOVE_Y; break;
-    case dfPACKET_MOVE_DIR_DD: dy = +dfMOVE_Y; break;
-    case dfPACKET_MOVE_DIR_RR: dx = +dfMOVE_X; break;
-    case dfPACKET_MOVE_DIR_LL: dx = -dfMOVE_X; break;
-    case dfPACKET_MOVE_DIR_RU: dx = +dfMOVE_X; dy = -dfMOVE_Y; break;
-    case dfPACKET_MOVE_DIR_RD: dx = +dfMOVE_X; dy = +dfMOVE_Y; break;
-    case dfPACKET_MOVE_DIR_LU: dx = -dfMOVE_X; dy = -dfMOVE_Y; break;
-    case dfPACKET_MOVE_DIR_LD: dx = -dfMOVE_X; dy = +dfMOVE_Y; break;
-    default:
-        break;
-    }
+	const DirectionInfo& info = gDirectionInfo[direction];
+	dx = info.dx;
+	dy = info.dy;
 }
 
 bool IsValidMoveDirection(BYTE direction) noexcept
 {
-    switch (direction)
-    {
-    case dfPACKET_MOVE_DIR_UU:
-    case dfPACKET_MOVE_DIR_DD:
-    case dfPACKET_MOVE_DIR_RR:
-    case dfPACKET_MOVE_DIR_LL:
-    case dfPACKET_MOVE_DIR_RU:
-    case dfPACKET_MOVE_DIR_RD:
-    case dfPACKET_MOVE_DIR_LU:
-    case dfPACKET_MOVE_DIR_LD:
-        return true;
-    default:
-        return false;
-    }
+	if (!gGameCacheInitialized)
+	{
+		InitializeGameCacheInternal();
+	}
+
+	return gDirectionInfo[direction].validMove;
 }
 
 bool IsValidViewDirection(BYTE direction) noexcept
 {
-    return (direction == dfPACKET_MOVE_DIR_LL || direction == dfPACKET_MOVE_DIR_RR);
+	if (!gGameCacheInitialized)
+	{
+		InitializeGameCacheInternal();
+	}
+
+	return gDirectionInfo[direction].validView;
 }
 
 bool IsHitAttack1(const Character* attacker, const Character* target, int centerX, int centerY) noexcept

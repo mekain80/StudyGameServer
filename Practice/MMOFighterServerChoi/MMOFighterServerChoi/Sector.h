@@ -17,6 +17,7 @@ using SectorCharacterList = std::vector<Character*>;
 
 extern SectorCharacterList gSector[dfSECTOR_MAX_Y][dfSECTOR_MAX_X];
 
+void InitializeSectorCache() noexcept;
 bool IsSameSector(const SectorPos& lhs, const SectorPos& rhs) noexcept;
 
 // 특정 섹터 좌표 기준 주변 영향권 섹터를 구한다.

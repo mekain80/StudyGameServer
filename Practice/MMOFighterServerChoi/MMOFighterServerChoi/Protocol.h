@@ -243,6 +243,7 @@ constexpr WORD dfPACKET_SC_DAMAGE_SIZE = sizeof(DWORD) + sizeof(DWORD) + sizeof(
 constexpr WORD dfPACKET_SC_SYNC_SIZE = sizeof(DWORD) + sizeof(WORD) + sizeof(WORD);
 constexpr WORD dfPACKET_SC_ECHO_SIZE = sizeof(DWORD);
 
+void InitializeProtocolCache() noexcept;
 WORD GetExpectedBodySize(BYTE packetType) noexcept;
 
 #endif
