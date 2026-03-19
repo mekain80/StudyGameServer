@@ -8,6 +8,8 @@
 #include "GameInfo.h"
 #include "Log.h"
 #include "Network.h"
+#include "Protocol.h"
+#include "Sector.h"
 #include "ServerControl.h"
 #include "PacketControl.h"
 
@@ -22,6 +24,9 @@ int _tmain(int argc, _TCHAR* argv[])
 
     LogFileInit();
     timeBeginPeriod(1);
+    InitializeProtocolCache();
+    InitializeSectorCache();
+    InitializeGameCache();
     NetStartUp(); // 네트워크 초기화, 리슨소켓 생성 및 listen
 
     ULONGLONG monitorTick = GetTickCount64();
