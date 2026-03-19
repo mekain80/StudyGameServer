@@ -12,6 +12,7 @@
 #include "Character.h"
 #include "Sector.h"
 
+#include <array>
 #include <deque>
 #include <vector>
 
@@ -20,12 +21,12 @@ namespace
 	struct PendingDamageEvent
 	{
 		explicit PendingDamageEvent(Character* targetCharacter)
-			: target(targetCharacter)
+			: targetSector((targetCharacter != nullptr) ? targetCharacter->sector : SectorPos{})
 			, packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_DAMAGE_SIZE)
 		{
 		}
 
-		Character* target = nullptr;
+		SectorPos targetSector{};
 		SerializedBuffer packet;
 	};
 
@@ -93,15 +94,9 @@ namespace
 		}
 	}
 
-	bool IsCharacterVisibleBySector(const Character* observer, const Character* target) noexcept
+	constexpr int GetSectorBucketIndex(const SectorPos& sectorPos) noexcept
 	{
-		if (observer == nullptr || target == nullptr)
-		{
-			return false;
-		}
-
-		return std::abs(observer->sector.x - target->sector.x) <= 1 &&
-			std::abs(observer->sector.y - target->sector.y) <= 1;
+		return (sectorPos.y * dfSECTOR_MAX_X) + sectorPos.x;
 	}
 
 	void BroadcastPendingDamageEvents(const std::deque<PendingDamageEvent>& damageEvents) noexcept
@@ -114,11 +109,19 @@ namespace
 		bool visitedSector[dfSECTOR_MAX_Y][dfSECTOR_MAX_X]{};
 		std::vector<SectorPos> sectorsToVisit;
 		sectorsToVisit.reserve(damageEvents.size() * 9);
+		std::array<int, dfSECTOR_MAX_X * dfSECTOR_MAX_Y> sectorDamageHead{};
+		sectorDamageHead.fill(-1);
+		std::vector<int> nextDamageIndex(damageEvents.size(), -1);
 
-		for (const PendingDamageEvent& damageEvent : damageEvents)
+		for (std::size_t damageIndex = 0; damageIndex < damageEvents.size(); ++damageIndex)
 		{
+			const PendingDamageEvent& damageEvent = damageEvents[damageIndex];
+			const int bucketIndex = GetSectorBucketIndex(damageEvent.targetSector);
+			nextDamageIndex[damageIndex] = sectorDamageHead[bucketIndex];
+			sectorDamageHead[bucketIndex] = static_cast<int>(damageIndex);
+
 			SectorAround targetAround{};
-			GetSectorAroundBySector(&damageEvent.target->sector, &targetAround);
+			GetSectorAroundBySector(&damageEvent.targetSector, &targetAround);
 			for (int sectorIndex = 0; sectorIndex < targetAround.count; ++sectorIndex)
 			{
 				const SectorPos sectorPos = targetAround.around[sectorIndex];
@@ -143,14 +146,28 @@ namespace
 					continue;
 				}
 
-				for (const PendingDamageEvent& damageEvent : damageEvents)
+				for (int sectorY = observer->sector.y - 1; sectorY <= observer->sector.y + 1; ++sectorY)
 				{
-					if (!IsCharacterVisibleBySector(observer, damageEvent.target))
+					if (sectorY < 0 || sectorY >= dfSECTOR_MAX_Y)
 					{
 						continue;
 					}
 
-					SendUnicast(observerSession, &damageEvent.packet);
+					for (int sectorX = observer->sector.x - 1; sectorX <= observer->sector.x + 1; ++sectorX)
+					{
+						if (sectorX < 0 || sectorX >= dfSECTOR_MAX_X)
+						{
+							continue;
+						}
+
+						const SectorPos targetSector{ static_cast<short>(sectorX), static_cast<short>(sectorY) };
+						for (int damageIndex = sectorDamageHead[GetSectorBucketIndex(targetSector)];
+							damageIndex != -1;
+							damageIndex = nextDamageIndex[damageIndex])
+						{
+							SendUnicast(observerSession, &damageEvents[damageIndex].packet);
+						}
+					}
 				}
 			}
 		}
