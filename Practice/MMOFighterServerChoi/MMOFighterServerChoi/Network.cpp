@@ -20,6 +20,7 @@ SOCKET gListenSocket = INVALID_SOCKET;
 namespace
 {
 	std::vector<Session*> gNetIoSessionBatch;
+	std::vector<Session*> gNetIoWritableBatch;
 
 	void LogRecvPacketHex(Session* session, const WCHAR* reason) noexcept
 	{
@@ -293,8 +294,8 @@ void NetEnd() noexcept
 void NetIOProcess() noexcept
 {
 	size_t maxBatchSize = static_cast<size_t>(FD_SETSIZE - 1);
-	const size_t activeSessionCount = gActiveSessions.size();
-	size_t offset = 0;
+	size_t readOffset = 0;
+	size_t writeOffset = 0;
 	do
 	{
 		FD_SET readSet;
@@ -310,10 +311,17 @@ void NetIOProcess() noexcept
 			gNetIoSessionBatch.reserve(maxBatchSize);
 		}
 
-		const size_t batchEnd = min(offset + maxBatchSize, activeSessionCount);
-		for (; offset < batchEnd; ++offset)
+		gNetIoWritableBatch.clear();
+		if (gNetIoWritableBatch.capacity() < maxBatchSize)
 		{
-			Session* session = gActiveSessions[offset];
+			gNetIoWritableBatch.reserve(maxBatchSize);
+		}
+
+		const size_t activeSessionCount = gActiveSessions.size();
+		const size_t readBatchEnd = min(readOffset + maxBatchSize, activeSessionCount);
+		for (; readOffset < readBatchEnd; ++readOffset)
+		{
+			Session* session = gActiveSessions[readOffset];
 			if (session == nullptr || session->disconnectFlag)
 			{
 				continue;
@@ -326,10 +334,25 @@ void NetIOProcess() noexcept
 
 			gNetIoSessionBatch.push_back(session);
 			FD_SET(session->socket, &readSet);
-			if (session->sendQ.GetUseSize() > 0)
+		}
+
+		const size_t writableSessionCount = gWritableSessions.size();
+		const size_t writeBatchEnd = min(writeOffset + maxBatchSize, writableSessionCount);
+		for (; writeOffset < writeBatchEnd; ++writeOffset)
+		{
+			Session* session = gWritableSessions[writeOffset];
+			if (session == nullptr || session->disconnectFlag)
 			{
-				FD_SET(session->socket, &writeSet);
+				continue;
 			}
+
+			if (session->socket == INVALID_SOCKET)
+			{
+				continue;
+			}
+
+			gNetIoWritableBatch.push_back(session);
+			FD_SET(session->socket, &writeSet);
 		}
 
 		timeval time{};
@@ -374,7 +397,29 @@ void NetIOProcess() noexcept
 				}
 			}
 		}
-	} while (offset < activeSessionCount);
+
+		for (Session* session : gNetIoWritableBatch)
+		{
+			if (session == nullptr || session->disconnectFlag)
+			{
+				continue;
+			}
+
+			if (session->socket == INVALID_SOCKET)
+			{
+				continue;
+			}
+
+			SOCKET socket = session->socket;
+			if (FD_ISSET(socket, &writeSet))
+			{
+				if (!NetProc_Send(session))
+				{
+					continue;
+				}
+			}
+		}
+	} while (readOffset < gActiveSessions.size() || writeOffset < gWritableSessions.size());
 }
 
 void NetProc_Accept() noexcept
@@ -643,6 +688,8 @@ bool NetProc_Send(Session* pSession) noexcept
 			return false;
 		}
 	}
+
+	RemoveWritableSession(pSession);
 
 	return true;
 }

@@ -45,6 +45,7 @@ bool EnqueuePacket(Session* session, const SerializedBuffer* pPacket) noexcept
         return false;
 
     const int packetSize = pPacket->GetDataSize();
+    const bool wasSendQueueEmpty = session->sendQ.IsEmpty();
 
     if (session->sendQ.GetFreeSize() < packetSize)
     {
@@ -60,6 +61,11 @@ bool EnqueuePacket(Session* session, const SerializedBuffer* pPacket) noexcept
     {
         Disconnect(session, L"sendQ enqueue 실패");
         return false;
+    }
+
+    if (wasSendQueueEmpty)
+    {
+        AddWritableSession(session);
     }
 
     return true;
@@ -227,6 +233,8 @@ void Disconnect(Session* pSession, const WCHAR* reason) noexcept
         pSession->ipStr,
         static_cast<unsigned long long>(pSession->socket),
         (reason != nullptr) ? reason : L"(none)");
+
+    RemoveWritableSession(pSession);
 
     // 앞으로 새로운 루프/조회에서 안 잡히게 먼저 분리
     gSessionIdMap.erase(pSession->sessionID);
