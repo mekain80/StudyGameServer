@@ -1,5 +1,6 @@
 ﻿#include "stdafx.h"
 
+#include <cassert>
 #include <vector>
 
 #include "Game.h"
@@ -63,18 +64,17 @@ namespace
 		}
 
 		std::size_t& trackedIndex = character->*indexMember;
-		if (trackedIndex < trackingList.size() && trackingList[trackedIndex] == character)
+		if (trackedIndex == kInvalidCharacterTrackingIndex)
 		{
+			trackedIndex = trackingList.size();
+			trackingList.push_back(character);
 			return;
 		}
 
-		for (std::size_t index = 0; index < trackingList.size(); ++index)
+		assert(trackedIndex < trackingList.size() && trackingList[trackedIndex] == character);
+		if (trackedIndex < trackingList.size() && trackingList[trackedIndex] == character)
 		{
-			if (trackingList[index] == character)
-			{
-				trackedIndex = index;
-				return;
-			}
+			return;
 		}
 
 		trackedIndex = trackingList.size();
@@ -92,20 +92,14 @@ namespace
 		}
 
 		std::size_t removeIndex = character->*indexMember;
-		if (removeIndex >= trackingList.size() || trackingList[removeIndex] != character)
+		if (removeIndex == kInvalidCharacterTrackingIndex)
 		{
-			removeIndex = kInvalidCharacterTrackingIndex;
-			for (std::size_t index = 0; index < trackingList.size(); ++index)
-			{
-				if (trackingList[index] == character)
-				{
-					removeIndex = index;
-					break;
-				}
-			}
+			character->*indexMember = kInvalidCharacterTrackingIndex;
+			return;
 		}
 
-		if (removeIndex == kInvalidCharacterTrackingIndex)
+		assert(removeIndex < trackingList.size() && trackingList[removeIndex] == character);
+		if (removeIndex >= trackingList.size() || trackingList[removeIndex] != character)
 		{
 			character->*indexMember = kInvalidCharacterTrackingIndex;
 			return;

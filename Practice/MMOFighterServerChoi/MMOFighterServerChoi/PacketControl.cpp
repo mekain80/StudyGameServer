@@ -12,6 +12,7 @@
 namespace
 {
     std::vector<Session*> gPendingDisconnects;
+    std::vector<Session*> gPendingDisconnectScratch;
 
     bool IsValidSectorIndex(short sectorX, short sectorY) noexcept
     {
@@ -258,10 +259,19 @@ void FlushDisconnectedSessions() noexcept
         return;
     }
 
-    std::vector<Session*> pending(gPendingDisconnects.size());
-    pending.swap(gPendingDisconnects); // flush 중 새로 들어온 건 다음 flush에서 처리
+    gPendingDisconnectScratch.clear();
+    if (gPendingDisconnectScratch.capacity() < gPendingDisconnects.size())
+    {
+        gPendingDisconnectScratch.reserve(gPendingDisconnects.size());
+    }
 
-    for (Session* pSession : pending)
+    gPendingDisconnectScratch.insert(
+        gPendingDisconnectScratch.end(),
+        gPendingDisconnects.begin(),
+        gPendingDisconnects.end());
+    gPendingDisconnects.clear(); // flush 중 새로 들어온 건 다음 flush에서 처리
+
+    for (Session* pSession : gPendingDisconnectScratch)
     {
         if (pSession == nullptr)
         {
@@ -288,4 +298,6 @@ void FlushDisconnectedSessions() noexcept
         RemoveActiveSession(pSession);
         FreeSession(pSession);
     }
+
+    gPendingDisconnectScratch.clear();
 }

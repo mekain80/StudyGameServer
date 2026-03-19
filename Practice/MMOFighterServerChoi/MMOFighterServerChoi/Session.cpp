@@ -1,5 +1,6 @@
 ﻿#include "stdafx.h"
 
+#include <cassert>
 #include <unordered_map>
 #include "Session.h"
 #include "MemoryPool.h"
@@ -81,20 +82,14 @@ void RemoveActiveSession(Session* session) noexcept
 	}
 
 	std::size_t removeIndex = session->activeSessionIndex;
-	if (removeIndex >= gActiveSessions.size() || gActiveSessions[removeIndex] != session)
+	if (removeIndex == kInvalidActiveSessionIndex)
 	{
-		removeIndex = kInvalidActiveSessionIndex;
-		for (std::size_t index = 0; index < gActiveSessions.size(); ++index)
-		{
-			if (gActiveSessions[index] == session)
-			{
-				removeIndex = index;
-				break;
-			}
-		}
+		session->activeSessionIndex = kInvalidActiveSessionIndex;
+		return;
 	}
 
-	if (removeIndex == kInvalidActiveSessionIndex)
+	assert(removeIndex < gActiveSessions.size() && gActiveSessions[removeIndex] == session);
+	if (removeIndex >= gActiveSessions.size() || gActiveSessions[removeIndex] != session)
 	{
 		session->activeSessionIndex = kInvalidActiveSessionIndex;
 		return;
@@ -144,20 +139,15 @@ void RemoveWritableSession(Session* session) noexcept
 	}
 
 	std::size_t removeIndex = session->writableIndex;
-	if (removeIndex >= gWritableSessions.size() || gWritableSessions[removeIndex] != session)
+	if (removeIndex == kInvalidWritableSessionIndex)
 	{
-		removeIndex = kInvalidWritableSessionIndex;
-		for (std::size_t index = 0; index < gWritableSessions.size(); ++index)
-		{
-			if (gWritableSessions[index] == session)
-			{
-				removeIndex = index;
-				break;
-			}
-		}
+		session->wantWrite = false;
+		session->writableIndex = kInvalidWritableSessionIndex;
+		return;
 	}
 
-	if (removeIndex == kInvalidWritableSessionIndex)
+	assert(removeIndex < gWritableSessions.size() && gWritableSessions[removeIndex] == session);
+	if (removeIndex >= gWritableSessions.size() || gWritableSessions[removeIndex] != session)
 	{
 		session->wantWrite = false;
 		session->writableIndex = kInvalidWritableSessionIndex;
