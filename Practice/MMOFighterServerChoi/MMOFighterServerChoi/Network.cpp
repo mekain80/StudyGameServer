@@ -150,9 +150,14 @@ namespace
 		return character;
 	}
 
-	void SendVisibleCharacterState(Session* session, const Character* character) noexcept
+	const SerializedBuffer* BuildCreateOtherCharacterPacket(const Character* character) noexcept
 	{
-		SerializedBuffer createPacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE);
+		if (character == nullptr)
+		{
+			return nullptr;
+		}
+
+		static SerializedBuffer createPacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE);
 		MakePacket_CreateOtherCharacter(
 			&createPacket,
 			character->direction,
@@ -160,26 +165,29 @@ namespace
 			character->x,
 			character->y,
 			character->HP);
-		SendUnicast(session, &createPacket);
+		return &createPacket;
+	}
 
-		if (character->action == dfACTION_STOP)
+	const SerializedBuffer* BuildMoveStartPacket(const Character* character) noexcept
+	{
+		if (character == nullptr || character->action == dfACTION_STOP)
 		{
-			return;
+			return nullptr;
 		}
 
-		SerializedBuffer movePacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
+		static SerializedBuffer movePacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
 		MakePacket_MoveStart(
 			&movePacket,
 			character->sessionID,
 			character->action,
 			character->x,
 			character->y);
-		SendUnicast(session, &movePacket);
+		return &movePacket;
 	}
 
 	void SendMyCharacterState(Session* session, const Character* character) noexcept
 	{
-		SerializedBuffer createPacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_MY_CHARACTER_SIZE);
+		static SerializedBuffer createPacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_MY_CHARACTER_SIZE);
 		MakePacket_CreateMyCharacter(
 			&createPacket,
 			character->direction,
@@ -192,6 +200,9 @@ namespace
 
 	void SendNearbyCharactersToNewSession(Session* session, const Character* character) noexcept
 	{
+		static SerializedBuffer batchPacket(SerializedBuffer::eBUFFER_DEFAULT);
+		batchPacket.Clear();
+
 		SectorAround nearbySectors{};
 		GetSectorAroundBySector(&character->sector, &nearbySectors);
 		for (int sectorIndex = 0; sectorIndex < nearbySectors.count; ++sectorIndex)
@@ -205,36 +216,45 @@ namespace
 					continue;
 				}
 
-				SendVisibleCharacterState(session, otherCharacter);
+				AppendPacketBatch(session, &batchPacket, BuildCreateOtherCharacterPacket(otherCharacter));
+				AppendPacketBatch(session, &batchPacket, BuildMoveStartPacket(otherCharacter));
 			}
 		}
+
+		FlushPacketBatch(session, &batchPacket);
 	}
 
 	void BroadcastNewCharacter(Session* session, const Character* character) noexcept
 	{
-		SerializedBuffer createPacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE);
-		MakePacket_CreateOtherCharacter(
-			&createPacket,
-			character->direction,
-			character->sessionID,
-			character->x,
-			character->y,
-			character->HP);
-		SendPacket_AroundCharacter(character, &createPacket, session);
+		const SerializedBuffer* createPacket = BuildCreateOtherCharacterPacket(character);
+		const SerializedBuffer* movePacket = BuildMoveStartPacket(character);
+		static SerializedBuffer targetSessionBatch(SerializedBuffer::eBUFFER_DEFAULT);
 
-		if (character->action == dfACTION_STOP)
+		SectorAround nearbySectors{};
+		GetSectorAroundBySector(&character->sector, &nearbySectors);
+		for (int sectorIndex = 0; sectorIndex < nearbySectors.count; ++sectorIndex)
 		{
-			return;
-		}
+			const SectorPos sectorPos = nearbySectors.around[sectorIndex];
+			SectorCharacterList& sectorCharacters = gSector[sectorPos.y][sectorPos.x];
+			for (Character* otherCharacter : sectorCharacters)
+			{
+				if (otherCharacter == nullptr || otherCharacter == character)
+				{
+					continue;
+				}
 
-		SerializedBuffer movePacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
-		MakePacket_MoveStart(
-			&movePacket,
-			character->sessionID,
-			character->action,
-			character->x,
-			character->y);
-		SendPacket_AroundCharacter(character, &movePacket, session);
+				Session* targetSession = FindActiveSession(otherCharacter);
+				if (targetSession == nullptr || targetSession == session)
+				{
+					continue;
+				}
+
+				targetSessionBatch.Clear();
+				AppendPacketBatch(targetSession, &targetSessionBatch, createPacket);
+				AppendPacketBatch(targetSession, &targetSessionBatch, movePacket);
+				FlushPacketBatch(targetSession, &targetSessionBatch);
+			}
+		}
 	}
 }
 
