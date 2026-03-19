@@ -19,6 +19,9 @@ SOCKET gListenSocket = INVALID_SOCKET;
 
 namespace
 {
+	std::vector<Session*> gNetIoSessions;
+	std::vector<Session*> gNetIoSessionBatch;
+
 	void LogRecvPacketHex(Session* session, const WCHAR* reason) noexcept
 	{
 		if (session == nullptr)
@@ -288,8 +291,12 @@ void NetEnd() noexcept
 
 void NetIOProcess() noexcept
 {
-	std::vector<Session*> sessions;
-	sessions.reserve(gSessionMap.size());
+	gNetIoSessions.clear();
+	if (gNetIoSessions.capacity() < gSessionMap.size())
+	{
+		gNetIoSessions.reserve(gSessionMap.size());
+	}
+
 	for (const auto& sessionPair : gSessionMap)
 	{
 		Session* session = sessionPair.second;
@@ -303,7 +310,7 @@ void NetIOProcess() noexcept
 			continue;
 		}
 
-		sessions.push_back(session);
+		gNetIoSessions.push_back(session);
 	}
 
 	size_t maxBatchSize = static_cast<size_t>(FD_SETSIZE - 1);
@@ -317,15 +324,18 @@ void NetIOProcess() noexcept
 
 		FD_SET(gListenSocket, &readSet);
 
-		std::vector<Session*> sessionBatch;
-		sessionBatch.reserve(FD_SETSIZE - 1);
+		gNetIoSessionBatch.clear();
+		if (gNetIoSessionBatch.capacity() < maxBatchSize)
+		{
+			gNetIoSessionBatch.reserve(maxBatchSize);
+		}
 
-		const size_t batchEnd = min(offset + maxBatchSize, sessions.size());
+		const size_t batchEnd = min(offset + maxBatchSize, gNetIoSessions.size());
 		for (; offset < batchEnd; ++offset)
 		{
-			Session* session = sessions[offset];
+			Session* session = gNetIoSessions[offset];
 
-			sessionBatch.push_back(session);
+			gNetIoSessionBatch.push_back(session);
 			FD_SET(session->socket, &readSet);
 			if (session->sendQ.GetUseSize() > 0)
 			{
@@ -346,7 +356,7 @@ void NetIOProcess() noexcept
 			NetProc_Accept();
 		}
 
-		for (Session* session : sessionBatch)
+		for (Session* session : gNetIoSessionBatch)
 		{
 			if (session == nullptr || session->disconnectFlag)
 			{
@@ -375,7 +385,7 @@ void NetIOProcess() noexcept
 				}
 			}
 		}
-	} while (offset < sessions.size());
+	} while (offset < gNetIoSessions.size());
 }
 
 void NetProc_Accept() noexcept
