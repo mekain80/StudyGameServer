@@ -10,6 +10,8 @@ struct Character;
 bool EnqueuePacket(Session* session, const SerializedBuffer* pPacket) noexcept;
 void SendUnicast(Session* pSession, const SerializedBuffer* pPacket) noexcept;
 void SendBroadcast(Session* pSession, const SerializedBuffer* pPacket) noexcept;
+void FlushPacketBatch(Session* session, SerializedBuffer* batchPacket) noexcept;
+void AppendPacketBatch(Session* session, SerializedBuffer* batchPacket, const SerializedBuffer* packet) noexcept;
 void Disconnect(Session* pSession, const WCHAR* reason = nullptr) noexcept;
 void FlushDisconnectedSessions() noexcept;
 

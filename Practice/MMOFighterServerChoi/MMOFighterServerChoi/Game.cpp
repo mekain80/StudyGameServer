@@ -195,14 +195,26 @@ namespace
 
 	void SendDeleteCharacterPacket(Session* session, DWORD sessionID) noexcept
 	{
-		SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_DELETE_CHARACTER_SIZE);
+		static SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_DELETE_CHARACTER_SIZE);
 		MakePacket_DeleteCharacter(&packet, sessionID);
 		SendUnicast(session, &packet);
 	}
 
-	void SendCreateCharacterPacket(Session* session, const Character* character) noexcept
+	const SerializedBuffer* BuildDeleteCharacterPacket(DWORD sessionID) noexcept
 	{
-		SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE);
+		static SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_DELETE_CHARACTER_SIZE);
+		MakePacket_DeleteCharacter(&packet, sessionID);
+		return &packet;
+	}
+
+	const SerializedBuffer* BuildCreateCharacterPacket(const Character* character) noexcept
+	{
+		if (character == nullptr)
+		{
+			return nullptr;
+		}
+
+		static SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE);
 		MakePacket_CreateOtherCharacter(
 			&packet,
 			character->direction,
@@ -210,24 +222,24 @@ namespace
 			character->x,
 			character->y,
 			character->HP);
-		SendUnicast(session, &packet);
+		return &packet;
 	}
 
-	void SendMoveStartPacket(Session* session, const Character* character) noexcept
+	const SerializedBuffer* BuildMoveStartPacket(const Character* character) noexcept
 	{
-		if (character->action == dfACTION_STOP)
+		if (character == nullptr || character->action == dfACTION_STOP)
 		{
-			return;
+			return nullptr;
 		}
 
-		SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
+		static SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
 		MakePacket_MoveStart(
 			&packet,
 			character->sessionID,
 			character->action,
 			character->x,
 			character->y);
-		SendUnicast(session, &packet);
+		return &packet;
 	}
 
 	void ProcessRemovedVisibility(
@@ -235,8 +247,10 @@ namespace
 		const Character* movingCharacter,
 		Session* currentSession) noexcept
 	{
-		SerializedBuffer leavePacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_DELETE_CHARACTER_SIZE);
+		static SerializedBuffer leavePacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_DELETE_CHARACTER_SIZE);
 		MakePacket_DeleteCharacter(&leavePacket, movingCharacter->sessionID);
+		static SerializedBuffer currentSessionBatch(SerializedBuffer::eBUFFER_DEFAULT);
+		currentSessionBatch.Clear();
 
 		for (int index = 0; index < removeAround.count; ++index)
 		{
@@ -256,10 +270,11 @@ namespace
 				}
 
 				SendUnicast(targetSession, &leavePacket);
-
-				SendDeleteCharacterPacket(currentSession, character->sessionID);
+				AppendPacketBatch(currentSession, &currentSessionBatch, BuildDeleteCharacterPacket(character->sessionID));
 			}
 		}
+
+		FlushPacketBatch(currentSession, &currentSessionBatch);
 	}
 
 	void ProcessAddedVisibility(
@@ -267,7 +282,7 @@ namespace
 		const Character* movingCharacter,
 		Session* currentSession) noexcept
 	{
-		SerializedBuffer createPacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE);
+		static SerializedBuffer createPacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE);
 		MakePacket_CreateOtherCharacter(
 			&createPacket,
 			movingCharacter->direction,
@@ -276,7 +291,7 @@ namespace
 			movingCharacter->y,
 			movingCharacter->HP);
 
-		SerializedBuffer movePacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
+		static SerializedBuffer movePacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
 		const bool sendMovePacket = (movingCharacter->action != dfACTION_STOP);
 		if (sendMovePacket)
 		{
@@ -287,6 +302,11 @@ namespace
 				movingCharacter->x,
 				movingCharacter->y);
 		}
+
+		static SerializedBuffer currentSessionBatch(SerializedBuffer::eBUFFER_DEFAULT);
+		static SerializedBuffer targetSessionBatch(SerializedBuffer::eBUFFER_DEFAULT);
+		currentSessionBatch.Clear();
+		targetSessionBatch.Clear();
 
 		for (int index = 0; index < addAround.count; ++index)
 		{
@@ -305,16 +325,25 @@ namespace
 					continue;
 				}
 
-				SendUnicast(targetSession, &createPacket);
+				targetSessionBatch.Clear();
+				AppendPacketBatch(targetSession, &targetSessionBatch, &createPacket);
 				if (sendMovePacket)
 				{
-					SendUnicast(targetSession, &movePacket);
+					AppendPacketBatch(targetSession, &targetSessionBatch, &movePacket);
 				}
+				FlushPacketBatch(targetSession, &targetSessionBatch);
 
-				SendCreateCharacterPacket(currentSession, character);
-				SendMoveStartPacket(currentSession, character);
+				AppendPacketBatch(currentSession, &currentSessionBatch, BuildCreateCharacterPacket(character));
+
+				const SerializedBuffer* moveOtherPacket = BuildMoveStartPacket(character);
+				if (moveOtherPacket != nullptr)
+				{
+					AppendPacketBatch(currentSession, &currentSessionBatch, moveOtherPacket);
+				}
 			}
 		}
+
+		FlushPacketBatch(currentSession, &currentSessionBatch);
 	}
 }
 

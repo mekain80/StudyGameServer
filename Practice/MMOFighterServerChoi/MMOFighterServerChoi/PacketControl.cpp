@@ -75,6 +75,54 @@ void SendUnicast(Session* pSession, const SerializedBuffer* pPacket) noexcept
     EnqueuePacket(pSession, pPacket);
 }
 
+void FlushPacketBatch(Session* session, SerializedBuffer* batchPacket) noexcept
+{
+    if (session == nullptr || batchPacket == nullptr)
+    {
+        return;
+    }
+
+    if (batchPacket->GetDataSize() <= 0)
+    {
+        return;
+    }
+
+    SendUnicast(session, batchPacket);
+    batchPacket->Clear();
+}
+
+void AppendPacketBatch(Session* session, SerializedBuffer* batchPacket, const SerializedBuffer* packet) noexcept
+{
+    if (session == nullptr || batchPacket == nullptr || packet == nullptr)
+    {
+        return;
+    }
+
+    const int packetSize = packet->GetDataSize();
+    if (packetSize <= 0)
+    {
+        return;
+    }
+
+    if (packetSize > batchPacket->GetBufferSize())
+    {
+        FlushPacketBatch(session, batchPacket);
+        SendUnicast(session, packet);
+        return;
+    }
+
+    if (batchPacket->GetFreeSize() < packetSize)
+    {
+        FlushPacketBatch(session, batchPacket);
+    }
+
+    if (batchPacket->PutData(packet->GetBufferRead(), packetSize) != packetSize)
+    {
+        FlushPacketBatch(session, batchPacket);
+        SendUnicast(session, packet);
+    }
+}
+
 void SendBroadcast(Session* pSession, const SerializedBuffer* pPacket) noexcept
 {
     const std::size_t activeSessionCount = gActiveSessions.size();
