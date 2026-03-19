@@ -134,7 +134,7 @@ namespace
 
 		for (const SectorPos& sectorPos : sectorsToVisit)
 		{
-			std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+			SectorCharacterList& sectorList = gSector[sectorPos.y][sectorPos.x];
 			for (Character* observer : sectorList)
 			{
 				Session* observerSession = FindActiveSession(observer);
@@ -171,7 +171,7 @@ namespace
 		for (int sectorIndex = 0; sectorIndex < attackerAround.count; ++sectorIndex)
 		{
 			const SectorPos sectorPos = attackerAround.around[sectorIndex];
-			std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
+			SectorCharacterList& sectorList = gSector[sectorPos.y][sectorPos.x];
 			for (Character* target : sectorList)
 			{
 				if (target == attacker)
@@ -282,7 +282,7 @@ bool NetPacketProc_MoveStart(Session* pSession, const char* packetData, WORD pac
 	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
-	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
+	static SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
 	MakePacket_MoveStart(
 		&sendMsg,
 		pCharacter->sessionID,
@@ -339,7 +339,7 @@ bool NetPacketProc_MoveStop(Session* pSession, const char* packetData, WORD pack
 	SetCharacterPosition(pCharacter, x, y, currentTick);
 	UpdateCharacterSector(pCharacter, pSession);
 
-	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_STOP_SIZE);
+	static SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_STOP_SIZE);
 	MakePacket_MoveStop(&sendMsg, pCharacter->sessionID, pCharacter->direction, pCharacter->x, pCharacter->y);
 	SendPacket_AroundCharacter(pCharacter, &sendMsg, pSession);
 
@@ -388,7 +388,7 @@ bool NetPacketProc_Attack1(Session* pSession, const char* packetData, WORD packe
 	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
-	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_ATTACK1_SIZE);
+	static SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_ATTACK1_SIZE);
 	MakePacket_Attack1(&sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
 	SendPacket_AroundCharacter(pCharacter, &sendMsg);
 
@@ -449,7 +449,7 @@ bool NetPacketProc_Attack2(Session* pSession, const char* packetData, WORD packe
 	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
-	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_ATTACK2_SIZE);
+	static SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_ATTACK2_SIZE);
 	MakePacket_Attack2(&sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
 	SendPacket_AroundCharacter(pCharacter, &sendMsg);
 
@@ -516,7 +516,7 @@ bool NetPacketProc_Attack3(Session* pSession, const char* packetData, WORD packe
 	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
-	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_ATTACK3_SIZE);
+	static SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_ATTACK3_SIZE);
 	MakePacket_Attack3(&sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
 	SendPacket_AroundCharacter(pCharacter, &sendMsg);
 
@@ -549,7 +549,7 @@ bool NetPacketProc_Echo(Session* pSession, const char* packetData, WORD packetSi
 		return false;
 	}
 
-	SerializedBuffer response(dfPACKET_HEADER_SIZE + dfPACKET_SC_ECHO_SIZE);
+	static SerializedBuffer response(dfPACKET_HEADER_SIZE + dfPACKET_SC_ECHO_SIZE);
 	MakePacket_Echo(&response, time);
 	SendUnicast(pSession, &response);
 

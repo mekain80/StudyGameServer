@@ -422,53 +422,88 @@ void NetProc_Accept() noexcept
 
 bool NetProc_Recv(Session* pSession) noexcept
 {
-	char buffer[BUFFER_SIZE] = { 0 };
-
-	int recvRet = recv(pSession->socket, buffer, sizeof(buffer), 0);
-	if (recvRet == 0)
+	bool receivedAnyData = false;
+	while (true)
 	{
-		Disconnect(pSession, L"recv 0");
-		return false;
-	}
-	else if (recvRet == SOCKET_ERROR)
-	{
-		int err = WSAGetLastError();
-		if (err == WSAEWOULDBLOCK)
+		const std::size_t directEnqueueSize = pSession->recvQ.GetDirectEnqueueSize();
+		if (directEnqueueSize == 0)
 		{
-			return true;
+			if (pSession->recvQ.GetFreeSize() == 0)
+			{
+				_LOG(LOG_LEVEL_ERROR, L"recvQ full");
+				Disconnect(pSession, L"recvQ full");
+				return false;
+			}
+			break;
 		}
 
-		if (err == WSAECONNRESET || err == WSAECONNABORTED ||
-			err == WSAENETRESET || err == WSAESHUTDOWN || err == WSAENOTCONN)
+		const int recvCapacity = static_cast<int>(
+			(directEnqueueSize < static_cast<std::size_t>(BUFFER_SIZE))
+			? directEnqueueSize
+			: static_cast<std::size_t>(BUFFER_SIZE));
+		int recvRet = recv(pSession->socket, pSession->recvQ.GetRear(), recvCapacity, 0);
+		if (recvRet == 0)
 		{
-			_LOG(LOG_LEVEL_ERROR, L"WSAGetLastError # SessionID:%d    WSA NUM:%d", pSession->sessionID, err);
-			Disconnect(pSession, L"recv socket error");
+			Disconnect(pSession, L"recv 0");
+			return false;
+		}
+		else if (recvRet == SOCKET_ERROR)
+		{
+			int err = WSAGetLastError();
+			if (err == WSAEWOULDBLOCK)
+			{
+				break;
+			}
+
+			if (err == WSAECONNRESET || err == WSAECONNABORTED ||
+				err == WSAENETRESET || err == WSAESHUTDOWN || err == WSAENOTCONN)
+			{
+				_LOG(LOG_LEVEL_ERROR, L"WSAGetLastError # SessionID:%d    WSA NUM:%d", pSession->sessionID, err);
+				Disconnect(pSession, L"recv socket error");
+				return false;
+			}
+
+			Disconnect(pSession, L"recv unknown socket error");
 			return false;
 		}
 
-		Disconnect(pSession, L"recv unknown socket error");
-		return false;
+		if (!pSession->recvQ.MoveRear(static_cast<std::size_t>(recvRet)))
+		{
+			_LOG(LOG_LEVEL_ERROR, L"recvQ move rear fail");
+			Disconnect(pSession, L"recvQ move rear fail");
+			return false;
+		}
+
+		receivedAnyData = true;
+		pSession->lastRecvTime = GetTickCount64();
+
+		if (recvRet < recvCapacity)
+		{
+			break;
+		}
 	}
 
-	if (!pSession->recvQ.Enqueue(buffer, recvRet))
+	if (!receivedAnyData)
 	{
-		_LOG(LOG_LEVEL_ERROR, L"recvQ enqueue fail");
-		Disconnect(pSession, L"recvQ enqueue fail");
-		return false;
+		return true;
 	}
-
-	pSession->lastRecvTime = GetTickCount64();
 
 	while (true)
 	{
 		const size_t headerSize = sizeof(PacketHeader);
-		if (pSession->recvQ.GetUseSize() < headerSize)
+		const std::size_t usedSize = pSession->recvQ.GetUseSize();
+		if (usedSize < headerSize)
 		{
 			break;
 		}
 
-		PacketHeader packetHeader;
-		if (!pSession->recvQ.Peek(reinterpret_cast<char*>(&packetHeader), static_cast<int>(headerSize)))
+		PacketHeader packetHeader{};
+		const std::size_t directDequeueSize = pSession->recvQ.GetDirectDequeueSize();
+		if (directDequeueSize >= headerSize)
+		{
+			std::memcpy(&packetHeader, pSession->recvQ.GetFront(), headerSize);
+		}
+		else if (!pSession->recvQ.Peek(reinterpret_cast<char*>(&packetHeader), headerSize))
 		{
 			Disconnect(pSession, L"packet header peek fail");
 			return false;
@@ -504,13 +539,11 @@ bool NetProc_Recv(Session* pSession) noexcept
 			return false;
 		}
 
-		int totalSize = static_cast<int>(headerSize) + packetHeader.size;
-		if (pSession->recvQ.GetUseSize() < totalSize)
+		const std::size_t totalSize = headerSize + packetHeader.size;
+		if (usedSize < totalSize)
 		{
 			return true;
 		}
-
-		pSession->recvQ.MoveFront(static_cast<int>(headerSize));
 
 		if (packetHeader.size > BUFFER_SIZE)
 		{
@@ -518,7 +551,29 @@ bool NetProc_Recv(Session* pSession) noexcept
 			return false;
 		}
 
-		char packetBuffer[BUFFER_SIZE];
+		if (directDequeueSize >= totalSize)
+		{
+			const char* packetData = pSession->recvQ.GetFront() + headerSize;
+			if (!PacketProc(pSession, packetHeader.type, packetData, packetHeader.size))
+			{
+				return false;
+			}
+
+			if (!pSession->recvQ.MoveFront(totalSize))
+			{
+				Disconnect(pSession, L"packet move front fail");
+				return false;
+			}
+			continue;
+		}
+
+		if (!pSession->recvQ.MoveFront(headerSize))
+		{
+			Disconnect(pSession, L"packet header move front fail");
+			return false;
+		}
+
+		char packetBuffer[BUFFER_SIZE]{};
 		if (!pSession->recvQ.Dequeue(packetBuffer, packetHeader.size))
 		{
 			Disconnect(pSession, L"packet body dequeue fail");
@@ -536,29 +591,28 @@ bool NetProc_Recv(Session* pSession) noexcept
 
 bool NetProc_Send(Session* pSession) noexcept
 {
-	char buffer[BUFFER_SIZE];
-
 	while (true)
 	{
-		int useSize = static_cast<int>(pSession->sendQ.GetUseSize());
+		const std::size_t useSize = pSession->sendQ.GetUseSize();
 		if (useSize <= 0)
 		{
 			break;
 		}
 
-		int sendSize = useSize;
+		const std::size_t directDequeueSize = pSession->sendQ.GetDirectDequeueSize();
+		if (directDequeueSize == 0)
+		{
+			Disconnect(pSession, L"sendQ direct dequeue fail");
+			return false;
+		}
+
+		int sendSize = static_cast<int>(directDequeueSize);
 		if (sendSize > BUFFER_SIZE)
 		{
 			sendSize = BUFFER_SIZE;
 		}
 
-		if (!pSession->sendQ.Peek(buffer, sendSize))
-		{
-			Disconnect(pSession, L"sendQ peek fail");
-			return false;
-		}
-
-		int sendRet = send(pSession->socket, buffer, sendSize, 0);
+		int sendRet = send(pSession->socket, pSession->sendQ.GetFront(), sendSize, 0);
 		if (sendRet == 0)
 		{
 			Disconnect(pSession, L"send 0");
@@ -583,7 +637,11 @@ bool NetProc_Send(Session* pSession) noexcept
 			return false;
 		}
 
-		pSession->sendQ.MoveFront(sendRet);
+		if (!pSession->sendQ.MoveFront(static_cast<std::size_t>(sendRet)))
+		{
+			Disconnect(pSession, L"sendQ move front fail");
+			return false;
+		}
 	}
 
 	return true;
