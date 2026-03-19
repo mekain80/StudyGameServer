@@ -12,6 +12,17 @@
 #include "Character.h"
 #include "Sector.h"
 
+namespace
+{
+	void AdvanceCharacterState(Character* character, Session* session, LONGLONG currentTick) noexcept
+	{
+		if (AdvanceCharacterByTime(character, currentTick))
+		{
+			UpdateCharacterSector(character, session);
+		}
+	}
+}
+
 bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packetSize)
 {
 	SerializedBuffer packet(static_cast<int>(packetSize));
@@ -61,6 +72,9 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
+	const LONGLONG currentTick = GetCurrentMoveTick();
+	AdvanceCharacterState(pCharacter, pSession, currentTick);
+
 	// 서버의 위치와 받은 패킷의 위치값이 너무 큰 차이가 난다면 싱크 패킷을 보내어 좌표 보정.
 	if (NeedSync(x, y, pCharacter))
 	{
@@ -69,8 +83,7 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 	}
 
 	// 입력이 유효하면 클라이언트 기준 최신 좌표를 서버 상태에도 반영한다.
-	pCharacter->x = x;
-	pCharacter->y = y;
+	SetCharacterPosition(pCharacter, x, y, currentTick);
 	pCharacter->action = direction;
 	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
@@ -109,6 +122,9 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
+	const LONGLONG currentTick = GetCurrentMoveTick();
+	AdvanceCharacterState(pCharacter, pSession, currentTick);
+
 	// 서버의 위치와 받은 패킷의 위치값이 너무 큰 차이가 난다면 싱크 패킷을 보내어 좌표 보정.
 	if (NeedSync(x, y, pCharacter))
 	{
@@ -118,8 +134,7 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 
 	pCharacter->action = dfACTION_STOP;
 	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
-	pCharacter->x = x;
-	pCharacter->y = y;
+	SetCharacterPosition(pCharacter, x, y, currentTick);
 	UpdateCharacterSector(pCharacter, pSession);
 
 	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_STOP_SIZE);
@@ -150,14 +165,16 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
+	const LONGLONG currentTick = GetCurrentMoveTick();
+	AdvanceCharacterState(pCharacter, pSession, currentTick);
+
 	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
 		return true;
 	}
 
-	pCharacter->x = x;
-	pCharacter->y = y;
+	SetCharacterPosition(pCharacter, x, y, currentTick);
 	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
@@ -224,14 +241,16 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
+	const LONGLONG currentTick = GetCurrentMoveTick();
+	AdvanceCharacterState(pCharacter, pSession, currentTick);
+
 	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
 		return true;
 	}
 
-	pCharacter->x = x;
-	pCharacter->y = y;
+	SetCharacterPosition(pCharacter, x, y, currentTick);
 	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
@@ -298,14 +317,16 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 		return false;
 	}
 
+	const LONGLONG currentTick = GetCurrentMoveTick();
+	AdvanceCharacterState(pCharacter, pSession, currentTick);
+
 	if (NeedSync(x, y, pCharacter))
 	{
 		SendSync(pSession, pCharacter);
 		return true;
 	}
 
-	pCharacter->x = x;
-	pCharacter->y = y;
+	SetCharacterPosition(pCharacter, x, y, currentTick);
 	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 

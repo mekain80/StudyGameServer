@@ -17,6 +17,18 @@ LARGE_INTEGER gFrameEndTick{};
 
 namespace
 {
+	constexpr double kServerFrameSeconds = 0.02;
+
+	double GetElapsedSeconds(LONGLONG previousTick, LONGLONG currentTick) noexcept
+	{
+		if (currentTick <= previousTick || gFreq.QuadPart <= 0)
+		{
+			return 0.0;
+		}
+
+		return static_cast<double>(currentTick - previousTick) / static_cast<double>(gFreq.QuadPart);
+	}
+
 	void SendDeleteCharacterPacket(Session* session, DWORD sessionID) noexcept
 	{
 		SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_DELETE_CHARACTER_SIZE);
@@ -126,6 +138,83 @@ namespace
 	}
 }
 
+LONGLONG GetCurrentMoveTick() noexcept
+{
+	LARGE_INTEGER currentTick{};
+	QueryPerformanceCounter(&currentTick);
+	return currentTick.QuadPart;
+}
+
+void SetCharacterPosition(Character* character, int x, int y, LONGLONG currentTick) noexcept
+{
+	if (character == nullptr)
+	{
+		return;
+	}
+
+	character->x = x;
+	character->y = y;
+	character->lastMoveTick = currentTick;
+	character->moveTimeRemainder = 0.0;
+}
+
+bool AdvanceCharacterByTime(Character* character, LONGLONG currentTick) noexcept
+{
+	if (character == nullptr)
+	{
+		return false;
+	}
+
+	if (character->lastMoveTick == 0)
+	{
+		SetCharacterPosition(character, character->x, character->y, currentTick);
+		return false;
+	}
+
+	const double elapsedSeconds = GetElapsedSeconds(character->lastMoveTick, currentTick);
+	character->lastMoveTick = currentTick;
+
+	if (elapsedSeconds <= 0.0)
+	{
+		return false;
+	}
+
+	if (character->action == dfACTION_STOP)
+	{
+		character->moveTimeRemainder = 0.0;
+		return false;
+	}
+
+	character->moveTimeRemainder += elapsedSeconds;
+
+	int dx = 0;
+	int dy = 0;
+	GetMoveDelta(character->action, dx, dy);
+	if (dx == 0 && dy == 0)
+	{
+		character->moveTimeRemainder = 0.0;
+		return false;
+	}
+
+	bool moved = false;
+	while (character->moveTimeRemainder >= kServerFrameSeconds)
+	{
+		if (!MoveCheck(character->action, character->x, character->y))
+		{
+			// 경계에서 이동이 막히면 누적 시간을 비워서 다음 프레임에 과도한 보정이 생기지 않게 한다.
+			character->moveTimeRemainder = 0.0;
+			break;
+		}
+
+		character->x += dx;
+		character->y += dy;
+		character->moveTimeRemainder -= kServerFrameSeconds;
+		moved = true;
+	}
+
+	return moved;
+}
+
 void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexcept
 {
     if (pCharacter == nullptr || currentSession == nullptr || currentSession->disconnectFlag)
@@ -159,17 +248,18 @@ void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexc
 
 }
 
-void Update() noexcept
+bool Update() noexcept
 {
     QueryPerformanceCounter(&gFrameEndTick);
-    double elapsed = static_cast<double>(gFrameEndTick.QuadPart - gFrameStartTick.QuadPart) / gFreq.QuadPart;
+    const double elapsed = GetElapsedSeconds(gFrameStartTick.QuadPart, gFrameEndTick.QuadPart);
 
-    if (elapsed <= 0.02)
+    if (elapsed <= kServerFrameSeconds)
     {
-        return;
+        return false;
     }
 
     gFrameStartTick = gFrameEndTick;
+    const LONGLONG currentMoveTick = gFrameEndTick.QuadPart;
 
     for (auto it = gCharacterMap.begin(); it != gCharacterMap.end();)
     {
@@ -201,19 +291,13 @@ void Update() noexcept
             continue;
         }
 
-        if (!MoveCheck(pCharacter->action, pCharacter->x, pCharacter->y))
+        if (AdvanceCharacterByTime(pCharacter, currentMoveTick))
         {
-            continue;
+            UpdateCharacterSector(pCharacter, currentSession);
         }
-
-        int dx = 0;
-        int dy = 0;
-        GetMoveDelta(pCharacter->action, dx, dy);
-        pCharacter->x += dx;
-        pCharacter->y += dy;
-
-        UpdateCharacterSector(pCharacter, currentSession);
     }
+
+    return true;
 }
 
 bool MoveCheck(BYTE direction, int x, int y) noexcept

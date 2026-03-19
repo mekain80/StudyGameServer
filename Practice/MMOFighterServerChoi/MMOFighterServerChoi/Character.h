@@ -11,6 +11,8 @@ struct Character
     BYTE direction = 0;
     int x = 0;
     int y = 0;
+    LONGLONG lastMoveTick = 0;          // 마지막으로 시간 계산한 시각
+    double moveTimeRemainder = 0.0;     // 아직 20ms 한 칸이 안 돼서 남겨둔 시간
     int HP = 0;
 
     SectorPos sector;

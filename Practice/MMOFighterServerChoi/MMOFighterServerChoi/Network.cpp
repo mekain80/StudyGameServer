@@ -107,11 +107,14 @@ namespace
 	Character* SpawnCharacter(Session* session)
 	{
 		Character* character = new Character;
+		const LONGLONG currentTick = GetCurrentMoveTick();
 		character->sessionID = session->sessionID;
 		character->y = dfRANGE_MOVE_TOP + rand() % (dfRANGE_MOVE_BOTTOM - dfRANGE_MOVE_TOP + 1);
 		character->x = dfRANGE_MOVE_LEFT + rand() % (dfRANGE_MOVE_RIGHT - dfRANGE_MOVE_LEFT + 1);
 		character->direction = dfPACKET_MOVE_DIR_LL;
 		character->action = dfACTION_STOP;
+		character->lastMoveTick = currentTick;
+		character->moveTimeRemainder = 0.0;
 		character->HP = MAX_HP;
 
 		gCharacterMap[session->sessionID] = character;
