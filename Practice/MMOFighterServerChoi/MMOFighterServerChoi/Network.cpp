@@ -401,14 +401,6 @@ void NetIOProcess() noexcept
 					continue;
 				}
 			}
-
-			if (FD_ISSET(socket, &writeSet))
-			{
-				if (!NetProc_Send(session))
-				{
-					continue;
-				}
-			}
 		}
 
 		for (Session* session : gNetIoWritableBatch)
