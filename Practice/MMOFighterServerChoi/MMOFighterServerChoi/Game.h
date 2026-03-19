@@ -17,6 +17,12 @@ LONGLONG GetCurrentMoveTick() noexcept;
 bool AdvanceCharacterByTime(Character* character, LONGLONG currentTick) noexcept;
 // 캐릭터 좌표를 새 기준점으로 맞추고 남은 이동 누적 시간도 함께 초기화한다.
 void SetCharacterPosition(Character* character, int x, int y, LONGLONG currentTick) noexcept;
+// 현재 action 기준으로 이동 캐릭터 추적 목록에 등록 또는 해제한다.
+void RefreshCharacterMoveTracking(Character* character) noexcept;
+// 캐릭터가 해제될 때 이동/사망 추적 목록에서 모두 제거한다.
+void RemoveCharacterFromUpdateTracking(Character* character) noexcept;
+// HP가 0 이하가 된 캐릭터를 다음 업데이트에서 정리하도록 예약한다.
+void MarkCharacterDead(Character* character) noexcept;
 // 좌표 변화로 섹터가 바뀌었는지 검사하고, 시야 범위 패킷을 갱신한다.
 void UpdateCharacterSector(Character* character, Session* currentSession) noexcept;
 // 주어진 방향으로 한 번 더 이동해도 맵 범위를 벗어나지 않는지 확인한다.

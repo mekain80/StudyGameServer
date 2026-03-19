@@ -182,7 +182,7 @@ namespace
 			std::list<Character*>& sectorCharacters = gSector[sectorPos.y][sectorPos.x];
 			for (Character* otherCharacter : sectorCharacters)
 			{
-				if (otherCharacter == character || !IsCharacterActive(otherCharacter))
+				if (otherCharacter == character || FindActiveSession(otherCharacter) == nullptr)
 				{
 					continue;
 				}

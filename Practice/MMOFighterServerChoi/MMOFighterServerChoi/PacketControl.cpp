@@ -6,6 +6,7 @@
 #include "Network.h"
 #include "Proxy.h"
 #include "Character.h"
+#include "Game.h"
 #include "Sector.h"
 
 namespace
@@ -89,12 +90,7 @@ void SendPacket_SectorOne(int sectorX, int sectorY, const SerializedBuffer* pPac
     std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
     for (Character* character : sectorList)
     {
-        if (!IsCharacterActive(character))
-        {
-            continue;
-        }
-
-        Session* session = FindSession(character->sessionID);
+        Session* session = FindActiveSession(character);
         if (session == nullptr)
         {
             continue;
@@ -202,6 +198,7 @@ void FlushDisconnectedSessions() noexcept
 
             RemoveSector(pCharacter);
             gCharacterMap.erase(pCharacter->sessionID);
+            RemoveCharacterFromUpdateTracking(pCharacter);
             FreeCharacter(pCharacter);
         }
 

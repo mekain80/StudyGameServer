@@ -23,4 +23,5 @@ extern std::unordered_map<DWORD, Character*> gCharacterMap;
 Character* AllocCharacter() noexcept;
 void FreeCharacter(Character* character) noexcept;
 Character* FindCharacter(DWORD sessionID) noexcept;
+Session* FindActiveSession(const Character* character) noexcept;
 bool IsCharacterActive(const Character* character) noexcept;

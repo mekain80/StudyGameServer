@@ -39,18 +39,23 @@ Character* FindCharacter(DWORD sessionID) noexcept
 	}
 }
 
-bool IsCharacterActive(const Character* character) noexcept
+Session* FindActiveSession(const Character* character) noexcept
 {
 	if (character == nullptr)
 	{
-		return false;
+		return nullptr;
 	}
 
 	Session* session = FindSession(character->sessionID);
-	if (session == nullptr)
+	if (session == nullptr || session->disconnectFlag)
 	{
-		return false;
+		return nullptr;
 	}
 
-	return session->disconnectFlag == false;
+	return session;
+}
+
+bool IsCharacterActive(const Character* character) noexcept
+{
+	return FindActiveSession(character) != nullptr;
 }

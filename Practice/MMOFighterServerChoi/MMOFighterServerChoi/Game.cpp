@@ -1,5 +1,7 @@
 ﻿#include "stdafx.h"
 
+#include <unordered_set>
+
 #include "Game.h"
 
 #include "Character.h"
@@ -18,6 +20,9 @@ LARGE_INTEGER gFrameEndTick{};
 namespace
 {
 	constexpr double kServerFrameSeconds = 0.02;
+	std::unordered_set<Character*> gMovingCharacters;
+	std::unordered_set<Character*> gPendingDeadCharacters;
+	ULONGLONG gLastTimeoutCheckTick = 0;
 
 	double GetElapsedSeconds(LONGLONG previousTick, LONGLONG currentTick) noexcept
 	{
@@ -27,6 +32,69 @@ namespace
 		}
 
 		return static_cast<double>(currentTick - previousTick) / static_cast<double>(gFreq.QuadPart);
+	}
+
+	bool IsTrackedMoveAction(BYTE action) noexcept
+	{
+		switch (action)
+		{
+		case dfPACKET_MOVE_DIR_UU:
+		case dfPACKET_MOVE_DIR_DD:
+		case dfPACKET_MOVE_DIR_RR:
+		case dfPACKET_MOVE_DIR_LL:
+		case dfPACKET_MOVE_DIR_RU:
+		case dfPACKET_MOVE_DIR_RD:
+		case dfPACKET_MOVE_DIR_LU:
+		case dfPACKET_MOVE_DIR_LD:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	void ProcessPendingDeadCharacters() noexcept
+	{
+		for (auto it = gPendingDeadCharacters.begin(); it != gPendingDeadCharacters.end();)
+		{
+			Character* character = *it;
+			auto currentIt = it++;
+			gPendingDeadCharacters.erase(currentIt);
+
+			if (character == nullptr)
+			{
+				continue;
+			}
+
+			gMovingCharacters.erase(character);
+
+			Session* session = FindActiveSession(character);
+			if (session == nullptr)
+			{
+				continue;
+			}
+
+			Disconnect(session, L"HP 0 이하");
+		}
+	}
+
+	void ProcessTimeoutSessions(ULONGLONG currentTick) noexcept
+	{
+		const ULONGLONG timeoutTick = static_cast<ULONGLONG>(NETWORK_PACKET_RECV_TIMEOUT) * 1000;
+		for (auto it = gSessionMap.begin(); it != gSessionMap.end();)
+		{
+			Session* session = it->second;
+			++it;
+
+			if (session == nullptr || session->disconnectFlag)
+			{
+				continue;
+			}
+
+			if (currentTick - session->lastRecvTime >= timeoutTick)
+			{
+				Disconnect(session, L"recv timeout");
+			}
+		}
 	}
 
 	void SendDeleteCharacterPacket(Session* session, DWORD sessionID) noexcept
@@ -81,7 +149,7 @@ namespace
 			std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
 			for (Character* character : sectorList)
 			{
-				if (character == movingCharacter || !IsCharacterActive(character))
+				if (character == movingCharacter || FindActiveSession(character) == nullptr)
 				{
 					continue;
 				}
@@ -126,7 +194,7 @@ namespace
 			std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
 			for (Character* character : sectorList)
 			{
-				if (character == movingCharacter || !IsCharacterActive(character))
+				if (character == movingCharacter || FindActiveSession(character) == nullptr)
 				{
 					continue;
 				}
@@ -156,6 +224,43 @@ void SetCharacterPosition(Character* character, int x, int y, LONGLONG currentTi
 	character->y = y;
 	character->lastMoveTick = currentTick;
 	character->moveTimeRemainder = 0.0;
+}
+
+void RefreshCharacterMoveTracking(Character* character) noexcept
+{
+	if (character == nullptr)
+	{
+		return;
+	}
+
+	if (IsTrackedMoveAction(character->action))
+	{
+		gMovingCharacters.insert(character);
+		return;
+	}
+
+	gMovingCharacters.erase(character);
+}
+
+void RemoveCharacterFromUpdateTracking(Character* character) noexcept
+{
+	if (character == nullptr)
+	{
+		return;
+	}
+
+	gMovingCharacters.erase(character);
+	gPendingDeadCharacters.erase(character);
+}
+
+void MarkCharacterDead(Character* character) noexcept
+{
+	if (character == nullptr)
+	{
+		return;
+	}
+
+	gPendingDeadCharacters.insert(character);
 }
 
 bool AdvanceCharacterByTime(Character* character, LONGLONG currentTick) noexcept
@@ -261,41 +366,38 @@ bool Update() noexcept
     gFrameStartTick = gFrameEndTick;
     const LONGLONG currentMoveTick = gFrameEndTick.QuadPart;
 
-    for (auto it = gCharacterMap.begin(); it != gCharacterMap.end();)
-    {
-        Character* pCharacter = it->second;
-        ++it;
+	ProcessPendingDeadCharacters();
 
-        if (!IsCharacterActive(pCharacter))
-        {
-            continue;
-        }
+	const ULONGLONG currentSystemTick = GetTickCount64();
+	if (gLastTimeoutCheckTick == 0 || currentSystemTick - gLastTimeoutCheckTick >= 1000)
+	{
+		gLastTimeoutCheckTick = currentSystemTick;
+		ProcessTimeoutSessions(currentSystemTick);
+	}
 
-        Session* currentSession = FindSession(pCharacter->sessionID);
-        if (currentSession == nullptr)
-        {
-            continue;
-        }
+	for (auto it = gMovingCharacters.begin(); it != gMovingCharacters.end();)
+	{
+		Character* pCharacter = *it;
+		auto currentIt = it++;
 
-        if (pCharacter->HP <= 0)
-        {
-            Disconnect(currentSession, L"HP 0 이하");
-            continue;
-        }
+		if (pCharacter == nullptr || !IsTrackedMoveAction(pCharacter->action))
+		{
+			gMovingCharacters.erase(currentIt);
+			continue;
+		}
 
-        const ULONGLONG currentTick = GetTickCount64();
-        const ULONGLONG timeoutTick = static_cast<ULONGLONG>(NETWORK_PACKET_RECV_TIMEOUT) * 1000;
-        if (currentTick - currentSession->lastRecvTime >= timeoutTick)
-        {
-            Disconnect(currentSession, L"recv timeout");
-            continue;
-        }
+		Session* currentSession = FindActiveSession(pCharacter);
+		if (currentSession == nullptr)
+		{
+			gMovingCharacters.erase(currentIt);
+			continue;
+		}
 
-        if (AdvanceCharacterByTime(pCharacter, currentMoveTick))
-        {
-            UpdateCharacterSector(pCharacter, currentSession);
-        }
-    }
+		if (AdvanceCharacterByTime(pCharacter, currentMoveTick))
+		{
+			UpdateCharacterSector(pCharacter, currentSession);
+		}
+	}
 
     return true;
 }

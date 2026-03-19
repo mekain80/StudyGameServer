@@ -85,6 +85,7 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 	// 입력이 유효하면 클라이언트 기준 최신 좌표를 서버 상태에도 반영한다.
 	SetCharacterPosition(pCharacter, x, y, currentTick);
 	pCharacter->action = direction;
+	RefreshCharacterMoveTracking(pCharacter);
 	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	UpdateCharacterSector(pCharacter, pSession);
 
@@ -133,6 +134,7 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 	}
 
 	pCharacter->action = dfACTION_STOP;
+	RefreshCharacterMoveTracking(pCharacter);
 	pCharacter->direction = NormalizeViewDir(direction, pCharacter->direction);
 	SetCharacterPosition(pCharacter, x, y, currentTick);
 	UpdateCharacterSector(pCharacter, pSession);
@@ -193,7 +195,13 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 		std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
 		for (Character* character : sectorList)
 		{
-			if (character == pCharacter || !IsCharacterActive(character))
+			if (character == pCharacter)
+			{
+				continue;
+			}
+
+			Session* targetSession = FindActiveSession(character);
+			if (targetSession == nullptr)
 			{
 				continue;
 			}
@@ -211,9 +219,12 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 				character->HP = 0;
 			}
 
-			Session* targetSession = FindSession(character->sessionID);
 			MakePacket_Damage(&dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
 			SendPacket_Around(targetSession, &dmgMsg, true);
+			if (character->HP <= 0)
+			{
+				MarkCharacterDead(character);
+			}
 		}
 	}
 
@@ -269,7 +280,13 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 		std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
 		for (Character* character : sectorList)
 		{
-			if (character == pCharacter || !IsCharacterActive(character))
+			if (character == pCharacter)
+			{
+				continue;
+			}
+
+			Session* targetSession = FindActiveSession(character);
+			if (targetSession == nullptr)
 			{
 				continue;
 			}
@@ -287,9 +304,12 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 				character->HP = 0;
 			}
 
-			Session* targetSession = FindSession(character->sessionID);
 			MakePacket_Damage(&dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
 			SendPacket_Around(targetSession, &dmgMsg, true);
+			if (character->HP <= 0)
+			{
+				MarkCharacterDead(character);
+			}
 		}
 	}
 
@@ -345,7 +365,13 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 		std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
 		for (Character* character : sectorList)
 		{
-			if (character == pCharacter || !IsCharacterActive(character))
+			if (character == pCharacter)
+			{
+				continue;
+			}
+
+			Session* targetSession = FindActiveSession(character);
+			if (targetSession == nullptr)
 			{
 				continue;
 			}
@@ -363,9 +389,12 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 				character->HP = 0;
 			}
 
-			Session* targetSession = FindSession(character->sessionID);
 			MakePacket_Damage(&dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
 			SendPacket_Around(targetSession, &dmgMsg, true);
+			if (character->HP <= 0)
+			{
+				MarkCharacterDead(character);
+			}
 		}
 	}
 
