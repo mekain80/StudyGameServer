@@ -134,32 +134,42 @@ namespace
 		SendUnicast(session, &packet);
 	}
 
-	void BroadcastCharacterLeave(const SectorAround& removeAround, DWORD sessionID) noexcept
+	void ProcessRemovedVisibility(
+		const SectorAround& removeAround,
+		const Character* movingCharacter,
+		Session* currentSession) noexcept
 	{
-		SerializedBuffer packet(dfPACKET_HEADER_SIZE + dfPACKET_SC_DELETE_CHARACTER_SIZE);
-		MakePacket_DeleteCharacter(&packet, sessionID);
-		SendPacket_BySectorAround(removeAround, &packet);
-	}
+		SerializedBuffer leavePacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_DELETE_CHARACTER_SIZE);
+		MakePacket_DeleteCharacter(&leavePacket, movingCharacter->sessionID);
 
-	void SyncRemovedCharactersToCurrentSession(const SectorAround& removeAround, const Character* movingCharacter, Session* currentSession) noexcept
-	{
 		for (int index = 0; index < removeAround.count; ++index)
 		{
 			const SectorPos sectorPos = removeAround.around[index];
 			std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
 			for (Character* character : sectorList)
 			{
-				if (character == movingCharacter || FindActiveSession(character) == nullptr)
+				if (character == movingCharacter)
 				{
 					continue;
 				}
+
+				Session* targetSession = FindActiveSession(character);
+				if (targetSession == nullptr || targetSession == currentSession)
+				{
+					continue;
+				}
+
+				SendUnicast(targetSession, &leavePacket);
 
 				SendDeleteCharacterPacket(currentSession, character->sessionID);
 			}
 		}
 	}
 
-	void BroadcastCharacterEnter(const SectorAround& addAround, const Character* movingCharacter) noexcept
+	void ProcessAddedVisibility(
+		const SectorAround& addAround,
+		const Character* movingCharacter,
+		Session* currentSession) noexcept
 	{
 		SerializedBuffer createPacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_CREATE_OTHER_CHARACTER_SIZE);
 		MakePacket_CreateOtherCharacter(
@@ -169,34 +179,40 @@ namespace
 			movingCharacter->x,
 			movingCharacter->y,
 			movingCharacter->HP);
-		SendPacket_BySectorAround(addAround, &createPacket);
-
-		if (movingCharacter->action == dfACTION_STOP)
-		{
-			return;
-		}
 
 		SerializedBuffer movePacket(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_START_SIZE);
-		MakePacket_MoveStart(
-			&movePacket,
-			movingCharacter->sessionID,
-			movingCharacter->action,
-			movingCharacter->x,
-			movingCharacter->y);
-		SendPacket_BySectorAround(addAround, &movePacket);
-	}
+		const bool sendMovePacket = (movingCharacter->action != dfACTION_STOP);
+		if (sendMovePacket)
+		{
+			MakePacket_MoveStart(
+				&movePacket,
+				movingCharacter->sessionID,
+				movingCharacter->action,
+				movingCharacter->x,
+				movingCharacter->y);
+		}
 
-	void SyncAddedCharactersToCurrentSession(const SectorAround& addAround, const Character* movingCharacter, Session* currentSession) noexcept
-	{
 		for (int index = 0; index < addAround.count; ++index)
 		{
 			const SectorPos sectorPos = addAround.around[index];
 			std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
 			for (Character* character : sectorList)
 			{
-				if (character == movingCharacter || FindActiveSession(character) == nullptr)
+				if (character == movingCharacter)
 				{
 					continue;
+				}
+
+				Session* targetSession = FindActiveSession(character);
+				if (targetSession == nullptr || targetSession == currentSession)
+				{
+					continue;
+				}
+
+				SendUnicast(targetSession, &createPacket);
+				if (sendMovePacket)
+				{
+					SendUnicast(targetSession, &movePacket);
 				}
 
 				SendCreateCharacterPacket(currentSession, character);
@@ -346,10 +362,8 @@ void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexc
         return;
     }
 
-    BroadcastCharacterLeave(removeAround, pCharacter->sessionID);
-    SyncRemovedCharactersToCurrentSession(removeAround, pCharacter, currentSession);
-    BroadcastCharacterEnter(addAround, pCharacter);
-    SyncAddedCharactersToCurrentSession(addAround, pCharacter, currentSession);
+    ProcessRemovedVisibility(removeAround, pCharacter, currentSession);
+    ProcessAddedVisibility(addAround, pCharacter, currentSession);
 
 }
 
