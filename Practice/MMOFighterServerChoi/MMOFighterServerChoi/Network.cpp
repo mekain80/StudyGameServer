@@ -88,6 +88,19 @@ namespace
 			return false;
 		}
 
+		BOOL noDelay = TRUE;
+		if (setsockopt(
+			clientSocket,
+			IPPROTO_TCP,
+			TCP_NODELAY,
+			reinterpret_cast<const char*>(&noDelay),
+			sizeof(noDelay)) == SOCKET_ERROR)
+		{
+			closesocket(clientSocket);
+			_LOG(LOG_LEVEL_ERROR, L"clientSocket setsockopt TCP_NODELAY fail");
+			return false;
+		}
+
 		return true;
 	}
 
