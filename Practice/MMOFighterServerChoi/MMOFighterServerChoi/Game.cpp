@@ -1,6 +1,6 @@
 ﻿#include "stdafx.h"
 
-#include <unordered_set>
+#include <vector>
 
 #include "Game.h"
 
@@ -20,9 +20,99 @@ LARGE_INTEGER gFrameEndTick{};
 namespace
 {
 	constexpr double kServerFrameSeconds = 0.02;
-	std::unordered_set<Character*> gMovingCharacters;
-	std::unordered_set<Character*> gPendingDeadCharacters;
+	constexpr std::size_t kInvalidCharacterTrackingIndex = static_cast<std::size_t>(-1);
+	using CharacterTrackingList = std::vector<Character*>;
+	CharacterTrackingList gMovingCharacters;
+	CharacterTrackingList gPendingDeadCharacters;
 	ULONGLONG gLastTimeoutCheckTick = 0;
+
+	void RemoveTrackedCharacterAt(
+		CharacterTrackingList& trackingList,
+		std::size_t removeIndex,
+		std::size_t Character::* indexMember) noexcept
+	{
+		if (removeIndex >= trackingList.size())
+		{
+			return;
+		}
+
+		Character* removedCharacter = trackingList[removeIndex];
+		const std::size_t lastIndex = trackingList.size() - 1;
+		Character* movedCharacter = trackingList[lastIndex];
+		trackingList[removeIndex] = movedCharacter;
+		if (movedCharacter != nullptr)
+		{
+			movedCharacter->*indexMember = removeIndex;
+		}
+
+		trackingList.pop_back();
+		if (removedCharacter != nullptr)
+		{
+			removedCharacter->*indexMember = kInvalidCharacterTrackingIndex;
+		}
+	}
+
+	void AddTrackedCharacter(
+		CharacterTrackingList& trackingList,
+		Character* character,
+		std::size_t Character::* indexMember) noexcept
+	{
+		if (character == nullptr)
+		{
+			return;
+		}
+
+		std::size_t& trackedIndex = character->*indexMember;
+		if (trackedIndex < trackingList.size() && trackingList[trackedIndex] == character)
+		{
+			return;
+		}
+
+		for (std::size_t index = 0; index < trackingList.size(); ++index)
+		{
+			if (trackingList[index] == character)
+			{
+				trackedIndex = index;
+				return;
+			}
+		}
+
+		trackedIndex = trackingList.size();
+		trackingList.push_back(character);
+	}
+
+	void RemoveTrackedCharacter(
+		CharacterTrackingList& trackingList,
+		Character* character,
+		std::size_t Character::* indexMember) noexcept
+	{
+		if (character == nullptr)
+		{
+			return;
+		}
+
+		std::size_t removeIndex = character->*indexMember;
+		if (removeIndex >= trackingList.size() || trackingList[removeIndex] != character)
+		{
+			removeIndex = kInvalidCharacterTrackingIndex;
+			for (std::size_t index = 0; index < trackingList.size(); ++index)
+			{
+				if (trackingList[index] == character)
+				{
+					removeIndex = index;
+					break;
+				}
+			}
+		}
+
+		if (removeIndex == kInvalidCharacterTrackingIndex)
+		{
+			character->*indexMember = kInvalidCharacterTrackingIndex;
+			return;
+		}
+
+		RemoveTrackedCharacterAt(trackingList, removeIndex, indexMember);
+	}
 
 	double GetElapsedSeconds(LONGLONG previousTick, LONGLONG currentTick) noexcept
 	{
@@ -54,18 +144,20 @@ namespace
 
 	void ProcessPendingDeadCharacters() noexcept
 	{
-		for (auto it = gPendingDeadCharacters.begin(); it != gPendingDeadCharacters.end();)
+		while (!gPendingDeadCharacters.empty())
 		{
-			Character* character = *it;
-			auto currentIt = it++;
-			gPendingDeadCharacters.erase(currentIt);
+			Character* character = gPendingDeadCharacters.back();
+			RemoveTrackedCharacterAt(
+				gPendingDeadCharacters,
+				gPendingDeadCharacters.size() - 1,
+				&Character::pendingDeadCharacterIndex);
 
 			if (character == nullptr)
 			{
 				continue;
 			}
 
-			gMovingCharacters.erase(character);
+			RemoveTrackedCharacter(gMovingCharacters, character, &Character::movingCharacterIndex);
 
 			Session* session = FindActiveSession(character);
 			if (session == nullptr)
@@ -255,11 +347,11 @@ void RefreshCharacterMoveTracking(Character* character) noexcept
 
 	if (IsTrackedMoveAction(character->action))
 	{
-		gMovingCharacters.insert(character);
+		AddTrackedCharacter(gMovingCharacters, character, &Character::movingCharacterIndex);
 		return;
 	}
 
-	gMovingCharacters.erase(character);
+	RemoveTrackedCharacter(gMovingCharacters, character, &Character::movingCharacterIndex);
 }
 
 void RemoveCharacterFromUpdateTracking(Character* character) noexcept
@@ -269,8 +361,8 @@ void RemoveCharacterFromUpdateTracking(Character* character) noexcept
 		return;
 	}
 
-	gMovingCharacters.erase(character);
-	gPendingDeadCharacters.erase(character);
+	RemoveTrackedCharacter(gMovingCharacters, character, &Character::movingCharacterIndex);
+	RemoveTrackedCharacter(gPendingDeadCharacters, character, &Character::pendingDeadCharacterIndex);
 }
 
 void MarkCharacterDead(Character* character) noexcept
@@ -280,7 +372,7 @@ void MarkCharacterDead(Character* character) noexcept
 		return;
 	}
 
-	gPendingDeadCharacters.insert(character);
+	AddTrackedCharacter(gPendingDeadCharacters, character, &Character::pendingDeadCharacterIndex);
 }
 
 bool AdvanceCharacterByTime(Character* character, LONGLONG currentTick) noexcept
@@ -393,21 +485,20 @@ bool Update() noexcept
 		ProcessTimeoutSessions(currentSystemTick);
 	}
 
-	for (auto it = gMovingCharacters.begin(); it != gMovingCharacters.end();)
+	for (std::size_t index = 0; index < gMovingCharacters.size();)
 	{
-		Character* pCharacter = *it;
-		auto currentIt = it++;
+		Character* pCharacter = gMovingCharacters[index];
 
 		if (pCharacter == nullptr || !IsTrackedMoveAction(pCharacter->action))
 		{
-			gMovingCharacters.erase(currentIt);
+			RemoveTrackedCharacterAt(gMovingCharacters, index, &Character::movingCharacterIndex);
 			continue;
 		}
 
 		Session* currentSession = FindActiveSession(pCharacter);
 		if (currentSession == nullptr)
 		{
-			gMovingCharacters.erase(currentIt);
+			RemoveTrackedCharacterAt(gMovingCharacters, index, &Character::movingCharacterIndex);
 			continue;
 		}
 
@@ -415,6 +506,8 @@ bool Update() noexcept
 		{
 			UpdateCharacterSector(pCharacter, currentSession);
 		}
+
+		++index;
 	}
 
     return true;

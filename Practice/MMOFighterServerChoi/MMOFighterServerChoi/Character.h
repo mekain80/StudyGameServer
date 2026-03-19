@@ -20,6 +20,8 @@ struct Character
 
     SectorPos sector;
     std::size_t sectorIndex = static_cast<std::size_t>(-1);
+    std::size_t movingCharacterIndex = static_cast<std::size_t>(-1);
+    std::size_t pendingDeadCharacterIndex = static_cast<std::size_t>(-1);
 };
 
 extern std::unordered_map<DWORD, Character*> gCharacterMap;
