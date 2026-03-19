@@ -11,6 +11,19 @@ namespace
 
 std::unordered_map<DWORD, Character*> gCharacterMap;
 
+namespace
+{
+	struct CharacterMapReserveInitializer
+	{
+		CharacterMapReserveInitializer() noexcept
+		{
+			gCharacterMap.reserve(kCharacterPoolInitCount);
+		}
+	};
+
+	CharacterMapReserveInitializer gCharacterMapReserveInitializer;
+}
+
 Character* AllocCharacter() noexcept
 {
 	return gCharacterPool.Alloc();

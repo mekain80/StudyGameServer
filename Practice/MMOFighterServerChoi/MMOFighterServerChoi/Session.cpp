@@ -18,6 +18,20 @@ std::unordered_map<DWORD, Session*> gSessionIdMap;
 ActiveSessionList gActiveSessions;
 WritableSessionList gWritableSessions;
 
+namespace
+{
+	struct SessionMapReserveInitializer
+	{
+		SessionMapReserveInitializer() noexcept
+		{
+			gSessionMap.reserve(kSessionPoolInitCount);
+			gSessionIdMap.reserve(kSessionPoolInitCount);
+		}
+	};
+
+	SessionMapReserveInitializer gSessionMapReserveInitializer;
+}
+
 Session* AllocSession() noexcept
 {
 	Session* session = gSessionPool.Alloc();
