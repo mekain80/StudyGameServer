@@ -6,6 +6,7 @@
 struct Character
 {
     DWORD sessionID = 0;
+    Session* session = nullptr;
 
     BYTE action = 0;
     BYTE direction = 0;

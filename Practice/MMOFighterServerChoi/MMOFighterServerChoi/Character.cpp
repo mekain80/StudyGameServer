@@ -46,8 +46,13 @@ Session* FindActiveSession(const Character* character) noexcept
 		return nullptr;
 	}
 
-	Session* session = FindSession(character->sessionID);
+	Session* session = character->session;
 	if (session == nullptr || session->disconnectFlag)
+	{
+		return nullptr;
+	}
+
+	if (session->sessionID != character->sessionID)
 	{
 		return nullptr;
 	}

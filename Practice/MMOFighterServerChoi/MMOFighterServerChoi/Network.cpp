@@ -122,6 +122,7 @@ namespace
 
 		const LONGLONG currentTick = GetCurrentMoveTick();
 		character->sessionID = session->sessionID;
+		character->session = session;
 		character->y = dfRANGE_MOVE_TOP + rand() % (dfRANGE_MOVE_BOTTOM - dfRANGE_MOVE_TOP + 1);
 		character->x = dfRANGE_MOVE_LEFT + rand() % (dfRANGE_MOVE_RIGHT - dfRANGE_MOVE_LEFT + 1);
 		character->direction = dfPACKET_MOVE_DIR_LL;
@@ -205,7 +206,7 @@ namespace
 			character->x,
 			character->y,
 			character->HP);
-		SendPacket_Around(session, &createPacket);
+		SendPacket_AroundCharacter(character, &createPacket, session);
 
 		if (character->action == dfACTION_STOP)
 		{
@@ -219,7 +220,7 @@ namespace
 			character->action,
 			character->x,
 			character->y);
-		SendPacket_Around(session, &movePacket);
+		SendPacket_AroundCharacter(character, &movePacket, session);
 	}
 }
 
