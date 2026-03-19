@@ -77,10 +77,19 @@ void SendUnicast(Session* pSession, const SerializedBuffer* pPacket) noexcept
 
 void SendBroadcast(Session* pSession, const SerializedBuffer* pPacket) noexcept
 {
-    for (auto it = gSessionMap.begin(); it != gSessionMap.end();)
+    const std::size_t activeSessionCount = gActiveSessions.size();
+    for (std::size_t index = 0; index < activeSessionCount; ++index)
     {
-        Session* session = it->second;
-        ++it;
+        Session* session = gActiveSessions[index];
+        if (session == nullptr || session->disconnectFlag)
+        {
+            continue;
+        }
+
+        if (session->socket == INVALID_SOCKET)
+        {
+            continue;
+        }
 
         if (session == pSession)
         {

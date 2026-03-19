@@ -80,12 +80,16 @@ namespace
 	void ProcessTimeoutSessions(ULONGLONG currentTick) noexcept
 	{
 		const ULONGLONG timeoutTick = static_cast<ULONGLONG>(NETWORK_PACKET_RECV_TIMEOUT) * 1000;
-		for (auto it = gSessionMap.begin(); it != gSessionMap.end();)
+		const std::size_t activeSessionCount = gActiveSessions.size();
+		for (std::size_t index = 0; index < activeSessionCount; ++index)
 		{
-			Session* session = it->second;
-			++it;
-
+			Session* session = gActiveSessions[index];
 			if (session == nullptr || session->disconnectFlag)
+			{
+				continue;
+			}
+
+			if (session->socket == INVALID_SOCKET)
 			{
 				continue;
 			}
