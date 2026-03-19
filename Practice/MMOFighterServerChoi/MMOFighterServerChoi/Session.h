@@ -22,6 +22,20 @@ struct Session
     ULONGLONG lastRecvTime = 0; // 메시지 수신 체크를 위한 시간 (타임아웃용)
     bool disconnectFlag = false;
     std::size_t activeSessionIndex = static_cast<std::size_t>(-1);
+
+    void Reset() noexcept
+    {
+        socket = INVALID_SOCKET;
+        addr = {};
+        ipStr[0] = L'\0';
+        port = 0;
+        sessionID = 0;
+        recvQ.ClearBuffer();
+        sendQ.ClearBuffer();
+        lastRecvTime = 0;
+        disconnectFlag = false;
+        activeSessionIndex = static_cast<std::size_t>(-1);
+    }
 };
 
 using ActiveSessionList = std::vector<Session*>;

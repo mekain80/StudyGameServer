@@ -8,7 +8,7 @@ namespace
 {
 	constexpr unsigned int kSessionPoolInitCount = 15000;
 	constexpr std::size_t kInvalidActiveSessionIndex = static_cast<std::size_t>(-1);
-	MemoryPool<Session> gSessionPool(true, kSessionPoolInitCount);
+	MemoryPool<Session> gSessionPool(false, kSessionPoolInitCount);
 }
 
 std::unordered_map<SOCKET, Session*> gSessionMap;
@@ -17,7 +17,14 @@ ActiveSessionList gActiveSessions;
 
 Session* AllocSession() noexcept
 {
-	return gSessionPool.Alloc();
+	Session* session = gSessionPool.Alloc();
+	if (session == nullptr)
+	{
+		return nullptr;
+	}
+
+	session->Reset();
+	return session;
 }
 
 void FreeSession(Session* session) noexcept
@@ -27,6 +34,7 @@ void FreeSession(Session* session) noexcept
 		return;
 	}
 
+	session->Reset();
 	gSessionPool.Free(session);
 }
 
