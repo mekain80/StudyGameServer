@@ -90,7 +90,12 @@ namespace
 
 	Session* CreateSession(SOCKET clientSocket, const SOCKADDR_IN& clientAddr)
 	{
-		Session* session = new Session;
+		Session* session = AllocSession();
+		if (session == nullptr)
+		{
+			return nullptr;
+		}
+
 		session->socket = clientSocket;
 		session->addr = clientAddr;
 		session->lastRecvTime = GetTickCount64();
@@ -106,7 +111,12 @@ namespace
 
 	Character* SpawnCharacter(Session* session)
 	{
-		Character* character = new Character;
+		Character* character = AllocCharacter();
+		if (character == nullptr)
+		{
+			return nullptr;
+		}
+
 		const LONGLONG currentTick = GetCurrentMoveTick();
 		character->sessionID = session->sessionID;
 		character->y = dfRANGE_MOVE_TOP + rand() % (dfRANGE_MOVE_BOTTOM - dfRANGE_MOVE_TOP + 1);
@@ -386,7 +396,24 @@ void NetProc_Accept() noexcept
 	}
 
 	Session* session = CreateSession(clientSocket, clientAddr);
+	if (session == nullptr)
+	{
+		closesocket(clientSocket);
+		_LOG(LOG_LEVEL_ERROR, L"session alloc fail");
+		return;
+	}
+
 	Character* character = SpawnCharacter(session);
+	if (character == nullptr)
+	{
+		gSessionIdMap.erase(session->sessionID);
+		gSessionMap.erase(session->socket);
+		closesocket(session->socket);
+		session->socket = INVALID_SOCKET;
+		FreeSession(session);
+		_LOG(LOG_LEVEL_ERROR, L"character alloc fail");
+		return;
+	}
 
 	SendMyCharacterState(session, character);
 	SendNearbyCharactersToNewSession(session, character);

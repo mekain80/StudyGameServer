@@ -122,5 +122,8 @@
     <ClInclude Include="SectorPos.h">
       <Filter>Game</Filter>
     </ClInclude>
+    <ClInclude Include="MemoryPool.h">
+      <Filter>Network</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -46,6 +46,7 @@
     <ClInclude Include="Game.h" />
     <ClInclude Include="GameInfo.h" />
     <ClInclude Include="Log.h" />
+    <ClInclude Include="MemoryPool.h" />
     <ClInclude Include="Network.h" />
     <ClInclude Include="PacketControl.h" />
     <ClInclude Include="Profiler.h" />

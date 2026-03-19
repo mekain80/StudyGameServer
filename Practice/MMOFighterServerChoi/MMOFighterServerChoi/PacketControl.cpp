@@ -202,9 +202,9 @@ void FlushDisconnectedSessions() noexcept
 
             RemoveSector(pCharacter);
             gCharacterMap.erase(pCharacter->sessionID);
-            delete pCharacter;
+            FreeCharacter(pCharacter);
         }
 
-        delete pSession;
+        FreeSession(pSession);
     }
 }

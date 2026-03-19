@@ -1,8 +1,30 @@
 ﻿#include "stdafx.h"
 
 #include "Character.h"
+#include "MemoryPool.h"
+
+namespace
+{
+	constexpr unsigned int kCharacterPoolInitCount = 15000;
+	MemoryPool<Character> gCharacterPool(true, kCharacterPoolInitCount);
+}
 
 std::unordered_map<DWORD, Character*> gCharacterMap;
+
+Character* AllocCharacter() noexcept
+{
+	return gCharacterPool.Alloc();
+}
+
+void FreeCharacter(Character* character) noexcept
+{
+	if (character == nullptr)
+	{
+		return;
+	}
+
+	gCharacterPool.Free(character);
+}
 
 Character* FindCharacter(DWORD sessionID) noexcept
 {

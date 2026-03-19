@@ -25,4 +25,6 @@ extern SOCKET gListenSocket;
 extern std::unordered_map<SOCKET, Session*> gSessionMap;
 extern std::unordered_map<DWORD, Session*> gSessionIdMap;
 
+Session* AllocSession() noexcept;
+void FreeSession(Session* session) noexcept;
 Session* FindSession(DWORD sessionID) noexcept;
