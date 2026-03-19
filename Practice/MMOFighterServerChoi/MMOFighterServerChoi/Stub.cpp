@@ -14,6 +14,62 @@
 
 namespace
 {
+	template <typename T>
+	bool ReadPacketValue(const char*& cursor, const char* end, T& outValue) noexcept
+	{
+		if (cursor == nullptr || end == nullptr)
+		{
+			return false;
+		}
+
+		const ptrdiff_t remain = end - cursor;
+		if (remain < 0 || static_cast<std::size_t>(remain) < sizeof(T))
+		{
+			return false;
+		}
+
+		std::memcpy(&outValue, cursor, sizeof(T));
+		cursor += sizeof(T);
+		return true;
+	}
+
+	bool ReadDirectionPositionPacket(
+		Session* session,
+		const char* packetData,
+		WORD packetSize,
+		BYTE& direction,
+		WORD& x,
+		WORD& y,
+		const WCHAR* failReason) noexcept
+	{
+		const char* cursor = packetData;
+		const char* const end = packetData + packetSize;
+
+		if (!ReadPacketValue(cursor, end, direction) ||
+			!ReadPacketValue(cursor, end, x) ||
+			!ReadPacketValue(cursor, end, y) ||
+			cursor != end)
+		{
+			Disconnect(session, failReason);
+			return false;
+		}
+
+		return true;
+	}
+
+	bool ReadEchoPacket(Session* session, const char* packetData, WORD packetSize, DWORD& time) noexcept
+	{
+		const char* cursor = packetData;
+		const char* const end = packetData + packetSize;
+		if (!ReadPacketValue(cursor, end, time) || cursor != end)
+		{
+			Disconnect(session, L"invalid echo packet body");
+			return false;
+		}
+
+		return true;
+	}
+
 	void AdvanceCharacterState(Character* character, Session* session, LONGLONG currentTick) noexcept
 	{
 		if (AdvanceCharacterByTime(character, currentTick))
@@ -23,41 +79,43 @@ namespace
 	}
 }
 
-bool PacketProc(Session* pSession, BYTE byPacketType, char* pPacket, WORD packetSize)
+bool PacketProc(Session* pSession, BYTE byPacketType, const char* packetData, WORD packetSize)
 {
-	SerializedBuffer packet(static_cast<int>(packetSize));
-	int putRet = packet.PutData(pPacket, packetSize);
-	if (putRet != packetSize)
-	{
-		Disconnect(pSession, L"SerializedBuffer PutData fail");
-		return false;
-	}
-
 	switch (byPacketType)
 	{
 	case dfPACKET_CS_MOVE_START:
-		return NetPacketProc_MoveStart(pSession, packet);
+		return NetPacketProc_MoveStart(pSession, packetData, packetSize);
 	case dfPACKET_CS_MOVE_STOP:
-		return NetPacketProc_MoveStop(pSession, packet);
+		return NetPacketProc_MoveStop(pSession, packetData, packetSize);
 	case dfPACKET_CS_ATTACK1:
-		return NetPacketProc_Attack1(pSession, packet);
+		return NetPacketProc_Attack1(pSession, packetData, packetSize);
 	case dfPACKET_CS_ATTACK2:
-		return NetPacketProc_Attack2(pSession, packet);
+		return NetPacketProc_Attack2(pSession, packetData, packetSize);
 	case dfPACKET_CS_ATTACK3:
-		return NetPacketProc_Attack3(pSession, packet);
+		return NetPacketProc_Attack3(pSession, packetData, packetSize);
 	case dfPACKET_CS_ECHO:
-		return NetPacketProc_Echo(pSession, packet);
+		return NetPacketProc_Echo(pSession, packetData, packetSize);
 	default:
 		return true;
 	}
 }
 
-bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
+bool NetPacketProc_MoveStart(Session* pSession, const char* packetData, WORD packetSize)
 {
-	BYTE direction;
-	WORD x, y;
-
-	packet >> direction >> x >> y;
+	BYTE direction = 0;
+	WORD x = 0;
+	WORD y = 0;
+	if (!ReadDirectionPositionPacket(
+		pSession,
+		packetData,
+		packetSize,
+		direction,
+		x,
+		y,
+		L"invalid move start packet body"))
+	{
+		return false;
+	}
 
 	if (!IsValidMoveDirection(direction))
 	{
@@ -101,15 +159,22 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 	return true;
 }
 
-bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
+bool NetPacketProc_MoveStop(Session* pSession, const char* packetData, WORD packetSize)
 {
 	BYTE direction = 0;
 	WORD x = 0;
 	WORD y = 0;
-
-	packet >> direction
-		>> x
-		>> y;
+	if (!ReadDirectionPositionPacket(
+		pSession,
+		packetData,
+		packetSize,
+		direction,
+		x,
+		y,
+		L"invalid move stop packet body"))
+	{
+		return false;
+	}
 
 	if (!IsValidViewDirection(direction))
 	{
@@ -146,14 +211,22 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 	return true;
 }
 
-bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
+bool NetPacketProc_Attack1(Session* pSession, const char* packetData, WORD packetSize)
 {
 	BYTE direction = 0;
 	WORD x = 0;
 	WORD y = 0;
-	packet >> direction
-		>> x
-		>> y;
+	if (!ReadDirectionPositionPacket(
+		pSession,
+		packetData,
+		packetSize,
+		direction,
+		x,
+		y,
+		L"invalid attack1 packet body"))
+	{
+		return false;
+	}
 
 	if (!IsValidViewDirection(direction))
 	{
@@ -231,14 +304,22 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 	return true;
 }
 
-bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
+bool NetPacketProc_Attack2(Session* pSession, const char* packetData, WORD packetSize)
 {
 	BYTE direction = 0;
 	WORD x = 0;
 	WORD y = 0;
-	packet >> direction
-		>> x
-		>> y;
+	if (!ReadDirectionPositionPacket(
+		pSession,
+		packetData,
+		packetSize,
+		direction,
+		x,
+		y,
+		L"invalid attack2 packet body"))
+	{
+		return false;
+	}
 
 	if (!IsValidViewDirection(direction))
 	{
@@ -316,14 +397,22 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 	return true;
 }
 
-bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
+bool NetPacketProc_Attack3(Session* pSession, const char* packetData, WORD packetSize)
 {
 	BYTE direction = 0;
 	WORD x = 0;
 	WORD y = 0;
-	packet >> direction
-		>> x
-		>> y;
+	if (!ReadDirectionPositionPacket(
+		pSession,
+		packetData,
+		packetSize,
+		direction,
+		x,
+		y,
+		L"invalid attack3 packet body"))
+	{
+		return false;
+	}
 
 	if (!IsValidViewDirection(direction))
 	{
@@ -401,10 +490,13 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 	return true;
 }
 
-bool NetPacketProc_Echo(Session* pSession, SerializedBuffer& packet)
+bool NetPacketProc_Echo(Session* pSession, const char* packetData, WORD packetSize)
 {
 	DWORD time = 0;
-	packet >> time;
+	if (!ReadEchoPacket(pSession, packetData, packetSize, time))
+	{
+		return false;
+	}
 
 	SerializedBuffer response(dfPACKET_HEADER_SIZE + dfPACKET_SC_ECHO_SIZE);
 	MakePacket_Echo(&response, time);
