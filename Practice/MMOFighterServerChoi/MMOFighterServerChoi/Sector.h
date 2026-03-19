@@ -26,10 +26,15 @@ void GetSectorAround(int sectorX, int sectorY, SectorAround* outSectorAround) no
 void GetSectorAroundBySector(const SectorPos* secPos, SectorAround* outSectorAround) noexcept;
 
 // 캐릭터 이동 시 이전 영향권에서 빠진 섹터와 새로 포함된 섹터를 구한다.
-// @param character 현재 위치가 반영된 캐릭터
+// @param oldSector 이동 전 섹터
+// @param newSector 이동 후 섹터
 // @param outRemoveSector 이전 영향권에서 제외된 섹터 목록 출력 버퍼
 // @param outAddSector 새 영향권에 추가된 섹터 목록 출력 버퍼
-void GetUpdateSectorAround(Character* character, SectorAround* outRemoveSector, SectorAround* outAddSector) noexcept;
+void GetUpdateSectorAround(
+    const SectorPos& oldSector,
+    const SectorPos& newSector,
+    SectorAround* outRemoveSector,
+    SectorAround* outAddSector) noexcept;
 
 
 // 월드 좌표를 섹터 좌표로 변환한다.
@@ -48,6 +53,7 @@ void RemoveSector(Character* ch) noexcept;
 
 // 캐릭터가 다른 섹터로 이동했는지 확인하고 필요하면 섹터를 갱신한다.
 // @param ch 섹터 갱신 대상 캐릭터
+// @param newSector 이동 후 섹터 좌표
 // @param oldPos 이동 전 섹터 좌표를 저장할 출력 버퍼, 필요 없으면 nullptr
 // @return movedSector 섹터 변경 발생 여부
-bool UpdateSector(Character* ch, SectorPos* oldPos = nullptr) noexcept;
+bool UpdateSector(Character* ch, const SectorPos& newSector, SectorPos* oldPos = nullptr) noexcept;

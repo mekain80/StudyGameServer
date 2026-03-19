@@ -16,6 +16,14 @@ bool IsSameSector(const SectorPos& lhs, const SectorPos& rhs) noexcept
 
 namespace
 {
+	struct SectorAroundBounds
+	{
+		short minX;
+		short maxX;
+		short minY;
+		short maxY;
+	};
+
 	bool IsValidSectorPos(const SectorPos& sectorPos) noexcept
 	{
 		return sectorPos.x >= 0
@@ -29,17 +37,22 @@ namespace
 		return std::find(characters.begin(), characters.end(), target) != characters.end();
 	}
 
-	bool ContainsSector(const SectorAround& sectorAround, const SectorPos& target) noexcept
+	SectorAroundBounds GetSectorAroundBounds(const SectorPos& sectorPos) noexcept
 	{
-		for (int index = 0; index < sectorAround.count; ++index)
-		{
-			if (IsSameSector(sectorAround.around[index], target))
-			{
-				return true;
-			}
-		}
+		SectorAroundBounds bounds{};
+		bounds.minX = (sectorPos.x > 0) ? static_cast<short>(sectorPos.x - 1) : 0;
+		bounds.maxX = (sectorPos.x + 1 < dfSECTOR_MAX_X) ? static_cast<short>(sectorPos.x + 1) : static_cast<short>(dfSECTOR_MAX_X - 1);
+		bounds.minY = (sectorPos.y > 0) ? static_cast<short>(sectorPos.y - 1) : 0;
+		bounds.maxY = (sectorPos.y + 1 < dfSECTOR_MAX_Y) ? static_cast<short>(sectorPos.y + 1) : static_cast<short>(dfSECTOR_MAX_Y - 1);
+		return bounds;
+	}
 
-		return false;
+	bool IsSectorInsideBounds(const SectorPos& sectorPos, const SectorAroundBounds& bounds) noexcept
+	{
+		return sectorPos.x >= bounds.minX
+			&& sectorPos.x <= bounds.maxX
+			&& sectorPos.y >= bounds.minY
+			&& sectorPos.y <= bounds.maxY;
 	}
 }
 
@@ -87,16 +100,19 @@ void GetSectorAroundBySector(const SectorPos* secPos, SectorAround* outSectorAro
 	GetSectorAround(secPos->x, secPos->y, outSectorAround);
 }
 
-void GetUpdateSectorAround(Character* character, SectorAround* outRemoveSector, SectorAround* outAddSector) noexcept
+void GetUpdateSectorAround(
+	const SectorPos& oldSector,
+	const SectorPos& newSector,
+	SectorAround* outRemoveSector,
+	SectorAround* outAddSector) noexcept
 {
-	assert(character != nullptr);
 	assert(outRemoveSector != nullptr);
 	assert(outAddSector != nullptr);
 
-	const SectorPos oldSector = character->sector;
-	const SectorPos newSector = CalcSector(character->x, character->y);
 	if (IsSameSector(oldSector, newSector))
 	{
+		outRemoveSector->count = 0;
+		outAddSector->count = 0;
 		return;
 	}
 
@@ -113,11 +129,13 @@ void GetUpdateSectorAround(Character* character, SectorAround* outRemoveSector, 
 	SectorAround newAround{};
 	GetSectorAround(oldSector.x, oldSector.y, &oldAround);
 	GetSectorAround(newSector.x, newSector.y, &newAround);
+	const SectorAroundBounds oldBounds = GetSectorAroundBounds(oldSector);
+	const SectorAroundBounds newBounds = GetSectorAroundBounds(newSector);
 
 	for (int index = 0; index < oldAround.count; ++index)
 	{
 		const SectorPos sectorPos = oldAround.around[index];
-		if (!ContainsSector(newAround, sectorPos))
+		if (!IsSectorInsideBounds(sectorPos, newBounds))
 		{
 			outRemoveSector->around[outRemoveSector->count] = sectorPos;
 			++outRemoveSector->count;
@@ -127,7 +145,7 @@ void GetUpdateSectorAround(Character* character, SectorAround* outRemoveSector, 
 	for (int index = 0; index < newAround.count; ++index)
 	{
 		const SectorPos sectorPos = newAround.around[index];
-		if (!ContainsSector(oldAround, sectorPos))
+		if (!IsSectorInsideBounds(sectorPos, oldBounds))
 		{
 			outAddSector->around[outAddSector->count] = sectorPos;
 			++outAddSector->count;
@@ -203,13 +221,11 @@ void RemoveSector(Character* ch) noexcept
 	}
 }
 
-bool UpdateSector(Character* ch, SectorPos* oldPos) noexcept
+bool UpdateSector(Character* ch, const SectorPos& newSec, SectorPos* oldPos) noexcept
 {
 	assert(ch != nullptr);
 
 	const SectorPos oldSec = ch->sector;
-	const SectorPos newSec = CalcSector(ch->x, ch->y);
-
 	if (IsSameSector(oldSec, newSec))
 	{
 		return false;
@@ -220,14 +236,21 @@ bool UpdateSector(Character* ch, SectorPos* oldPos) noexcept
 		*oldPos = oldSec;
 	}
 
-	RemoveSector(ch);
-
-	auto& newSectorList = gSector[newSec.y][newSec.x];
-	if (!ContainsCharacter(newSectorList, ch))
+	if (IsValidSectorPos(oldSec))
 	{
-		newSectorList.push_back(ch);
+		auto& oldSectorList = gSector[oldSec.y][oldSec.x];
+		for (auto iter = oldSectorList.begin(); iter != oldSectorList.end(); ++iter)
+		{
+			if (*iter == ch)
+			{
+				oldSectorList.erase(iter);
+				break;
+			}
+		}
 	}
 
+	auto& newSectorList = gSector[newSec.y][newSec.x];
+	newSectorList.push_back(ch);
 	ch->sector = newSec;
 
 	return true;

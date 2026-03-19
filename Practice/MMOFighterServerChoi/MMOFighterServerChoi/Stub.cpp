@@ -96,7 +96,7 @@ bool NetPacketProc_MoveStart(Session* pSession, SerializedBuffer& packet)
 		pCharacter->action, 
 		pCharacter->x, 
 		pCharacter->y);
-	SendPacket_Around(pSession, &sendMsg);
+	SendPacket_AroundCharacter(pCharacter, &sendMsg, pSession);
 
 	return true;
 }
@@ -141,7 +141,7 @@ bool NetPacketProc_MoveStop(Session* pSession, SerializedBuffer& packet)
 
 	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_MOVE_STOP_SIZE);
 	MakePacket_MoveStop(&sendMsg, pCharacter->sessionID, pCharacter->direction, pCharacter->x, pCharacter->y);
-	SendPacket_Around(pSession, &sendMsg);
+	SendPacket_AroundCharacter(pCharacter, &sendMsg, pSession);
 
 	return true;
 }
@@ -182,7 +182,7 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 
 	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_ATTACK1_SIZE);
 	MakePacket_Attack1(&sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
-	SendPacket_Around(pSession, &sendMsg, true);
+	SendPacket_AroundCharacter(pCharacter, &sendMsg);
 
 	const int centerX = pCharacter->x;
 	const int centerY = pCharacter->y;
@@ -220,7 +220,7 @@ bool NetPacketProc_Attack1(Session* pSession, SerializedBuffer& packet)
 			}
 
 			MakePacket_Damage(&dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
-			SendPacket_Around(targetSession, &dmgMsg, true);
+			SendPacket_AroundCharacter(character, &dmgMsg);
 			if (character->HP <= 0)
 			{
 				MarkCharacterDead(character);
@@ -267,7 +267,7 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 
 	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_ATTACK2_SIZE);
 	MakePacket_Attack2(&sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
-	SendPacket_Around(pSession, &sendMsg, true);
+	SendPacket_AroundCharacter(pCharacter, &sendMsg);
 
 	const int centerX = pCharacter->x;
 	const int centerY = pCharacter->y;
@@ -305,7 +305,7 @@ bool NetPacketProc_Attack2(Session* pSession, SerializedBuffer& packet)
 			}
 
 			MakePacket_Damage(&dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
-			SendPacket_Around(targetSession, &dmgMsg, true);
+			SendPacket_AroundCharacter(character, &dmgMsg);
 			if (character->HP <= 0)
 			{
 				MarkCharacterDead(character);
@@ -352,7 +352,7 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 
 	SerializedBuffer sendMsg(dfPACKET_HEADER_SIZE + dfPACKET_SC_ATTACK3_SIZE);
 	MakePacket_Attack3(&sendMsg, pCharacter->direction, pCharacter->sessionID, pCharacter->x, pCharacter->y);
-	SendPacket_Around(pSession, &sendMsg, true);
+	SendPacket_AroundCharacter(pCharacter, &sendMsg);
 
 	const int centerX = pCharacter->x;
 	const int centerY = pCharacter->y;
@@ -390,7 +390,7 @@ bool NetPacketProc_Attack3(Session* pSession, SerializedBuffer& packet)
 			}
 
 			MakePacket_Damage(&dmgMsg, pCharacter->sessionID, character->sessionID, static_cast<BYTE>(character->HP));
-			SendPacket_Around(targetSession, &dmgMsg, true);
+			SendPacket_AroundCharacter(character, &dmgMsg);
 			if (character->HP <= 0)
 			{
 				MarkCharacterDead(character);

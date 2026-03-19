@@ -339,9 +339,9 @@ void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexc
     // 더 이상 보이지 않는 섹터와 새로 보이기 시작한 섹터를 구한다.
     SectorAround removeAround;
     SectorAround addAround;
-    GetUpdateSectorAround(pCharacter, &removeAround, &addAround);
+    GetUpdateSectorAround(pCharacter->sector, curSector, &removeAround, &addAround);
     // 계산이 끝났으면 캐릭터가 실제로 속한 섹터 정보를 갱신한다.
-    if (!UpdateSector(pCharacter, &curSector))
+    if (!UpdateSector(pCharacter, curSector))
     {
         return;
     }

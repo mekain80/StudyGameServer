@@ -13,12 +13,29 @@ namespace
 {
     std::vector<Session*> gPendingDisconnects;
 
-    bool IsValidSectorIndex(const SectorPos& sectorPos) noexcept
+    bool IsValidSectorIndex(short sectorX, short sectorY) noexcept
     {
-        return sectorPos.x >= 0
-            && sectorPos.x < dfSECTOR_MAX_X
-            && sectorPos.y >= 0
-            && sectorPos.y < dfSECTOR_MAX_Y;
+        return sectorX >= 0
+            && sectorX < dfSECTOR_MAX_X
+            && sectorY >= 0
+            && sectorY < dfSECTOR_MAX_Y;
+    }
+
+    void SendPacket_ToSectorList(
+        const std::list<Character*>& sectorList,
+        const SerializedBuffer* pPacket,
+        Session* pExceptSession) noexcept
+    {
+        for (Character* character : sectorList)
+        {
+            Session* session = FindActiveSession(character);
+            if (session == nullptr || session == pExceptSession)
+            {
+                continue;
+            }
+
+            EnqueuePacket(session, pPacket);
+        }
     }
 }
 
@@ -76,42 +93,38 @@ void SendBroadcast(Session* pSession, const SerializedBuffer* pPacket) noexcept
 
 void SendPacket_SectorOne(int sectorX, int sectorY, const SerializedBuffer* pPacket, Session* pExceptSession) noexcept
 {
-    SectorPos sectorPos
-    {
-        static_cast<short>(sectorX),
-        static_cast<short>(sectorY)
-    };
-
-    if (!IsValidSectorIndex(sectorPos))
+    if (!IsValidSectorIndex(static_cast<short>(sectorX), static_cast<short>(sectorY)))
     {
         return;
     }
 
-    std::list<Character*>& sectorList = gSector[sectorPos.y][sectorPos.x];
-    for (Character* character : sectorList)
-    {
-        Session* session = FindActiveSession(character);
-        if (session == nullptr)
-        {
-            continue;
-        }
-
-        if (session == pExceptSession)
-        {
-            continue;
-        }
-
-        EnqueuePacket(session, pPacket);
-    }
+    SendPacket_ToSectorList(gSector[sectorY][sectorX], pPacket, pExceptSession);
 }
 
-void SendPacket_BySectorAround(SectorAround sectorAround, const SerializedBuffer* pPacket, Session* pExceptSession) noexcept
+void SendPacket_BySectorAround(const SectorAround& sectorAround, const SerializedBuffer* pPacket, Session* pExceptSession) noexcept
 {
     for (int index = 0; index < sectorAround.count; ++index)
     {
-        const SectorPos sectorPos = sectorAround.around[index];
-        SendPacket_SectorOne(sectorPos.x, sectorPos.y, pPacket, pExceptSession);
+        const SectorPos& sectorPos = sectorAround.around[index];
+        if (!IsValidSectorIndex(sectorPos.x, sectorPos.y))
+        {
+            continue;
+        }
+
+        SendPacket_ToSectorList(gSector[sectorPos.y][sectorPos.x], pPacket, pExceptSession);
     }
+}
+
+void SendPacket_AroundCharacter(const Character* character, const SerializedBuffer* pPacket, Session* pExceptSession) noexcept
+{
+    if (character == nullptr)
+    {
+        return;
+    }
+
+    SectorAround sectorAround{};
+    GetSectorAroundBySector(&character->sector, &sectorAround);
+    SendPacket_BySectorAround(sectorAround, pPacket, pExceptSession);
 }
 
 void SendPacket_Around(Session* pSession, const SerializedBuffer* pPacket, bool sendMe) noexcept
@@ -127,10 +140,8 @@ void SendPacket_Around(Session* pSession, const SerializedBuffer* pPacket, bool 
         return;
     }
 
-    SectorAround sectorAround{};
-    GetSectorAroundBySector(&character->sector, &sectorAround);
     Session* exceptSession = sendMe ? nullptr : pSession;
-    SendPacket_BySectorAround(sectorAround, pPacket, exceptSession);
+    SendPacket_AroundCharacter(character, pPacket, exceptSession);
 }
 
 void Disconnect(Session* pSession, const WCHAR* reason) noexcept
@@ -145,6 +156,12 @@ void Disconnect(Session* pSession, const WCHAR* reason) noexcept
         return; // 중복 예약 방지
     }
     pSession->disconnectFlag = true;
+
+    Character* character = FindCharacter(pSession->sessionID);
+    if (character != nullptr)
+    {
+        character->session = nullptr;
+    }
 
     _LOG(
         LOG_LEVEL_DEBUG,
@@ -194,10 +211,11 @@ void FlushDisconnectedSessions() noexcept
             MakePacket_DeleteCharacter(&packet, pSession->sessionID);
 
             // 아직 Character와 sector 정보가 살아 있으니 주변에 삭제 통지 가능
-            SendPacket_Around(pSession, &packet);
+            SendPacket_AroundCharacter(pCharacter, &packet, pSession);
 
             RemoveSector(pCharacter);
             gCharacterMap.erase(pCharacter->sessionID);
+            pCharacter->session = nullptr;
             RemoveCharacterFromUpdateTracking(pCharacter);
             FreeCharacter(pCharacter);
         }
