@@ -1,19 +1,79 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="NewFilter1">
-      <UniqueIdentifier>{eff893cd-3291-4c2c-859e-7e5972dcf92c}</UniqueIdentifier>
+    <Filter Include="Content">
+      <UniqueIdentifier>{b33b2483-2fc1-4a1e-afd0-52abe9f66e6c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Define">
+      <UniqueIdentifier>{b9653fd0-80c1-4528-a890-a45d6306111c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network">
+      <UniqueIdentifier>{124b0982-6b87-46fa-8200-788de22501a2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="NetworkLib">
+      <UniqueIdentifier>{1a2fb674-a3c8-4a6b-8fe3-c0dda2a389f6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Tools">
+      <UniqueIdentifier>{926666a4-67ce-476d-bd7b-e83b01571849}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>NewFilter1</Filter>
+    <ClCompile Include="..\..\RingBuffer\RingBuffer\RingBuffer.cpp">
+      <Filter>NetworkLib</Filter>
     </ClCompile>
-    <ClCompile Include="Profiler.cpp" />
-    <ClCompile Include="RingBuffer.cpp" />
+    <ClCompile Include="EchoServer.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="CLogger.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="LanServer.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="Profiler.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="SerializedBuffer.cpp">
+      <Filter>NetworkLib</Filter>
+    </ClCompile>
+    <ClCompile Include="Session.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Profiler.h" />
-    <ClInclude Include="RingBuffer.h" />
+    <ClInclude Include="..\..\MemoryPool\MemoryPool\MemoryPool.h">
+      <Filter>NetworkLib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\RingBuffer\RingBuffer\RingBuffer.h">
+      <Filter>NetworkLib</Filter>
+    </ClInclude>
+    <ClInclude Include="CLogger.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="Common.h">
+      <Filter>Define</Filter>
+    </ClInclude>
+    <ClInclude Include="DefineServer.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="EchoServer.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="LanServer.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Profiler.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="SerializedBuffer.h">
+      <Filter>NetworkLib</Filter>
+    </ClInclude>
+    <ClInclude Include="ServerConfig.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Session.h">
+      <Filter>Network</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
