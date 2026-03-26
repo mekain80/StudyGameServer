@@ -10,8 +10,8 @@ extern LARGE_INTEGER gFrameStartTick;
 extern LARGE_INTEGER gFrameEndTick;
 
 void InitializeGameCache() noexcept;
-// 게임 로직 한 틱을 처리하고, 실제 갱신이 일어났으면 true를 반환한다.
-bool Update() noexcept;
+// 이번 루프에서 처리한 고정 틱 수를 반환한다.
+int Update() noexcept;
 // 현재 고해상도 타이머 값을 이동 계산 기준 시각으로 반환한다.
 LONGLONG GetCurrentMoveTick() noexcept;
 // 마지막 이동 시각부터 currentTick까지 누적된 시간을 20ms 이동 단위로 환산해 처리한다.

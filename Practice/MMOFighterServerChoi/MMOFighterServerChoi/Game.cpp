@@ -21,6 +21,7 @@ LARGE_INTEGER gFrameEndTick{};
 namespace
 {
 	constexpr double kServerFrameSeconds = 0.02;
+	constexpr LONGLONG kTargetServerFramePerSecond = 50;
 	constexpr std::size_t kInvalidCharacterTrackingIndex = static_cast<std::size_t>(-1);
 	struct DirectionInfo
 	{
@@ -128,6 +129,18 @@ namespace
 		}
 
 		return static_cast<double>(currentTick - previousTick) / static_cast<double>(gFreq.QuadPart);
+	}
+
+	LONGLONG GetServerFrameTickInterval() noexcept
+	{
+		if (gFreq.QuadPart <= 0)
+		{
+			return 0;
+		}
+
+		const LONGLONG frameTickInterval =
+			(gFreq.QuadPart + (kTargetServerFramePerSecond / 2)) / kTargetServerFramePerSecond;
+		return (frameTickInterval > 0) ? frameTickInterval : 1;
 	}
 
 	void SetDirectionInfo(
@@ -393,6 +406,43 @@ void InitializeGameCacheInternal() noexcept
 
 		FlushPacketBatch(currentSession, &currentSessionBatch);
 	}
+
+	void RunUpdateTick(LONGLONG currentMoveTick) noexcept
+	{
+		ProcessPendingDeadCharacters();
+
+		const ULONGLONG currentSystemTick = GetTickCount64();
+		if (gLastTimeoutCheckTick == 0 || currentSystemTick - gLastTimeoutCheckTick >= 1000)
+		{
+			gLastTimeoutCheckTick = currentSystemTick;
+			ProcessTimeoutSessions(currentSystemTick);
+		}
+
+		for (std::size_t index = 0; index < gMovingCharacters.size();)
+		{
+			Character* pCharacter = gMovingCharacters[index];
+
+			if (pCharacter == nullptr || !IsTrackedMoveAction(pCharacter->action))
+			{
+				RemoveTrackedCharacterAt(gMovingCharacters, index, &Character::movingCharacterIndex);
+				continue;
+			}
+
+			Session* currentSession = FindActiveSession(pCharacter);
+			if (currentSession == nullptr)
+			{
+				RemoveTrackedCharacterAt(gMovingCharacters, index, &Character::movingCharacterIndex);
+				continue;
+			}
+
+			if (AdvanceCharacterByTime(pCharacter, currentMoveTick))
+			{
+				UpdateCharacterSector(pCharacter, currentSession);
+			}
+
+			++index;
+		}
+	}
 }
 
 void InitializeGameCache() noexcept
@@ -545,54 +595,36 @@ void UpdateCharacterSector(Character* pCharacter, Session* currentSession) noexc
 
 }
 
-bool Update() noexcept
+int Update() noexcept
 {
-    QueryPerformanceCounter(&gFrameEndTick);
-    const double elapsed = GetElapsedSeconds(gFrameStartTick.QuadPart, gFrameEndTick.QuadPart);
+	QueryPerformanceCounter(&gFrameEndTick);
 
-    if (elapsed <= kServerFrameSeconds)
-    {
-        return false;
-    }
-
-    gFrameStartTick = gFrameEndTick;
-    const LONGLONG currentMoveTick = gFrameEndTick.QuadPart;
-
-	ProcessPendingDeadCharacters();
-
-	const ULONGLONG currentSystemTick = GetTickCount64();
-	if (gLastTimeoutCheckTick == 0 || currentSystemTick - gLastTimeoutCheckTick >= 1000)
+	const LONGLONG frameTickInterval = GetServerFrameTickInterval();
+	if (frameTickInterval <= 0)
 	{
-		gLastTimeoutCheckTick = currentSystemTick;
-		ProcessTimeoutSessions(currentSystemTick);
+		return 0;
 	}
 
-	for (std::size_t index = 0; index < gMovingCharacters.size();)
+	if (gFrameStartTick.QuadPart == 0)
 	{
-		Character* pCharacter = gMovingCharacters[index];
-
-		if (pCharacter == nullptr || !IsTrackedMoveAction(pCharacter->action))
-		{
-			RemoveTrackedCharacterAt(gMovingCharacters, index, &Character::movingCharacterIndex);
-			continue;
-		}
-
-		Session* currentSession = FindActiveSession(pCharacter);
-		if (currentSession == nullptr)
-		{
-			RemoveTrackedCharacterAt(gMovingCharacters, index, &Character::movingCharacterIndex);
-			continue;
-		}
-
-		if (AdvanceCharacterByTime(pCharacter, currentMoveTick))
-		{
-			UpdateCharacterSector(pCharacter, currentSession);
-		}
-
-		++index;
+		gFrameStartTick = gFrameEndTick;
+		return 0;
 	}
 
-    return true;
+	if ((gFrameEndTick.QuadPart - gFrameStartTick.QuadPart) < frameTickInterval)
+	{
+		return 0;
+	}
+
+	int updatedFrameCount = 0;
+	while ((gFrameEndTick.QuadPart - gFrameStartTick.QuadPart) >= frameTickInterval)
+	{
+		gFrameStartTick.QuadPart += frameTickInterval;
+		RunUpdateTick(gFrameStartTick.QuadPart);
+		++updatedFrameCount;
+	}
+
+	return updatedFrameCount;
 }
 
 bool MoveCheck(BYTE direction, int x, int y) noexcept

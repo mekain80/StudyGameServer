@@ -32,7 +32,7 @@ public:
     void OnPlayerSpawned() noexcept;
     void OnPlayerReleased() noexcept;
     void OnLoop() noexcept;
-    void OnFrame() noexcept;
+    void OnFrame(LONG frameCount = 1) noexcept;
     void OnAccept() noexcept;
     void OnRecv() noexcept;
     void OnSend() noexcept;

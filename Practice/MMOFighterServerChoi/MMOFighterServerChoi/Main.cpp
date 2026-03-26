@@ -80,9 +80,10 @@ int _tmain(int argc, _TCHAR* argv[])
         gServerMonitor.OnLoop();
         NetIOProcess();     // Wait only for the first select batch until the next update tick.
         FlushDisconnectedSessions();
-        if (Update())       // Run one game update tick.
+        const int updatedFrameCount = Update();
+        if (updatedFrameCount > 0)
         {
-            gServerMonitor.OnFrame();
+            gServerMonitor.OnFrame(updatedFrameCount);
         }
         FlushDisconnectedSessions();
 

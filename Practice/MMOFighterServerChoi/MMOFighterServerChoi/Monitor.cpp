@@ -101,9 +101,14 @@ void ServerMonitor::OnLoop() noexcept
     InterlockedIncrement(&m_loopCount);
 }
 
-void ServerMonitor::OnFrame() noexcept
+void ServerMonitor::OnFrame(LONG frameCount) noexcept
 {
-    InterlockedIncrement(&m_fps);
+    if (frameCount <= 0)
+    {
+        return;
+    }
+
+    InterlockedExchangeAdd(&m_fps, frameCount);
 }
 
 void ServerMonitor::OnAccept() noexcept
