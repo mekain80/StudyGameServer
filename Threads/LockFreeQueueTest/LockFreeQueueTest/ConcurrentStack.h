@@ -2,10 +2,13 @@
 
 #include <atomic>
 #include <cstdio>
+#include <type_traits>
 #include <vector>
 #include <windows.h>
 
-extern std::vector<char[64]> debugging;
+#include "SimpleMemoryPool.h"
+
+extern std::vector<char[128]> debugging;
 extern std::atomic<int> debugCnt;
 
 template <typename T>
@@ -32,14 +35,14 @@ public:
         while (node != nullptr)
         {
             Node* next = node->next;
-            delete node;
+            _nodePool.Free(node);
             node = next;
         }
     }
 
     void Push(const T& value)
     {
-        Node* newNode = new Node(value);
+        Node* newNode = _nodePool.Alloc(value);
 
         while (true)
         {
@@ -47,13 +50,21 @@ public:
             WriteDebugLog(SnapshotNode(oldHead), "Push head loaded");
 
             newNode->next = oldHead;
-            WriteDebugPairLog(SnapshotNode(oldHead), SnapshotNode(newNode, newNode->next), "Push link old/new");
+            WriteDebugPairValueLog(
+                SnapshotNode(oldHead),
+                SnapshotNode(newNode, newNode->next),
+                newNode->data,
+                "Push link old/new");
 
             Node* observedHead = CompareExchangeHead(newNode, oldHead);
 
             if (observedHead == oldHead)
             {
-                WriteDebugPairLog(SnapshotNode(oldHead), SnapshotNode(newNode, newNode->next), "Push CAS ok old/new");
+                WriteDebugPairValueLog(
+                    SnapshotNode(oldHead),
+                    SnapshotNode(newNode, newNode->next),
+                    newNode->data,
+                    "Push CAS ok old/new");
                 return;
             }
 
@@ -86,9 +97,14 @@ public:
 
             if (observedHead == oldHead)
             {
-                WriteDebugPairLog(SnapshotNode(oldHead, next), SnapshotNode(next), "Pop CAS ok old/next");
-                value = oldHead->data;
-                delete oldHead;
+                const T poppedValue = oldHead->data;
+                WriteDebugPairValueLog(
+                    SnapshotNode(oldHead, next),
+                    SnapshotNode(next),
+                    poppedValue,
+                    "Pop CAS ok old/next");
+                value = poppedValue;
+                _nodePool.Free(oldHead);
                 return true;
             }
 
@@ -226,6 +242,101 @@ private:
             stage);
     }
 
+    static void FormatValueText(const T& value, char* buffer, size_t bufferCount)
+    {
+        if constexpr (std::is_integral_v<T> || std::is_enum_v<T>)
+        {
+            sprintf_s(buffer, bufferCount, "%lld", static_cast<long long>(value));
+        }
+        else if constexpr (std::is_floating_point_v<T>)
+        {
+            sprintf_s(buffer, bufferCount, "%.3f", static_cast<double>(value));
+        }
+        else if constexpr (std::is_pointer_v<T>)
+        {
+            sprintf_s(buffer, bufferCount, "%p", value);
+        }
+        else
+        {
+            strcpy_s(buffer, bufferCount, "?");
+        }
+    }
+
+    static void WriteDebugPairValueLog(
+        const DebugNodeSnapshot& first,
+        const DebugNodeSnapshot& second,
+        const T& value,
+        const char* stage)
+    {
+        const int index = debugCnt.fetch_add(1, std::memory_order_relaxed);
+
+        if (index < 0 || index >= static_cast<int>(debugging.size()))
+        {
+            return;
+        }
+
+        char valueText[32] = {};
+        FormatValueText(value, valueText, _countof(valueText));
+
+        const DWORD threadDigit = GetCurrentThreadId() % 10;
+
+        if (first.hasNext && second.hasNext)
+        {
+            sprintf_s(
+                debugging[index],
+                _countof(debugging[index]),
+                "[T%lu] A=%06X(%06X) B=%06X(%06X) V=%s %s",
+                threadDigit,
+                PointerSuffix(first.node),
+                PointerSuffix(first.next),
+                PointerSuffix(second.node),
+                PointerSuffix(second.next),
+                valueText,
+                stage);
+            return;
+        }
+
+        if (first.hasNext)
+        {
+            sprintf_s(
+                debugging[index],
+                _countof(debugging[index]),
+                "[T%lu] A=%06X(%06X) B=%06X(------) V=%s %s",
+                threadDigit,
+                PointerSuffix(first.node),
+                PointerSuffix(first.next),
+                PointerSuffix(second.node),
+                valueText,
+                stage);
+            return;
+        }
+
+        if (second.hasNext)
+        {
+            sprintf_s(
+                debugging[index],
+                _countof(debugging[index]),
+                "[T%lu] A=%06X(------) B=%06X(%06X) V=%s %s",
+                threadDigit,
+                PointerSuffix(first.node),
+                PointerSuffix(second.node),
+                PointerSuffix(second.next),
+                valueText,
+                stage);
+            return;
+        }
+
+        sprintf_s(
+            debugging[index],
+            _countof(debugging[index]),
+            "[T%lu] A=%06X(------) B=%06X(------) V=%s %s",
+            threadDigit,
+            PointerSuffix(first.node),
+            PointerSuffix(second.node),
+            valueText,
+            stage);
+    }
+
     static LONG64 EncodeNode(Node* node) noexcept
     {
         return static_cast<LONG64>(reinterpret_cast<LONG_PTR>(node));
@@ -246,6 +357,7 @@ private:
         return DecodeNode(InterlockedCompareExchange64(&_head, EncodeNode(exchange), EncodeNode(comparand)));
     }
 
+    SimpleMemoryPool<Node> _nodePool;
     volatile LONG64 _head = 0;
 };
 

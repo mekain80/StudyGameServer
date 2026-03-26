@@ -6,7 +6,7 @@
 
 #include "ConcurrentStack.h"
 
-std::vector<char[64]> debugging(100'0000);
+std::vector<char[128]> debugging(100'0000);
 std::atomic<int> debugCnt = 0;
 
 namespace
@@ -18,7 +18,7 @@ namespace
     };
 
     constexpr TestCase kSelectedTestCase = TestCase::AbaSmallLoop;
-    constexpr int kThreadCount = 4;
+    constexpr int kThreadCount = 2;
     constexpr int kAbaLoopCount = 2;
     constexpr int kUafPrefillCount = 10000;
 
@@ -32,14 +32,14 @@ namespace
         {
             for (int i = 0; i < kAbaLoopCount; ++i)
             {
-                int data = i;
-                g_Stack.push(data);
+                int data = 0;
+                g_Stack.pop(&data);
             }
 
             for (int i = 0; i < kAbaLoopCount; ++i)
             {
-                int data = 0;
-                g_Stack.pop(&data);
+                int data = i;
+                g_Stack.push(data);
             }
         }
 
@@ -90,6 +90,11 @@ namespace
     {
         std::cout << "[TC] ABA small-loop test\n";
         std::cout << "thread count: " << kThreadCount << ", push/pop count: " << kAbaLoopCount << '\n';
+
+        g_Stack.push(100);
+        g_Stack.push(200);
+        g_Stack.push(300);
+
         return StartWorkers(&AbaWorker);
     }
 
