@@ -6,6 +6,7 @@
 #include "Game.h"
 #include "GameInfo.h"
 #include "Log.h"
+#include "Monitor.h"
 #include "PacketControl.h"
 #include "Protocol.h"
 #include "Proxy.h"
@@ -471,6 +472,7 @@ void NetProc_Accept() noexcept
 		_LOG(LOG_LEVEL_ERROR, L"session alloc fail");
 		return;
 	}
+	gServerMonitor.OnSessionAccepted();
 
 	Character* character = SpawnCharacter(session);
 	if (character == nullptr)
@@ -480,14 +482,17 @@ void NetProc_Accept() noexcept
 		RemoveActiveSession(session);
 		closesocket(session->socket);
 		session->socket = INVALID_SOCKET;
+		gServerMonitor.OnSessionReleased();
 		FreeSession(session);
 		_LOG(LOG_LEVEL_ERROR, L"character alloc fail");
 		return;
 	}
+	gServerMonitor.OnPlayerSpawned();
 
 	SendMyCharacterState(session, character);
 	SendNearbyCharactersToNewSession(session, character);
 	BroadcastNewCharacter(session, character);
+	gServerMonitor.OnAccept();
 }
 
 bool NetProc_Recv(Session* pSession) noexcept
@@ -528,7 +533,7 @@ bool NetProc_Recv(Session* pSession) noexcept
 			if (err == WSAECONNRESET || err == WSAECONNABORTED ||
 				err == WSAENETRESET || err == WSAESHUTDOWN || err == WSAENOTCONN)
 			{
-				_LOG(LOG_LEVEL_ERROR, L"WSAGetLastError # SessionID:%d    WSA NUM:%d", pSession->sessionID, err);
+				// _LOG(LOG_LEVEL_ERROR, L"WSAGetLastError # SessionID:%d    WSA NUM:%d", pSession->sessionID, err);
 				Disconnect(pSession, L"recv socket error");
 				return false;
 			}
@@ -557,6 +562,7 @@ bool NetProc_Recv(Session* pSession) noexcept
 	{
 		return true;
 	}
+	gServerMonitor.OnRecv();
 
 	while (true)
 	{
@@ -661,6 +667,7 @@ bool NetProc_Recv(Session* pSession) noexcept
 
 bool NetProc_Send(Session* pSession) noexcept
 {
+	bool sentAnyData = false;
 	while (true)
 	{
 		const std::size_t useSize = pSession->sendQ.GetUseSize();
@@ -693,6 +700,10 @@ bool NetProc_Send(Session* pSession) noexcept
 			int err = WSAGetLastError();
 			if (err == WSAEWOULDBLOCK)
 			{
+				if (sentAnyData)
+				{
+					gServerMonitor.OnSend();
+				}
 				return true;
 			}
 
@@ -712,6 +723,13 @@ bool NetProc_Send(Session* pSession) noexcept
 			Disconnect(pSession, L"sendQ move front fail");
 			return false;
 		}
+
+		sentAnyData = true;
+	}
+
+	if (sentAnyData)
+	{
+		gServerMonitor.OnSend();
 	}
 
 	RemoveWritableSession(pSession);

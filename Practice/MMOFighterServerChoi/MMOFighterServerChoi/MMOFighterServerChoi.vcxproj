@@ -23,6 +23,7 @@
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Log.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Monitor.cpp" />
     <ClCompile Include="Network.cpp" />
     <ClCompile Include="PacketControl.cpp" />
     <ClCompile Include="Protocol.cpp" />
@@ -47,6 +48,7 @@
     <ClInclude Include="GameInfo.h" />
     <ClInclude Include="Log.h" />
     <ClInclude Include="MemoryPool.h" />
+    <ClInclude Include="Monitor.h" />
     <ClInclude Include="Network.h" />
     <ClInclude Include="PacketControl.h" />
     <ClInclude Include="Profiler.h" />
@@ -138,8 +140,8 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <Optimization>Disabled</Optimization>
-      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <Optimization>MaxSpeed</Optimization>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -171,8 +173,8 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <Optimization>Disabled</Optimization>
-      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <Optimization>MaxSpeed</Optimization>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>

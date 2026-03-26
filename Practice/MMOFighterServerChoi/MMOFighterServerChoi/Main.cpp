@@ -1,17 +1,48 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 
 #include <WS2tcpip.h>
+#include <process.h>
 #include <stdio.h>
 #include <tchar.h>
 
 #include "Game.h"
 #include "GameInfo.h"
 #include "Log.h"
+#include "Monitor.h"
 #include "Network.h"
 #include "Protocol.h"
 #include "Sector.h"
 #include "ServerControl.h"
 #include "PacketControl.h"
+
+namespace
+{
+    volatile LONG gMonitorThreadRunning = FALSE;
+
+    unsigned int __stdcall MonitoringThreadFunc(void*)
+    {
+        DWORD nextTick = timeGetTime();
+        while (InterlockedCompareExchange(&gMonitorThreadRunning, 0, 0) != FALSE)
+        {
+            const DWORD currentTick = timeGetTime();
+            const DWORD elapsed = currentTick - nextTick;
+            if (elapsed < 1000)
+            {
+                Sleep(1000 - elapsed);
+            }
+
+            if (InterlockedCompareExchange(&gMonitorThreadRunning, 0, 0) == FALSE)
+            {
+                break;
+            }
+
+            gServerMonitor.Tick();
+            nextTick += 1000;
+        }
+
+        return 0;
+    }
+}
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -27,35 +58,49 @@ int _tmain(int argc, _TCHAR* argv[])
     InitializeProtocolCache();
     InitializeSectorCache();
     InitializeGameCache();
-    NetStartUp(); // 네트워크 초기화, 리슨소켓 생성 및 listen
+    NetStartUp(); // Initialize networking and create the listen socket.
 
-    ULONGLONG monitorTick = GetTickCount64();
-    unsigned int frameCount = 0;
-    unsigned int loopCount = 0;
+    HANDLE monitorThread = nullptr;
+    if (!gShutdown)
+    {
+        gServerMonitor.Initialize();
+        InterlockedExchange(&gMonitorThreadRunning, TRUE);
+        monitorThread = reinterpret_cast<HANDLE>(_beginthreadex(nullptr, 0, MonitoringThreadFunc, nullptr, 0, nullptr));
+        if (monitorThread == nullptr)
+        {
+            InterlockedExchange(&gMonitorThreadRunning, FALSE);
+            _LOG(LOG_LEVEL_ERROR, L"monitor thread create fail");
+        }
+    }
+
+    ULONGLONG controlTick = GetTickCount64();
 
     while (!gShutdown)
     {
-        ++loopCount;
-        NetIOProcess();     // 첫 select 배치만 다음 업데이트 시점까지 대기
+        gServerMonitor.OnLoop();
+        NetIOProcess();     // Wait only for the first select batch until the next update tick.
         FlushDisconnectedSessions();
-        if (Update())       // 게임 로직 업데이트
+        if (Update())       // Run one game update tick.
         {
-            ++frameCount;
+            gServerMonitor.OnFrame();
         }
         FlushDisconnectedSessions();
-        
 
         const ULONGLONG currentTick = GetTickCount64();
-        if (currentTick - monitorTick >= 1000)
+        if (currentTick - controlTick >= 1000)
         {
-            _LOG(LOG_LEVEL_SYSTEM, L"Frame : %u  Loop : %u", frameCount, loopCount);
-            frameCount = 0;
-            loopCount = 0;
-            monitorTick = currentTick;
+            controlTick = currentTick;
 
-            // 부하 때문에 1초에 한번만 되도록 수정
-            ServerControl();    // 키보드 입력을 통해서 서버를 제어할 경우 사용
+            // Check keyboard control once per second to keep the main loop light.
+            ServerControl();
         }
+    }
+
+    InterlockedExchange(&gMonitorThreadRunning, FALSE);
+    if (monitorThread != nullptr)
+    {
+        WaitForSingleObject(monitorThread, 1500);
+        CloseHandle(monitorThread);
     }
 
     NetEnd();

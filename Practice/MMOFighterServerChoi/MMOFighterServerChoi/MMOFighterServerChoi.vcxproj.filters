@@ -36,6 +36,9 @@
     <ClCompile Include="Log.cpp">
       <Filter>Util</Filter>
     </ClCompile>
+    <ClCompile Include="Monitor.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
     <ClCompile Include="Network.cpp">
       <Filter>Network</Filter>
     </ClCompile>
@@ -84,6 +87,9 @@
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="Log.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Monitor.h">
       <Filter>Util</Filter>
     </ClInclude>
     <ClInclude Include="Network.h">

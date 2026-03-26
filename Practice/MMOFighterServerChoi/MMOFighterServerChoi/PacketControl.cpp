@@ -7,6 +7,7 @@
 #include "Proxy.h"
 #include "Character.h"
 #include "Game.h"
+#include "Monitor.h"
 #include "Sector.h"
 
 namespace
@@ -292,10 +293,12 @@ void FlushDisconnectedSessions() noexcept
             gCharacterMap.erase(pCharacter->sessionID);
             pCharacter->session = nullptr;
             RemoveCharacterFromUpdateTracking(pCharacter);
+            gServerMonitor.OnPlayerReleased();
             FreeCharacter(pCharacter);
         }
 
         RemoveActiveSession(pSession);
+        gServerMonitor.OnSessionReleased();
         FreeSession(pSession);
     }
 

@@ -1,7 +1,8 @@
-﻿#pragma once
+#pragma once
 
 #pragma comment(lib, "ws2_32")
 #pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "psapi.lib")
 
 #include <iostream>
 #include <WinSock2.h>
