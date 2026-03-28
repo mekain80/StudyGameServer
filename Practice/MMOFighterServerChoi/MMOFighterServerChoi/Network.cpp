@@ -450,49 +450,62 @@ void NetIOProcess() noexcept
 
 void NetProc_Accept() noexcept
 {
-	SOCKADDR_IN clientAddr{};
-	int addrlen = sizeof(clientAddr);
+	constexpr int kAcceptBudget = 256; // 한 루프에 너무 오래 머물지 않도록 상한
 
-	SOCKET clientSocket = accept(gListenSocket, reinterpret_cast<SOCKADDR*>(&clientAddr), &addrlen);
-	if (clientSocket == INVALID_SOCKET)
+	for (int i = 0; i < kAcceptBudget; ++i)
 	{
-		_LOG(LOG_LEVEL_ERROR, L"clientSocket accept fail");
-		return;
-	}
+		SOCKADDR_IN clientAddr{};
+		int addrlen = sizeof(clientAddr);
 
-	if (!ConfigureAcceptedSocket(clientSocket))
-	{
-		return;
-	}
+		SOCKET clientSocket =
+			accept(gListenSocket, reinterpret_cast<SOCKADDR*>(&clientAddr), &addrlen);
 
-	Session* session = CreateSession(clientSocket, clientAddr);
-	if (session == nullptr)
-	{
-		closesocket(clientSocket);
-		_LOG(LOG_LEVEL_ERROR, L"session alloc fail");
-		return;
-	}
-	gServerMonitor.OnSessionAccepted();
+		if (clientSocket == INVALID_SOCKET)
+		{
+			const int err = WSAGetLastError();
+			if (err == WSAEWOULDBLOCK)
+				break; // 지금 처리할 신규 접속 없음
 
-	Character* character = SpawnCharacter(session);
-	if (character == nullptr)
-	{
-		gSessionIdMap.erase(session->sessionID);
-		gSessionMap.erase(session->socket);
-		RemoveActiveSession(session);
-		closesocket(session->socket);
-		session->socket = INVALID_SOCKET;
-		gServerMonitor.OnSessionReleased();
-		FreeSession(session);
-		_LOG(LOG_LEVEL_ERROR, L"character alloc fail");
-		return;
-	}
-	gServerMonitor.OnPlayerSpawned();
+			_LOG(LOG_LEVEL_ERROR, L"clientSocket accept fail # WSA:%d", err);
+			break;
+		}
 
-	SendMyCharacterState(session, character);
-	SendNearbyCharactersToNewSession(session, character);
-	BroadcastNewCharacter(session, character);
-	gServerMonitor.OnAccept();
+		if (!ConfigureAcceptedSocket(clientSocket))
+		{
+			// ConfigureAcceptedSocket 내부에서 실패 시 close 처리
+			continue;
+		}
+
+		Session* session = CreateSession(clientSocket, clientAddr);
+		if (session == nullptr)
+		{
+			closesocket(clientSocket);
+			_LOG(LOG_LEVEL_ERROR, L"session alloc fail");
+			continue;
+		}
+
+		gServerMonitor.OnSessionAccepted();
+
+		Character* character = SpawnCharacter(session);
+		if (character == nullptr)
+		{
+			gSessionIdMap.erase(session->sessionID);
+			gSessionMap.erase(session->socket);
+			RemoveActiveSession(session);
+			closesocket(session->socket);
+			session->socket = INVALID_SOCKET;
+			gServerMonitor.OnSessionReleased();
+			FreeSession(session);
+			_LOG(LOG_LEVEL_ERROR, L"character alloc fail");
+			continue;
+		}
+
+		gServerMonitor.OnPlayerSpawned();
+		SendMyCharacterState(session, character);
+		SendNearbyCharactersToNewSession(session, character);
+		BroadcastNewCharacter(session, character);
+		gServerMonitor.OnAccept();
+	}
 }
 
 bool NetProc_Recv(Session* pSession) noexcept
