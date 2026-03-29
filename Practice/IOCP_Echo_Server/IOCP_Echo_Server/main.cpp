@@ -1,11 +1,11 @@
 #include "Common.h"
 
-#include "CLogger.h"
+#include "Logger.h"
 #include "EchoServer.h"
 
 int main()
 {
-	g_Logger = CLogger::GetInstance();
+	g_Logger = Logger::GetInstance();
 	g_Logger->SetDirectory(L"LogFile");
 	g_Logger->SetLogLevel(LOG_LEVEL::DEBUG);
 

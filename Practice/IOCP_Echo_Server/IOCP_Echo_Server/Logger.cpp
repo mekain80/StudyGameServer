@@ -1,24 +1,24 @@
-#include "CLogger.h"
+#include "Logger.h"
 
 #include <ctime>
 #include <cwchar>
 #include <share.h>
 #include <strsafe.h>
 
-CLogger* g_Logger = nullptr;
+Logger* g_Logger = nullptr;
 
 namespace
 {
 	WCHAR g_MessageBuf[10000] = {};
 }
 
-CLogger* CLogger::GetInstance() noexcept
+Logger* Logger::GetInstance() noexcept
 {
-	static CLogger logger;
+	static Logger logger;
 	return &logger;
 }
 
-CLogger::CLogger() noexcept
+Logger::Logger() noexcept
 	: m_lock()
 	, m_LogCount(0)
 	, m_LogLevel(LOG_LEVEL::DEBUG)
@@ -27,7 +27,7 @@ CLogger::CLogger() noexcept
 	InitializeSRWLock(&m_lock);
 }
 
-void CLogger::WriteLog(const WCHAR* type, LOG_LEVEL logLevel, const WCHAR* fmt, ...)
+void Logger::WriteLog(const WCHAR* type, LOG_LEVEL logLevel, const WCHAR* fmt, ...)
 {
 	if (m_LogLevel > logLevel || type == nullptr || fmt == nullptr)
 	{
@@ -119,7 +119,7 @@ void CLogger::WriteLog(const WCHAR* type, LOG_LEVEL logLevel, const WCHAR* fmt, 
 	UnLock();
 }
 
-void CLogger::WriteLogHex(const WCHAR* type, LOG_LEVEL logLevel, const WCHAR* log, BYTE* pByte, int byteLen)
+void Logger::WriteLogHex(const WCHAR* type, LOG_LEVEL logLevel, const WCHAR* log, BYTE* pByte, int byteLen)
 {
 	if (type == nullptr || log == nullptr || pByte == nullptr || byteLen <= 0)
 	{
@@ -137,7 +137,7 @@ void CLogger::WriteLogHex(const WCHAR* type, LOG_LEVEL logLevel, const WCHAR* lo
 	WriteLog(type, logLevel, L"%s", g_MessageBuf);
 }
 
-void CLogger::WriteLogConsole(LOG_LEVEL logLevel, const WCHAR* fmt, ...)
+void Logger::WriteLogConsole(LOG_LEVEL logLevel, const WCHAR* fmt, ...)
 {
 	if (m_LogLevel > logLevel || fmt == nullptr)
 	{

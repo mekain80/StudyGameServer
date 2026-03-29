@@ -1,6 +1,6 @@
 #include "EchoServer.h"
 
-#include "CLogger.h"
+#include "Logger.h"
 #include "SerializedBuffer.h"
 
 bool EchoServer::OnConnectionRequest(const WCHAR* ip, USHORT port)

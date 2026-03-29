@@ -10,10 +10,10 @@ enum class LOG_LEVEL
 	ERR
 };
 
-class CLogger
+class Logger
 {
 public:
-	static CLogger* GetInstance() noexcept;
+	static Logger* GetInstance() noexcept;
 
 	void WriteLog(const WCHAR* type, LOG_LEVEL logLevel, const WCHAR* fmt, ...);
 	void WriteLogHex(const WCHAR* type, LOG_LEVEL logLevel, const WCHAR* log, BYTE* pByte, int byteLen);
@@ -35,14 +35,14 @@ public:
 		m_LogLevel = logLevel;
 	}
 
-	CLogger(const CLogger&) = delete;
-	CLogger& operator=(const CLogger&) = delete;
-	CLogger(CLogger&&) = delete;
-	CLogger& operator=(CLogger&&) = delete;
+	Logger(const Logger&) = delete;
+	Logger& operator=(const Logger&) = delete;
+	Logger(Logger&&) = delete;
+	Logger& operator=(Logger&&) = delete;
 
 private:
-	CLogger() noexcept;
-	~CLogger() noexcept = default;
+	Logger() noexcept;
+	~Logger() noexcept = default;
 
 	void Lock() noexcept
 	{
@@ -61,4 +61,4 @@ private:
 	const WCHAR* m_directoryName;
 };
 
-extern CLogger* g_Logger;
+extern Logger* g_Logger;

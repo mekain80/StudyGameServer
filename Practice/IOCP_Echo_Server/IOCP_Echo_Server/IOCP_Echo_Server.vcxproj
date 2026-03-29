@@ -130,7 +130,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\RingBuffer\RingBuffer\RingBuffer.cpp" />
-    <ClCompile Include="CLogger.cpp" />
+    <ClCompile Include="Logger.cpp" />
     <ClCompile Include="EchoServer.cpp" />
     <ClCompile Include="LanServer.cpp" />
     <ClCompile Include="main.cpp" />
@@ -141,7 +141,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\MemoryPool\MemoryPool\MemoryPool.h" />
     <ClInclude Include="..\..\RingBuffer\RingBuffer\RingBuffer.h" />
-    <ClInclude Include="CLogger.h" />
+    <ClInclude Include="Logger.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="DefineServer.h" />
     <ClInclude Include="EchoServer.h" />

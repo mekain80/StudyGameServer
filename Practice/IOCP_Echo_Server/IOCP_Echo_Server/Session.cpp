@@ -1,7 +1,7 @@
 #include "Session.h"
 
-#include "CLogger.h"
 #include "LanServer.h"
+#include "Logger.h"
 
 Session::Session()
 	: mSocket(INVALID_SOCKET)

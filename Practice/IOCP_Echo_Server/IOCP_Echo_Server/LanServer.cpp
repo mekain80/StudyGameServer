@@ -1,6 +1,6 @@
 #include "LanServer.h"
 
-#include "CLogger.h"
+#include "Logger.h"
 #include "DefineServer.h"
 #include "SerializedBuffer.h"
 #include "Session.h"
