@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <cstdlib>
 #include <new>
@@ -9,8 +9,8 @@
 template<typename T>
 struct MemoryPoolNode
 {
-    T Data;
-    ULONG_PTR Next = 0;
+    T data;
+    ULONG_PTR next = 0;
 };
 
 template<typename T>
@@ -52,7 +52,7 @@ inline LFMemoryPool<T>::LFMemoryPool(int initCount, bool placementNewFlag)
         Node* newTop = mPlacementNewFlag ? placementNewAlloc() : newAlloc();
         const ULONG_PTR combinedNewTop = CombineIdentAndAddr(ident, reinterpret_cast<ULONG_PTR>(newTop));
 
-        newTop->Next = static_cast<ULONG_PTR>(mTop);
+        newTop->next = static_cast<ULONG_PTR>(mTop);
         mTop = static_cast<LONG64>(combinedNewTop);
     }
 }
@@ -66,10 +66,10 @@ inline LFMemoryPool<T>::~LFMemoryPool()
 
         if (mPlacementNewFlag)
         {
-            delNode->Data.~T();
+            delNode->data.~T();
         }
 
-        mTop = static_cast<LONG64>(delNode->Next);
+        mTop = static_cast<LONG64>(delNode->next);
         std::free(delNode);
     }
 }
@@ -99,7 +99,7 @@ inline T* LFMemoryPool<T>::Alloc()
             }
 
             node = reinterpret_cast<Node*>(GetAddress(readTop));
-            newTop = node->Next;
+            newTop = node->next;
         } while (InterlockedCompareExchange64(
             &mTop,
             static_cast<LONG64>(newTop),
@@ -111,7 +111,7 @@ inline T* LFMemoryPool<T>::Alloc()
         }
     }
 
-    return &node->Data;
+    return &node->data;
 }
 
 template<typename T>
@@ -126,7 +126,7 @@ inline void LFMemoryPool<T>::Free(T* ptr)
 
     if (mPlacementNewFlag)
     {
-        newTop->Data.~T();
+        newTop->data.~T();
     }
 
     const ULONG_PTR ident = nextIdentifier();
@@ -136,7 +136,7 @@ inline void LFMemoryPool<T>::Free(T* ptr)
     do
     {
         readTop = static_cast<ULONG_PTR>(mTop);
-        newTop->Next = readTop;
+        newTop->next = readTop;
     } while (InterlockedCompareExchange64(
         &mTop,
         static_cast<LONG64>(combinedNewTop),

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <cassert>
 #include <windows.h>
@@ -8,12 +8,12 @@
 
 struct DebugInfo
 {
-    LONG64 Index;
-    DWORD ThreadId;
-    USHORT PushOrPop;
-    USHORT Data;
-    void* TopPtr;
-    void* NewTopPtr;
+    LONG64 index;
+    DWORD threadId;
+    USHORT pushOrPop;
+    USHORT data;
+    void* topPtr;
+    void* newTopPtr;
 };
 
 constexpr int LOG_MAX = 200000;
@@ -21,11 +21,11 @@ constexpr int LOG_MAX = 200000;
 extern DebugInfo logging[LOG_MAX];
 extern LONG64 logIndex;
 
-template<typename TData>
+template<typename T>
 struct StackNode
 {
-    TData Data;
-    ULONG_PTR Next = 0;
+    T data;
+    ULONG_PTR next = 0;
 };
 
 template<typename T, bool UseMemoryPool = TRUE>
@@ -98,12 +98,12 @@ inline void LFStack<T, TRUE>::Push(T data) noexcept
     const ULONG_PTR combinedNewTop = CombineIdentAndAddr(ident, reinterpret_cast<ULONG_PTR>(newTop));
     ULONG_PTR readTop = 0;
 
-    newTop->Data = data;
+    newTop->data = data;
 
     do
     {
         readTop = static_cast<ULONG_PTR>(mTop);
-        newTop->Next = readTop;
+        newTop->next = readTop;
     } while (InterlockedCompareExchange64(
         &mTop,
         static_cast<LONG64>(combinedNewTop),
@@ -125,14 +125,14 @@ inline void LFStack<T, TRUE>::Pop(T* outData) noexcept
     {
         readTop = static_cast<ULONG_PTR>(mTop);
         readTopAddr = reinterpret_cast<Node*>(GetAddress(readTop));
-        newTop = readTopAddr->Next;
+        newTop = readTopAddr->next;
     } while (InterlockedCompareExchange64(
         &mTop,
         static_cast<LONG64>(newTop),
         static_cast<LONG64>(readTop)) != static_cast<LONG64>(readTop));
 
     InterlockedDecrement(&mUseCount);
-    *outData = readTopAddr->Data;
+    *outData = readTopAddr->data;
     mStackNodePool.Free(readTopAddr);
 }
 
@@ -168,12 +168,12 @@ inline void LFStack<T, FALSE>::Push(T data) noexcept
     const ULONG_PTR combinedNewTop = CombineIdentAndAddr(ident, reinterpret_cast<ULONG_PTR>(newTop));
     ULONG_PTR readTop = 0;
 
-    newTop->Data = data;
+    newTop->data = data;
 
     do
     {
         readTop = static_cast<ULONG_PTR>(mTop);
-        newTop->Next = readTop;
+        newTop->next = readTop;
     } while (InterlockedCompareExchange64(
         &mTop,
         static_cast<LONG64>(combinedNewTop),
@@ -198,7 +198,7 @@ inline void LFStack<T, FALSE>::Pop(T* outData)
 
         __try
         {
-            newTop = readTopAddr->Next;
+            newTop = readTopAddr->next;
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
         {
@@ -210,7 +210,7 @@ inline void LFStack<T, FALSE>::Pop(T* outData)
         static_cast<LONG64>(readTop)) != static_cast<LONG64>(readTop));
 
     InterlockedDecrement(&mUseCount);
-    *outData = readTopAddr->Data;
+    *outData = readTopAddr->data;
     delete readTopAddr;
 }
 
