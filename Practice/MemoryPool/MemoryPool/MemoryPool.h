@@ -4,9 +4,20 @@
 #include <cstdlib>
 #include <new>
 
-template <class T>
+template<typename T>
+struct MemoryPoolNode
+{
+	unsigned int BufferGuardFront = 0;
+	T Data;
+	unsigned int BufferGuardEnd = 0;
+	MemoryPoolNode* Next = nullptr;
+};
+
+template<typename T>
 class MemoryPool
 {
+	using Node = MemoryPoolNode<T>;
+
 public:
 	static constexpr unsigned int kDefaultInitSize = 100;
 	static constexpr unsigned int kDefaultMaxSize = static_cast<unsigned int>(-1);
@@ -30,14 +41,6 @@ public:
 	MemoryPool& operator=(MemoryPool&&) = delete;
 
 private:
-	struct Node
-	{
-		unsigned int bufferGuardFront = 0;
-		T data;
-		unsigned int bufferGuardEnd = 0;
-		Node* next = nullptr;
-	};
-
 	bool mIsPlacementNew;
 	unsigned int mBufferGuardValue;
 	unsigned int mSizeInitialize;
@@ -47,7 +50,7 @@ private:
 	unsigned int mUseCount;
 };
 
-template <class T>
+template<typename T>
 inline MemoryPool<T>::MemoryPool(
 	bool placementNew,
 	unsigned int sizeInitialize,
@@ -68,35 +71,35 @@ inline MemoryPool<T>::MemoryPool(
 	for (unsigned int i = 0; i < mSizeInitialize; ++i)
 	{
 		Node* newNode = static_cast<Node*>(std::malloc(sizeof(Node)));
-		newNode->bufferGuardFront = mBufferGuardValue;
-		newNode->bufferGuardEnd = mBufferGuardValue;
+		newNode->BufferGuardFront = mBufferGuardValue;
+		newNode->BufferGuardEnd = mBufferGuardValue;
 		if (mIsPlacementNew == false)
 		{
-			new (&(newNode->data)) T;
+			new (&(newNode->Data)) T;
 		}
-		newNode->next = mFreeNode;
+		newNode->Next = mFreeNode;
 		mFreeNode = newNode;
 		++mCapacity;
 	}
 }
 
-template <class T>
+template<typename T>
 inline MemoryPool<T>::~MemoryPool() noexcept
 {
 	Node* deleteNode = mFreeNode;
 	while (deleteNode != nullptr)
 	{
-		Node* nextNode = deleteNode->next;
+		Node* nextNode = deleteNode->Next;
 		if (mIsPlacementNew == false)
 		{
-			deleteNode->data.~T();
+			deleteNode->Data.~T();
 		}
 		std::free(deleteNode);
 		deleteNode = nextNode;
 	}
 }
 
-template <class T>
+template<typename T>
 inline T* MemoryPool<T>::Alloc(void) noexcept
 {
 	Node* returnNode = nullptr;
@@ -104,10 +107,10 @@ inline T* MemoryPool<T>::Alloc(void) noexcept
 	if (mFreeNode != nullptr)
 	{
 		returnNode = mFreeNode;
-		mFreeNode = mFreeNode->next;
+		mFreeNode = mFreeNode->Next;
 		if (mIsPlacementNew)
 		{
-			new (&(returnNode->data)) T;
+			new (&(returnNode->Data)) T;
 		}
 	}
 	else
@@ -118,18 +121,18 @@ inline T* MemoryPool<T>::Alloc(void) noexcept
 		}
 
 		returnNode = static_cast<Node*>(std::malloc(sizeof(Node)));
-		returnNode->bufferGuardFront = mBufferGuardValue;
-		returnNode->bufferGuardEnd = mBufferGuardValue;
-		returnNode->next = nullptr;
-		new (&(returnNode->data)) T;
+		returnNode->BufferGuardFront = mBufferGuardValue;
+		returnNode->BufferGuardEnd = mBufferGuardValue;
+		returnNode->Next = nullptr;
+		new (&(returnNode->Data)) T;
 		++mCapacity;
 	}
 
 	++mUseCount;
-	return &(returnNode->data);
+	return &(returnNode->Data);
 }
 
-template <class T>
+template<typename T>
 inline bool MemoryPool<T>::Free(T* data) noexcept
 {
 	if (data == nullptr)
@@ -138,20 +141,20 @@ inline bool MemoryPool<T>::Free(T* data) noexcept
 	}
 
 	Node* ptrNode = reinterpret_cast<Node*>(
-		reinterpret_cast<char*>(data) - offsetof(Node, data));
+		reinterpret_cast<char*>(data) - offsetof(Node, Data));
 
-	if (ptrNode->bufferGuardFront != mBufferGuardValue ||
-		ptrNode->bufferGuardEnd != mBufferGuardValue)
+	if (ptrNode->BufferGuardFront != mBufferGuardValue ||
+		ptrNode->BufferGuardEnd != mBufferGuardValue)
 	{
 		return false;
 	}
 
 	if (mIsPlacementNew)
 	{
-		ptrNode->data.~T();
+		ptrNode->Data.~T();
 	}
 
-	ptrNode->next = mFreeNode;
+	ptrNode->Next = mFreeNode;
 	mFreeNode = ptrNode;
 	--mUseCount;
 
