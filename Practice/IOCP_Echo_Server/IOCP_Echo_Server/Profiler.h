@@ -26,14 +26,11 @@ struct profile
 extern profile gProfileArray[PROFILE_MAX_CNT];
 extern LARGE_INTEGER gFreq;
 
-// 하나의 함수 Profiling 시작
-// Parameters: Profiling이름.
 void ProfileBegin(const WCHAR* mName);
 void ProfileEnd(const WCHAR* mName);
 
 // Profiling 된 데이터를 Text 파일로 출력
-//
-// Parameters: (char *)출력될 파일 이름.
+// @param szFileName (char *)출력될 파일 이름.
 void ProfileDataOutText(const WCHAR* szFileName);
 
 // 프로파일링 된 데이터를 모두 초기화
