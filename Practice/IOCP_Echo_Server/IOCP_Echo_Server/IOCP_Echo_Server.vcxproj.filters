@@ -21,6 +21,9 @@
     <ClCompile Include="..\..\RingBuffer\RingBuffer\RingBuffer.cpp">
       <Filter>NetworkLib</Filter>
     </ClCompile>
+    <ClCompile Include="CrashDump.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
     <ClCompile Include="EchoServer.cpp">
       <Filter>Content</Filter>
     </ClCompile>
@@ -47,6 +50,9 @@
     </ClInclude>
     <ClInclude Include="..\..\RingBuffer\RingBuffer\RingBuffer.h">
       <Filter>NetworkLib</Filter>
+    </ClInclude>
+    <ClInclude Include="CrashDump.h">
+      <Filter>Tools</Filter>
     </ClInclude>
     <ClInclude Include="Logger.h">
       <Filter>Tools</Filter>

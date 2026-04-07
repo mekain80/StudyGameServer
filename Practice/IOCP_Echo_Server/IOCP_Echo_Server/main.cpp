@@ -1,10 +1,13 @@
-#include "Common.h"
+﻿#include "Common.h"
 
+#include "CrashDump.h"
 #include "Logger.h"
 #include "EchoServer.h"
 
 int main()
 {
+	CrashDump crashDump;
+
 	g_Logger = Logger::GetInstance();
 	g_Logger->SetDirectory(L"LogFile");
 	g_Logger->SetLogLevel(LOG_LEVEL::DEBUG);
