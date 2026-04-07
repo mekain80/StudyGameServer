@@ -1,5 +1,7 @@
 ﻿#include "stdafx.h"
 
+#include <cstring>
+
 #include "PacketControl.h"
 
 #include "Log.h"
@@ -14,6 +16,51 @@ namespace
 {
     std::vector<Session*> gPendingDisconnects;
     std::vector<Session*> gPendingDisconnectScratch;
+
+    LONG CountEnqueuedPackets(const SerializedBuffer* packet) noexcept
+    {
+        if (packet == nullptr)
+        {
+            return 0;
+        }
+
+        const int dataSize = packet->GetDataSize();
+        if (dataSize <= 0)
+        {
+            return 0;
+        }
+
+        const char* cursor = packet->GetBufferRead();
+        const char* const end = cursor + dataSize;
+        LONG packetCount = 0;
+        while (cursor < end)
+        {
+            const int remain = static_cast<int>(end - cursor);
+            if (remain < static_cast<int>(dfPACKET_HEADER_SIZE))
+            {
+                return (packetCount > 0) ? packetCount : 1;
+            }
+
+            PacketHeader header{};
+            std::memcpy(&header, cursor, sizeof(header));
+
+            if (header.code != dfNETWORK_PACKET_CODE)
+            {
+                return (packetCount > 0) ? packetCount : 1;
+            }
+
+            const int packetSize = static_cast<int>(dfPACKET_HEADER_SIZE) + header.size;
+            if (packetSize <= 0 || remain < packetSize)
+            {
+                return (packetCount > 0) ? packetCount : 1;
+            }
+
+            cursor += packetSize;
+            ++packetCount;
+        }
+
+        return (packetCount > 0) ? packetCount : 1;
+    }
 
     bool IsValidSectorIndex(short sectorX, short sectorY) noexcept
     {
@@ -64,6 +111,8 @@ bool EnqueuePacket(Session* session, const SerializedBuffer* pPacket) noexcept
         Disconnect(session, L"sendQ enqueue 실패");
         return false;
     }
+
+    gServerMonitor.OnSendPacket(CountEnqueuedPackets(pPacket));
 
     if (wasSendQueueEmpty)
     {

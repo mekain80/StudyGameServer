@@ -11,7 +11,9 @@ struct MonitorSnapshot
     LONG fps = 0;
     LONG acceptTps = 0;
     LONG recvTps = 0;
+    LONG recvPacketTps = 0;
     LONG sendTps = 0;
+    LONG sendPacketTps = 0;
     DWORD privateMemoryMb = 0;
     float systemCpuTotal = 0.0f;
     float systemCpuUser = 0.0f;
@@ -35,7 +37,9 @@ public:
     void OnFrame(LONG frameCount = 1) noexcept;
     void OnAccept() noexcept;
     void OnRecv() noexcept;
+    void OnRecvPacket(LONG packetCount = 1) noexcept;
     void OnSend() noexcept;
+    void OnSendPacket(LONG packetCount = 1) noexcept;
 
 private:
     static LONG ReadCounter(volatile LONG* counter) noexcept;
@@ -70,7 +74,9 @@ private:
     volatile LONG m_fps = 0;
     volatile LONG m_acceptTps = 0;
     volatile LONG m_recvTps = 0;
+    volatile LONG m_recvPacketTps = 0;
     volatile LONG m_sendTps = 0;
+    volatile LONG m_sendPacketTps = 0;
 };
 
 extern ServerMonitor gServerMonitor;

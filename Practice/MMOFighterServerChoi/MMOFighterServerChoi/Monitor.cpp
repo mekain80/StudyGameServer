@@ -54,7 +54,9 @@ void ServerMonitor::Tick() noexcept
     snapshot.fps = InterlockedExchange(&m_fps, 0);
     snapshot.acceptTps = InterlockedExchange(&m_acceptTps, 0);
     snapshot.recvTps = InterlockedExchange(&m_recvTps, 0);
+    snapshot.recvPacketTps = InterlockedExchange(&m_recvPacketTps, 0);
     snapshot.sendTps = InterlockedExchange(&m_sendTps, 0);
+    snapshot.sendPacketTps = InterlockedExchange(&m_sendPacketTps, 0);
     snapshot.privateMemoryMb = static_cast<DWORD>(m_memory.PrivateUsage / (1024 * 1024));
     snapshot.systemCpuTotal = m_systemCpuTotal;
     snapshot.systemCpuUser = m_systemCpuUser;
@@ -121,9 +123,29 @@ void ServerMonitor::OnRecv() noexcept
     InterlockedIncrement(&m_recvTps);
 }
 
+void ServerMonitor::OnRecvPacket(LONG packetCount) noexcept
+{
+    if (packetCount <= 0)
+    {
+        return;
+    }
+
+    InterlockedExchangeAdd(&m_recvPacketTps, packetCount);
+}
+
 void ServerMonitor::OnSend() noexcept
 {
     InterlockedIncrement(&m_sendTps);
+}
+
+void ServerMonitor::OnSendPacket(LONG packetCount) noexcept
+{
+    if (packetCount <= 0)
+    {
+        return;
+    }
+
+    InterlockedExchangeAdd(&m_sendPacketTps, packetCount);
 }
 
 void ServerMonitor::UpdateCpuTime() noexcept
@@ -205,14 +227,16 @@ void ServerMonitor::PrintConsole(const MonitorSnapshot& snapshot) const noexcept
 {
     _LOG_CONSOLE(
         LOG_LEVEL_SYSTEM,
-        L"[Monitor] Session:%ld Player:%ld FPS:%ld Loop:%ld AcceptTPS:%ld RecvTPS:%ld SendTPS:%ld",
+        L"[Monitor] Session:%ld Player:%ld FPS:%ld Loop:%ld AcceptTPS:%ld RecvTPS(IO/Packet):%ld/%ld SendTPS(IO/Packet):%ld/%ld",
         snapshot.sessionCount,
         snapshot.playerCount,
         snapshot.fps,
         snapshot.loopCount,
         snapshot.acceptTps,
         snapshot.recvTps,
-        snapshot.sendTps);
+        snapshot.recvPacketTps,
+        snapshot.sendTps,
+        snapshot.sendPacketTps);
     _LOG_CONSOLE(
         LOG_LEVEL_SYSTEM,
         L"[Monitor] CPU(System T/U/K): %.2f / %.2f / %.2f",
@@ -236,14 +260,16 @@ void ServerMonitor::LogUnexpectedFps(const MonitorSnapshot& snapshot) const noex
     _LOG_TYPE(
         L"ServerFPS",
         LOG_LEVEL_SYSTEM,
-        L"FPS:%ld Loop:%ld Session:%ld Player:%ld AcceptTPS:%ld RecvTPS:%ld SendTPS:%ld",
+        L"FPS:%ld Loop:%ld Session:%ld Player:%ld AcceptTPS:%ld RecvTPS(IO/Packet):%ld/%ld SendTPS(IO/Packet):%ld/%ld",
         snapshot.fps,
         snapshot.loopCount,
         snapshot.sessionCount,
         snapshot.playerCount,
         snapshot.acceptTps,
         snapshot.recvTps,
-        snapshot.sendTps);
+        snapshot.recvPacketTps,
+        snapshot.sendTps,
+        snapshot.sendPacketTps);
 }
 
 void ServerMonitor::LogLowFps(const MonitorSnapshot& snapshot) const noexcept
@@ -252,14 +278,16 @@ void ServerMonitor::LogLowFps(const MonitorSnapshot& snapshot) const noexcept
     _LOG_TYPE(
         L"LowerFPS",
         LOG_LEVEL_SYSTEM,
-        L"Session:%ld Player:%ld FPS:%ld Loop:%ld AcceptTPS:%ld RecvTPS:%ld SendTPS:%ld",
+        L"Session:%ld Player:%ld FPS:%ld Loop:%ld AcceptTPS:%ld RecvTPS(IO/Packet):%ld/%ld SendTPS(IO/Packet):%ld/%ld",
         snapshot.sessionCount,
         snapshot.playerCount,
         snapshot.fps,
         snapshot.loopCount,
         snapshot.acceptTps,
         snapshot.recvTps,
-        snapshot.sendTps);
+        snapshot.recvPacketTps,
+        snapshot.sendTps,
+        snapshot.sendPacketTps);
     _LOG_TYPE(
         L"LowerFPS",
         LOG_LEVEL_SYSTEM,

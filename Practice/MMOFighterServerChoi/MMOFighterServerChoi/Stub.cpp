@@ -5,6 +5,7 @@
 #include "Game.h"
 #include "GameInfo.h"
 #include "Log.h"
+#include "Monitor.h"
 #include "Network.h"
 #include "PacketControl.h"
 #include "Protocol.h"
@@ -233,6 +234,8 @@ namespace
 
 bool PacketProc(Session* pSession, BYTE byPacketType, const char* packetData, WORD packetSize)
 {
+    gServerMonitor.OnRecvPacket();
+
 	switch (byPacketType)
 	{
 	case dfPACKET_CS_MOVE_START:
